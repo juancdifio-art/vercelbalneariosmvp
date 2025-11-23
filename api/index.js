@@ -345,6 +345,104 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/clients (GET/POST) =============
+    if (first === 'clients' && !second) {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        if (method === 'GET') {
+          const result = await db.query(
+            'SELECT * FROM clients WHERE establishment_id = $1 ORDER BY full_name ASC',
+            [establishmentId]
+          );
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({
+            clients: result.rows.map(row => ({
+              id: row.id,
+              fullName: row.full_name,
+              phone: row.phone,
+              email: row.email,
+              notes: row.notes,
+              documentNumber: row.document_number,
+              birthDate: row.birth_date,
+              nationality: row.nationality,
+              addressStreet: row.address_street,
+              addressNeighborhood: row.address_neighborhood,
+              addressPostalCode: row.address_postal_code,
+              addressCity: row.address_city,
+              addressState: row.address_state,
+              addressCountry: row.address_country,
+              vehicleBrand: row.vehicle_brand,
+              vehicleModel: row.vehicle_model,
+              vehiclePlate: row.vehicle_plate,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at
+            }))
+          }));
+        }
+
+        if (method === 'POST') {
+          const body = await parseJsonBody(req);
+          const { fullName, phone, email, notes, documentNumber, birthDate, nationality, addressStreet, addressNeighborhood, addressPostalCode, addressCity, addressState, addressCountry, vehicleBrand, vehicleModel, vehiclePlate } = body;
+
+          if (!fullName || typeof fullName !== 'string' || !fullName.trim()) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'invalid_full_name' }));
+          }
+
+          const insertResult = await db.query(
+            `INSERT INTO clients (establishment_id, full_name, phone, email, notes, document_number, birth_date, nationality, address_street, address_neighborhood, address_postal_code, address_city, address_state, address_country, vehicle_brand, vehicle_model, vehicle_plate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+            [establishmentId, fullName.trim(), phone || null, email || null, notes || null, documentNumber || null, birthDate || null, nationality || null, addressStreet || null, addressNeighborhood || null, addressPostalCode || null, addressCity || null, addressState || null, addressCountry || null, vehicleBrand || null, vehicleModel || null, vehiclePlate || null]
+          );
+
+          const row = insertResult.rows[0];
+          res.statusCode = 201;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({
+            client: {
+              id: row.id,
+              fullName: row.full_name,
+              phone: row.phone,
+              email: row.email,
+              notes: row.notes,
+              documentNumber: row.document_number,
+              birthDate: row.birth_date,
+              nationality: row.nationality,
+              addressStreet: row.address_street,
+              addressNeighborhood: row.address_neighborhood,
+              addressPostalCode: row.address_postal_code,
+              addressCity: row.address_city,
+              addressState: row.address_state,
+              addressCountry: row.address_country,
+              vehicleBrand: row.vehicle_brand,
+              vehicleModel: row.vehicle_model,
+              vehiclePlate: row.vehicle_plate,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at
+            }
+          }));
+        }
+      } catch (error) {
+        console.error('Error with clients:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // ============= /api/reservation-groups (GET) =============
     if (first === 'reservation-groups' && !second && method === 'GET') {
       const user = authenticateToken(req, res);
