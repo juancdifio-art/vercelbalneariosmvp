@@ -1,16 +1,16 @@
-const healthHandler = require('./health');
-const loginHandler = require('./auth/login');
-const registerHandler = require('./auth/register');
-const clientsHandler = require('./clients');
-const clientByIdHandler = require('./clients/[id]');
-const establishmentHandler = require('./establishment');
-const establishmentMeHandler = require('./establishment/me');
-const reservationsHandler = require('./reservations');
-const reservationGroupsHandler = require('./reservation-groups');
-const reservationGroupByIdHandler = require('./reservation-groups/[id]');
-const reservationGroupPaymentsHandler = require('./reservation-groups/[id]/payments');
-const reportPaymentsHandler = require('./reports/payments');
-const reportOccupancyHandler = require('./reports/occupancy');
+const healthHandler = require('./_handlers/health');
+const loginHandler = require('./_handlers/auth/login');
+const registerHandler = require('./_handlers/auth/register');
+const clientsHandler = require('./_handlers/clients');
+const clientByIdHandler = require('./_handlers/clients/[id]');
+const establishmentHandler = require('./_handlers/establishment');
+const establishmentMeHandler = require('./_handlers/establishment/me');
+const reservationsHandler = require('./_handlers/reservations');
+const reservationGroupsHandler = require('./_handlers/reservation-groups');
+const reservationGroupByIdHandler = require('./_handlers/reservation-groups/[id]');
+const reservationGroupPaymentsHandler = require('./_handlers/reservation-groups/[id]/payments');
+const reportPaymentsHandler = require('./_handlers/reports/payments');
+const reportOccupancyHandler = require('./_handlers/reports/occupancy');
 
 module.exports = async (req, res) => {
   try {
