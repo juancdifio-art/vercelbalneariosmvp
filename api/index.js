@@ -243,6 +243,164 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/establishment (POST) =============
+    if (first === 'establishment' && !second && method === 'POST') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const body = await parseJsonBody(req);
+        const { name, hasParking, hasCarpas, hasSombrillas, hasPileta, parkingCapacity, carpasCapacity, sombrillasCapacity, poolMaxOccupancy } = body;
+
+        if (!name || typeof name !== 'string') {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'invalid_name' }));
+        }
+
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+
+        const parkingCap = (parkingCapacity === null || parkingCapacity === undefined || parkingCapacity === '') ? null : parseInt(parkingCapacity, 10);
+        const carpasCap = (carpasCapacity === null || carpasCapacity === undefined || carpasCapacity === '') ? null : parseInt(carpasCapacity, 10);
+        const sombrillasCap = (sombrillasCapacity === null || sombrillasCapacity === undefined || sombrillasCapacity === '') ? null : parseInt(sombrillasCapacity, 10);
+        const poolCap = (poolMaxOccupancy === null || poolMaxOccupancy === undefined || poolMaxOccupancy === '') ? null : parseInt(poolMaxOccupancy, 10);
+
+        let result;
+        if (estResult.rows.length === 0) {
+          result = await db.query(
+            'INSERT INTO establishments (user_id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *',
+            [user.id, name, Boolean(hasParking), Boolean(hasCarpas), Boolean(hasSombrillas), Boolean(hasPileta), parkingCap, carpasCap, sombrillasCap, poolCap]
+          );
+        } else {
+          result = await db.query(
+            'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9 WHERE user_id = $10 RETURNING *',
+            [name, Boolean(hasParking), Boolean(hasCarpas), Boolean(hasSombrillas), Boolean(hasPileta), parkingCap, carpasCap, sombrillasCap, poolCap, user.id]
+          );
+        }
+
+        const row = result.rows[0];
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          establishment: {
+            id: row.id,
+            name: row.name,
+            hasParking: row.has_parking,
+            hasCarpas: row.has_carpas,
+            hasSombrillas: row.has_sombrillas,
+            hasPileta: row.has_pileta,
+            parkingCapacity: row.parking_capacity,
+            carpasCapacity: row.carpas_capacity,
+            sombrillasCapacity: row.sombrillas_capacity,
+            poolMaxOccupancy: row.pool_max_occupancy
+          }
+        }));
+      } catch (error) {
+        console.error('Error saving establishment:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/establishment/me (GET) =============
+    if (first === 'establishment' && second === 'me' && method === 'GET') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const result = await db.query(
+          'SELECT * FROM establishments WHERE user_id = $1',
+          [user.id]
+        );
+
+        if (result.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'not_found' }));
+        }
+
+        const row = result.rows[0];
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          establishment: {
+            id: row.id,
+            name: row.name,
+            hasParking: row.has_parking,
+            hasCarpas: row.has_carpas,
+            hasSombrillas: row.has_sombrillas,
+            hasPileta: row.has_pileta,
+            parkingCapacity: row.parking_capacity,
+            carpasCapacity: row.carpas_capacity,
+            sombrillasCapacity: row.sombrillas_capacity,
+            poolMaxOccupancy: row.pool_max_occupancy
+          }
+        }));
+      } catch (error) {
+        console.error('Error fetching establishment:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/reservation-groups (GET) =============
+    if (first === 'reservation-groups' && !second && method === 'GET') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const url = new URL(req.url, 'http://localhost');
+        const status = url.searchParams.get('status');
+
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+        let query = `SELECT rg.*, COALESCE(SUM(rp.amount), 0) AS paid_amount FROM reservation_groups rg LEFT JOIN reservation_payments rp ON rp.establishment_id = rg.establishment_id AND rp.reservation_group_id = rg.id WHERE rg.establishment_id = $1`;
+        const params = [establishmentId];
+
+        if (status) {
+          query += ` AND rg.status = $2`;
+          params.push(status);
+        }
+
+        query += ' GROUP BY rg.id ORDER BY rg.start_date ASC';
+
+        const result = await db.query(query, params);
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          reservationGroups: result.rows.map(row => ({
+            id: row.id,
+            serviceType: row.service_type,
+            resourceNumber: row.resource_number,
+            startDate: row.start_date,
+            endDate: row.end_date,
+            customerName: row.customer_name,
+            customerPhone: row.customer_phone,
+            dailyPrice: row.daily_price,
+            totalPrice: row.total_price,
+            notes: row.notes,
+            status: row.status,
+            clientId: row.client_id,
+            paidAmount: Number(row.paid_amount || 0)
+          }))
+        }));
+      } catch (error) {
+        console.error('Error fetching reservation groups:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // Default: not found
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json');
