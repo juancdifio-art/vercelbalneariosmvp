@@ -1,3 +1,4 @@
+const debugHandler = require('./_handlers/debug');
 const healthHandler = require('./_handlers/health');
 const loginHandler = require('./_handlers/auth/login');
 const registerHandler = require('./_handlers/auth/register');
@@ -35,6 +36,10 @@ module.exports = async (req, res) => {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify({ error: 'not_found' }));
+    }
+
+    if (first === 'debug') {
+      return debugHandler(req, res);
     }
 
     if (first === 'health') {
