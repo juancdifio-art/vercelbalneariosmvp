@@ -23,8 +23,9 @@ import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
 import useEstablishment from './hooks/useEstablishment';
 import useClients from './hooks/useClients';
+import { getApiBaseUrl } from './apiConfig';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_BASE_URL = getApiBaseUrl();
 const QUICK_VIEW_LOOKAHEAD_DAYS = 90;
 
 const CARPA_RESERVATION_COLORS = [
