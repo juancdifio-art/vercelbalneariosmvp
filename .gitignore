@@ -7,6 +7,11 @@ node_modules/
 backend/.env
 .env
 
+# Frontend environment files
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
+
 # Build outputs
 frontend/dist/
 dist/
