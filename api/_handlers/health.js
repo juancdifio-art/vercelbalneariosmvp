@@ -1,5 +1,5 @@
-const db = require('./_lib/db');
-const handleCors = require('./_lib/cors');
+const db = require('../lib/db');
+const handleCors = require('../lib/cors');
 
 module.exports = async (req, res) => {
   if (handleCors(req, res)) {

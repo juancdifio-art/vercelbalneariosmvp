@@ -1,6 +1,6 @@
-const db = require('../_lib/db');
-const handleCors = require('../_lib/cors');
-const { authenticateToken } = require('../_lib/auth');
+const db = require('../lib/db');
+const handleCors = require('../lib/cors');
+const { authenticateToken } = require('../lib/auth');
 
 async function parseJsonBody(req) {
   return new Promise((resolve, reject) => {

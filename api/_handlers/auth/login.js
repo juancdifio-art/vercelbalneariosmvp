@@ -1,6 +1,6 @@
-const db = require('../_lib/db');
-const handleCors = require('../_lib/cors');
-const { signToken } = require('../_lib/auth');
+const db = require('../lib/db');
+const handleCors = require('../lib/cors');
+const { signToken } = require('../lib/auth');
 const bcrypt = require('bcryptjs');
 
 async function parseJsonBody(req) {
