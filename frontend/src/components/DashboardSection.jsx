@@ -422,7 +422,9 @@ function DashboardSection({
                           </p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="text-xs text-slate-500">
-                              {payment.paymentDate}
+                              {payment.paymentDate
+                                ? format(parseISO(payment.paymentDate), 'dd/MM/yyyy')
+                                : 'N/A'}
                             </span>
                             <span className="text-xs text-slate-400">•</span>
                             <span className="text-xs text-slate-500">
