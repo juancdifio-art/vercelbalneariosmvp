@@ -1,13 +1,12 @@
 export function getApiBaseUrl() {
-  // 1) Si está definida VITE_API_URL, siempre la usamos (desarrollo o producción)
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL;
-  }
-
-  // 2) En producción (Vercel), si no hay VITE_API_URL, asumimos mismo origen
-  //    Esto hace que `${API_BASE_URL}/api/...` se convierta en `/api/...`
+  // 1) En producción, SIEMPRE usar rutas relativas (mismo origen)
   if (import.meta.env.PROD) {
     return '';
+  }
+
+  // 2) Si está definida VITE_API_URL en desarrollo, usarla
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
   }
 
   // 3) Desarrollo local: fallback al backend clásico en localhost:4000
