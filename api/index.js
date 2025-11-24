@@ -345,6 +345,101 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/clients/:id (PATCH/DELETE) =============
+    if (first === 'clients' && second && second !== 'undefined') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      const clientId = parseInt(second, 10);
+      if (isNaN(clientId) || clientId <= 0) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'invalid_id' }));
+      }
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        if (method === 'PATCH') {
+          const body = await parseJsonBody(req);
+          const { fullName, phone, email, notes, documentNumber, birthDate, nationality, addressStreet, addressNeighborhood, addressPostalCode, addressCity, addressState, addressCountry, vehicleBrand, vehicleModel, vehiclePlate } = body;
+
+          const existingResult = await db.query('SELECT * FROM clients WHERE id = $1 AND establishment_id = $2', [clientId, establishmentId]);
+          if (existingResult.rows.length === 0) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'not_found' }));
+          }
+
+          const current = existingResult.rows[0];
+          const nextFullName = fullName !== undefined ? fullName : current.full_name;
+
+          if (!nextFullName || !nextFullName.trim()) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'invalid_full_name' }));
+          }
+
+          const updateResult = await db.query(
+            `UPDATE clients SET full_name = $1, phone = $2, email = $3, notes = $4, document_number = $5, birth_date = $6, nationality = $7, address_street = $8, address_neighborhood = $9, address_postal_code = $10, address_city = $11, address_state = $12, address_country = $13, vehicle_brand = $14, vehicle_model = $15, vehicle_plate = $16, updated_at = NOW() WHERE id = $17 RETURNING *`,
+            [nextFullName.trim(), phone !== undefined ? phone : current.phone, email !== undefined ? email : current.email, notes !== undefined ? notes : current.notes, documentNumber !== undefined ? documentNumber : current.document_number, birthDate !== undefined ? birthDate : current.birth_date, nationality !== undefined ? nationality : current.nationality, addressStreet !== undefined ? addressStreet : current.address_street, addressNeighborhood !== undefined ? addressNeighborhood : current.address_neighborhood, addressPostalCode !== undefined ? addressPostalCode : current.address_postal_code, addressCity !== undefined ? addressCity : current.address_city, addressState !== undefined ? addressState : current.address_state, addressCountry !== undefined ? addressCountry : current.address_country, vehicleBrand !== undefined ? vehicleBrand : current.vehicle_brand, vehicleModel !== undefined ? vehicleModel : current.vehicle_model, vehiclePlate !== undefined ? vehiclePlate : current.vehicle_plate, clientId]
+          );
+
+          const row = updateResult.rows[0];
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({
+            client: {
+              id: row.id,
+              fullName: row.full_name,
+              phone: row.phone,
+              email: row.email,
+              notes: row.notes,
+              documentNumber: row.document_number,
+              birthDate: row.birth_date,
+              nationality: row.nationality,
+              addressStreet: row.address_street,
+              addressNeighborhood: row.address_neighborhood,
+              addressPostalCode: row.address_postal_code,
+              addressCity: row.address_city,
+              addressState: row.address_state,
+              addressCountry: row.address_country,
+              vehicleBrand: row.vehicle_brand,
+              vehicleModel: row.vehicle_model,
+              vehiclePlate: row.vehicle_plate,
+              createdAt: row.created_at,
+              updatedAt: row.updated_at
+            }
+          }));
+        }
+
+        if (method === 'DELETE') {
+          const deleteResult = await db.query('DELETE FROM clients WHERE id = $1 AND establishment_id = $2 RETURNING id', [clientId, establishmentId]);
+          if (deleteResult.rows.length === 0) {
+            res.statusCode = 404;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'not_found' }));
+          }
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ status: 'deleted' }));
+        }
+      } catch (error) {
+        console.error('Error with client by ID:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // ============= /api/clients (GET/POST) =============
     if (first === 'clients' && !second) {
       const user = authenticateToken(req, res);
