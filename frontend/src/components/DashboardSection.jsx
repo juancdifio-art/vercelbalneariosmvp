@@ -162,7 +162,7 @@ function DashboardSection({
       case 'transfer': return 'Transferencia';
       case 'card': return 'Tarjeta';
       case 'other': return 'Otro';
-      default: return method || 'N/A';
+      default: return method || 'Sin método';
     }
   };
 
