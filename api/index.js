@@ -866,8 +866,8 @@ module.exports = async (req, res) => {
       }
     }
 
-    // ============= /api/reservation-groups/:id/payments (GET) =============
-    if (first === 'reservation-groups' && second && segments[3] === 'payments' && method === 'GET') {
+    // ============= /api/reservation-groups/:id/payments (GET/POST) =============
+    if (first === 'reservation-groups' && second && segments[3] === 'payments') {
       const user = authenticateToken(req, res);
       if (!user) return;
 
@@ -900,26 +900,58 @@ module.exports = async (req, res) => {
           return res.end(JSON.stringify({ error: 'reservation_group_not_found' }));
         }
 
-        // Get payments
-        const result = await db.query(
-          'SELECT * FROM reservation_payments WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY payment_date DESC',
-          [establishmentId, reservationGroupId]
-        );
+        if (method === 'GET') {
+          // Get payments
+          const result = await db.query(
+            'SELECT * FROM reservation_payments WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY payment_date DESC',
+            [establishmentId, reservationGroupId]
+          );
 
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        return res.end(JSON.stringify({
-          payments: result.rows.map(row => ({
-            id: row.id,
-            amount: row.amount,
-            paymentDate: row.payment_date,
-            paymentMethod: row.payment_method,
-            notes: row.notes,
-            createdAt: row.created_at
-          }))
-        }));
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({
+            payments: result.rows.map(row => ({
+              id: row.id,
+              amount: row.amount,
+              paymentDate: row.payment_date,
+              paymentMethod: row.payment_method,
+              notes: row.notes,
+              createdAt: row.created_at
+            }))
+          }));
+        }
+
+        if (method === 'POST') {
+          const body = await parseJsonBody(req);
+          const { amount, paymentDate, method: paymentMethod, notes } = body;
+
+          if (!amount || !paymentDate || !paymentMethod) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'missing_required_fields' }));
+          }
+
+          const insertResult = await db.query(
+            'INSERT INTO reservation_payments (establishment_id, reservation_group_id, amount, payment_date, payment_method, notes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [establishmentId, reservationGroupId, amount, paymentDate, paymentMethod, notes || null]
+          );
+
+          const row = insertResult.rows[0];
+          res.statusCode = 201;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({
+            payment: {
+              id: row.id,
+              amount: row.amount,
+              paymentDate: row.payment_date,
+              paymentMethod: row.payment_method,
+              notes: row.notes,
+              createdAt: row.created_at
+            }
+          }));
+        }
       } catch (error) {
-        console.error('Error fetching payments:', error);
+        console.error('Error with payments:', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));
