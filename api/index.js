@@ -130,6 +130,22 @@ async function parseJsonBody(req) {
 // ============= Main Handler =============
 module.exports = async (req, res) => {
   try {
+    // Attach Express-like helpers for shared handlers
+    if (typeof res.status !== 'function') {
+      res.status = (code) => {
+        res.statusCode = code;
+        return res;
+      };
+    }
+    if (typeof res.json !== 'function') {
+      res.json = (data) => {
+        if (!res.headersSent) {
+          res.setHeader('Content-Type', 'application/json');
+        }
+        res.end(JSON.stringify(data));
+      };
+    }
+
     // Handle CORS
     if (handleCors(req, res)) {
       return;
