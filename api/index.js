@@ -717,16 +717,18 @@ module.exports = async (req, res) => {
 
         const establishmentId = estResult.rows[0].id;
 
-        // Check for overlapping reservations
-        const overlapCheck = await db.query(
-          `SELECT id FROM reservation_groups WHERE establishment_id = $1 AND service_type = $2 AND resource_number = $3 AND status = 'active' AND NOT (end_date < $4::date OR start_date > $5::date)`,
-          [establishmentId, serviceType, resourceNumber, startDate, endDate]
-        );
+        // Check for overlapping reservations (only for carpa, sombrilla, parking - not pileta)
+        if (serviceType !== 'pileta') {
+          const overlapCheck = await db.query(
+            `SELECT id FROM reservation_groups WHERE establishment_id = $1 AND service_type = $2 AND resource_number = $3 AND status = 'active' AND NOT (end_date < $4::date OR start_date > $5::date)`,
+            [establishmentId, serviceType, resourceNumber, startDate, endDate]
+          );
 
-        if (overlapCheck.rows.length > 0) {
-          res.statusCode = 409;
-          res.setHeader('Content-Type', 'application/json');
-          return res.end(JSON.stringify({ error: 'reservation_conflict' }));
+          if (overlapCheck.rows.length > 0) {
+            res.statusCode = 409;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'reservation_conflict' }));
+          }
         }
 
         // Insert reservation group
