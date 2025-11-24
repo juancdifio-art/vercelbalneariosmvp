@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { format } from 'date-fns';
 import { generateReceipt } from '../utils/generateReceipt';
 
 function ReservationDetailsModal({
@@ -28,7 +29,9 @@ function ReservationDetailsModal({
     paymentsLoading,
     linkedParkingResourceNumber,
     poolAdultsCount,
-    poolChildrenCount
+    poolChildrenCount,
+    adultsCount,
+    childrenCount
   } = reservation;
 
   const getDaysCount = () => {
@@ -177,7 +180,7 @@ function ReservationDetailsModal({
                   <div className="flex-1">
                     <p className="text-[10px] text-slate-500 font-medium">Composición pileta</p>
                     <p className="text-xs font-semibold text-slate-900">
-                      Adultos: {Number(poolAdultsCount ?? 0)} · Niños: {Number(poolChildrenCount ?? 0)}
+                      Adultos: {Number(poolAdultsCount ?? adultsCount ?? 0)} · Niños: {Number(poolChildrenCount ?? childrenCount ?? 0)}
                     </p>
                   </div>
                 </div>
@@ -283,20 +286,32 @@ function ReservationDetailsModal({
             {!paymentsLoading && payments && payments.length > 0 && (
               <div className="space-y-2 max-h-48 overflow-y-auto">
                 {payments.map((p) => {
+                  const rawMethod = p.method || p.paymentMethod || '';
                   let methodLabel = '';
                   let methodIcon = '💵';
-                  if (p.method === 'cash') {
+                  if (rawMethod === 'cash') {
                     methodLabel = 'Efectivo';
                     methodIcon = '💵';
-                  } else if (p.method === 'transfer') {
+                  } else if (rawMethod === 'transfer') {
                     methodLabel = 'Transferencia';
                     methodIcon = '🏦';
-                  } else if (p.method === 'card') {
+                  } else if (rawMethod === 'card') {
                     methodLabel = 'Tarjeta';
                     methodIcon = '💳';
-                  } else if (p.method === 'other') {
+                  } else if (rawMethod === 'other') {
                     methodLabel = 'Otro';
                     methodIcon = '💰';
+                  }
+
+                  let paymentDateLabel = '';
+                  if (p.paymentDate) {
+                    const dateObj =
+                      typeof p.paymentDate === 'string'
+                        ? new Date(p.paymentDate)
+                        : p.paymentDate;
+                    if (!Number.isNaN(dateObj.getTime())) {
+                      paymentDateLabel = format(dateObj, 'dd/MM/yyyy');
+                    }
                   }
 
                   return (
@@ -311,7 +326,7 @@ function ReservationDetailsModal({
                             ${p.amount}
                           </p>
                           <p className="text-[10px] text-slate-500">
-                            {typeof p.paymentDate === 'string' ? p.paymentDate : ''}
+                            {paymentDateLabel}
                           </p>
                         </div>
                       </div>

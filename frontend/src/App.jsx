@@ -1746,8 +1746,15 @@ function App() {
       }
     }
 
+    const mappedPoolAdultsCount =
+      group.poolAdultsCount ?? group.adultsCount ?? 0;
+    const mappedPoolChildrenCount =
+      group.poolChildrenCount ?? group.childrenCount ?? 0;
+
     setReservationDetailsModal({
       ...group,
+      poolAdultsCount: mappedPoolAdultsCount,
+      poolChildrenCount: mappedPoolChildrenCount,
       linkedParkingResourceNumber,
       linkedParkingData,
       payments: [],

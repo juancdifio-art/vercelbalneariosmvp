@@ -95,8 +95,10 @@ function DashboardSection({
     reservationGroups.forEach(group => {
       if (group && group.payments && Array.isArray(group.payments)) {
         group.payments.forEach(payment => {
+          const method = payment.method || payment.paymentMethod || '';
           allPayments.push({
             ...payment,
+            method,
             groupId: group.id,
             serviceType: group.serviceType,
             resourceNumber: group.resourceNumber,
