@@ -661,6 +661,100 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/reservation-groups (POST) =============
+    if (first === 'reservation-groups' && !second && method === 'POST') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const body = await parseJsonBody(req);
+        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId } = body;
+
+        // Validate required fields
+        if (!serviceType || !resourceNumber || !startDate || !endDate || !customerName) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'missing_required_fields' }));
+        }
+
+        // Validate service type
+        const allowedServices = ['carpa', 'sombrilla', 'parking', 'pileta'];
+        if (!allowedServices.includes(serviceType)) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'invalid_service_type' }));
+        }
+
+        // Validate dates
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'invalid_dates' }));
+        }
+
+        if (start > end) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'start_date_after_end_date' }));
+        }
+
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        // Check for overlapping reservations
+        const overlapCheck = await db.query(
+          `SELECT id FROM reservation_groups WHERE establishment_id = $1 AND service_type = $2 AND resource_number = $3 AND status = 'active' AND NOT (end_date < $4::date OR start_date > $5::date)`,
+          [establishmentId, serviceType, resourceNumber, startDate, endDate]
+        );
+
+        if (overlapCheck.rows.length > 0) {
+          res.statusCode = 409;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'reservation_conflict' }));
+        }
+
+        // Insert reservation group
+        const insertResult = await db.query(
+          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null]
+        );
+
+        const row = insertResult.rows[0];
+        res.statusCode = 201;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          reservationGroup: {
+            id: row.id,
+            serviceType: row.service_type,
+            resourceNumber: row.resource_number,
+            startDate: row.start_date,
+            endDate: row.end_date,
+            customerName: row.customer_name,
+            customerPhone: row.customer_phone,
+            dailyPrice: row.daily_price,
+            totalPrice: row.total_price,
+            notes: row.notes,
+            status: row.status,
+            clientId: row.client_id,
+            createdAt: row.created_at
+          }
+        }));
+      } catch (error) {
+        console.error('Error creating reservation group:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // Default: not found
     res.statusCode = 404;
     res.setHeader('Content-Type', 'application/json');
