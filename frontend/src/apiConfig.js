@@ -1,6 +1,9 @@
 export function getApiBaseUrl() {
-  // 1) En producción, SIEMPRE usar rutas relativas (mismo origen)
-  if (import.meta.env.PROD) {
+  // Detectar si estamos en Vercel (producción)
+  const isVercel = typeof window !== 'undefined' && window.location.hostname.includes('vercel.app');
+
+  // 1) Si estamos en Vercel O en modo producción, usar rutas relativas
+  if (isVercel || import.meta.env.PROD || import.meta.env.MODE === 'production') {
     return '';
   }
 
