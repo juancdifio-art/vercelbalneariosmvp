@@ -935,6 +935,10 @@ function App() {
           totalPrice: totalPrice > 0 ? String(totalPrice) : '',
           notes: '',
           clientId: clientId ?? '',
+          // Compatibilidad: backend serverless usa adultsCount/childrenCount,
+          // backend Express usa poolAdultsCount/poolChildrenCount
+          adultsCount: String(adults),
+          childrenCount: String(children),
           poolAdultsCount: String(adults),
           poolChildrenCount: String(children),
           poolAdultPricePerDay: poolAdultPricePerDay ? String(poolAdultPricePerDay) : '',
