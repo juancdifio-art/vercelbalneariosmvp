@@ -1,6 +1,6 @@
-const db = require('../lib/db');
-const handleCors = require('../lib/cors');
-const { authenticateToken } = require('../lib/auth');
+const db = require('../../lib/db');
+const handleCors = require('../../lib/cors');
+const { authenticateToken } = require('../../lib/auth');
 
 module.exports = async (req, res) => {
   if (handleCors(req, res)) {
