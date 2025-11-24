@@ -647,8 +647,8 @@ module.exports = async (req, res) => {
             id: row.id,
             serviceType: row.service_type,
             resourceNumber: row.resource_number,
-            startDate: row.start_date,
-            endDate: row.end_date,
+            startDate: row.start_date instanceof Date ? row.start_date.toISOString().slice(0, 10) : row.start_date,
+            endDate: row.end_date instanceof Date ? row.end_date.toISOString().slice(0, 10) : row.end_date,
             customerName: row.customer_name,
             customerPhone: row.customer_phone,
             dailyPrice: row.daily_price,
@@ -741,8 +741,8 @@ module.exports = async (req, res) => {
             id: row.id,
             serviceType: row.service_type,
             resourceNumber: row.resource_number,
-            startDate: row.start_date,
-            endDate: row.end_date,
+            startDate: row.start_date instanceof Date ? row.start_date.toISOString().slice(0, 10) : row.start_date,
+            endDate: row.end_date instanceof Date ? row.end_date.toISOString().slice(0, 10) : row.end_date,
             customerName: row.customer_name,
             customerPhone: row.customer_phone,
             dailyPrice: row.daily_price,
@@ -755,6 +755,66 @@ module.exports = async (req, res) => {
         }));
       } catch (error) {
         console.error('Error creating reservation group:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/reservation-groups/:id/payments (GET) =============
+    if (first === 'reservation-groups' && second && segments[3] === 'payments' && method === 'GET') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      const reservationGroupId = parseInt(second, 10);
+      if (isNaN(reservationGroupId) || reservationGroupId <= 0) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'invalid_id' }));
+      }
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        // Verify reservation group belongs to this establishment
+        const rgCheck = await db.query(
+          'SELECT id FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+          [reservationGroupId, establishmentId]
+        );
+
+        if (rgCheck.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'reservation_group_not_found' }));
+        }
+
+        // Get payments
+        const result = await db.query(
+          'SELECT * FROM reservation_payments WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY payment_date DESC',
+          [establishmentId, reservationGroupId]
+        );
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          payments: result.rows.map(row => ({
+            id: row.id,
+            amount: row.amount,
+            paymentDate: row.payment_date,
+            paymentMethod: row.payment_method,
+            notes: row.notes,
+            createdAt: row.created_at
+          }))
+        }));
+      } catch (error) {
+        console.error('Error fetching payments:', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));
