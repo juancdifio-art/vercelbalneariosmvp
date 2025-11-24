@@ -283,6 +283,9 @@ module.exports = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching occupancy report', error);
-    return res.status(500).json({ error: 'server_error' });
+    return res.status(500).json({
+      error: 'server_error',
+      message: error && error.message ? error.message : 'unknown_error'
+    });
   }
 };
