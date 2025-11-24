@@ -25,11 +25,23 @@ function DashboardSection({
 
     // Ingresos del día (pagos realizados hoy)
     let todayIncome = 0;
-    reservationGroups.forEach(group => {
+    reservationGroups.forEach((group) => {
       if (group && group.payments && Array.isArray(group.payments)) {
-        group.payments.forEach(payment => {
-          if (payment.paymentDate === today) {
-            todayIncome += parseFloat(payment.amount || 0);
+        group.payments.forEach((payment) => {
+          if (!payment || !payment.paymentDate) return;
+
+          let paymentDateStr = '';
+          if (typeof payment.paymentDate === 'string') {
+            paymentDateStr = payment.paymentDate.slice(0, 10);
+          } else if (payment.paymentDate instanceof Date && !Number.isNaN(payment.paymentDate.getTime())) {
+            paymentDateStr = format(payment.paymentDate, 'yyyy-MM-dd');
+          }
+
+          if (paymentDateStr === today) {
+            const amountNum = Number.parseFloat(payment.amount || 0);
+            if (!Number.isNaN(amountNum)) {
+              todayIncome += amountNum;
+            }
           }
         });
       }
