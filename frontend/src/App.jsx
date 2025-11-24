@@ -931,10 +931,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          // Para pases de pileta, el backend recalcula dailyPrice y totalPrice en base
-          // a poolAdultsCount/poolChildrenCount y sus precios por día
-          dailyPrice: '',
-          totalPrice: '',
+          dailyPrice: dailyPrice > 0 ? String(dailyPrice) : '',
+          totalPrice: totalPrice > 0 ? String(totalPrice) : '',
           notes: '',
           clientId: clientId ?? '',
           poolAdultsCount: String(adults),
