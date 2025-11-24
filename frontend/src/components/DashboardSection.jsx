@@ -141,6 +141,7 @@ function DashboardSection({
       case 'carpa': return '🏖️';
       case 'sombrilla': return '☂️';
       case 'parking': return '🚗';
+      case 'pileta': return '🏊';
       default: return '📋';
     }
   };
@@ -150,6 +151,7 @@ function DashboardSection({
       case 'carpa': return 'Carpa';
       case 'sombrilla': return 'Sombrilla';
       case 'parking': return 'Estacionamiento';
+      case 'pileta': return 'Pileta';
       default: return type;
     }
   };
