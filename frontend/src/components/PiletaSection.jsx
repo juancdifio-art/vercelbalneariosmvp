@@ -37,8 +37,8 @@ function PiletaSection({
       const end = typeof g.endDate === 'string' ? g.endDate : g.endDate?.toString?.() ?? '';
       if (!start || !end) return;
       if (start <= todayStr && end >= todayStr) {
-        const adults = Number.parseInt(String(g.poolAdultsCount ?? '0'), 10) || 0;
-        const children = Number.parseInt(String(g.poolChildrenCount ?? '0'), 10) || 0;
+        const adults = Number.parseInt(String(g.adultsCount ?? '0'), 10) || 0;
+        const children = Number.parseInt(String(g.childrenCount ?? '0'), 10) || 0;
         activeToday += adults + children;
       }
     });
@@ -458,8 +458,8 @@ function PiletaSection({
                     paidClassName += 'text-slate-500';
                   }
 
-                  const adults = Number.parseInt(String(group.poolAdultsCount ?? '0'), 10) || 0;
-                  const children = Number.parseInt(String(group.poolChildrenCount ?? '0'), 10) || 0;
+                  const adults = Number.parseInt(String(group.adultsCount ?? '0'), 10) || 0;
+                  const children = Number.parseInt(String(group.childrenCount ?? '0'), 10) || 0;
 
                   const startStr = group.startDate || '';
                   const endStr = group.endDate || '';
