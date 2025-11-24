@@ -1,0 +1,4 @@
+# Forzar rebuild ignorando cache
+.env
+.env.local
+node_modules

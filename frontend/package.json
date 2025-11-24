@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build --mode production",
     "preview": "vite preview",
-    "vercel-build": "NODE_ENV=production vite build"
+    "vercel-build": "vite build --mode production"
   },
   "dependencies": {
     "date-fns": "^4.1.0",
