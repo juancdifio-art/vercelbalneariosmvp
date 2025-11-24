@@ -636,7 +636,14 @@ module.exports = async (req, res) => {
 
       try {
         const url = new URL(req.url, 'http://localhost');
+        const service = url.searchParams.get('service');
         const status = url.searchParams.get('status');
+        const from = url.searchParams.get('from');
+        const to = url.searchParams.get('to');
+        const clientId = url.searchParams.get('clientId');
+
+        const allowedServices = ['carpa', 'sombrilla', 'parking', 'pileta'];
+        const allowedStatus = ['active', 'cancelled'];
 
         const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
         if (estResult.rows.length === 0) {
@@ -646,27 +653,132 @@ module.exports = async (req, res) => {
         }
 
         const establishmentId = estResult.rows[0].id;
-        let query = `SELECT rg.*, COALESCE(SUM(rp.amount), 0) AS paid_amount FROM reservation_groups rg LEFT JOIN reservation_payments rp ON rp.establishment_id = rg.establishment_id AND rp.reservation_group_id = rg.id WHERE rg.establishment_id = $1`;
+
+        let query = `
+          SELECT
+            rg.id,
+            rg.service_type,
+            rg.resource_number,
+            rg.start_date,
+            rg.end_date,
+            rg.customer_name,
+            rg.customer_phone,
+            rg.daily_price,
+            rg.total_price,
+            rg.notes,
+            rg.status,
+            rg.client_id,
+            rg.adults_count,
+            rg.children_count,
+            COALESCE(SUM(rp.amount), 0) AS paid_amount
+          FROM reservation_groups rg
+          LEFT JOIN reservation_payments rp
+            ON rp.establishment_id = rg.establishment_id
+           AND rp.reservation_group_id = rg.id
+          WHERE rg.establishment_id = $1`;
+
         const params = [establishmentId];
 
-        if (status) {
-          query += ` AND rg.status = $2`;
+        if (service && allowedServices.includes(service)) {
+          query += ` AND rg.service_type = $${params.length + 1}`;
+          params.push(service);
+        }
+
+        if (status && allowedStatus.includes(status)) {
+          query += ` AND rg.status = $${params.length + 1}`;
           params.push(status);
         }
 
-        query += ' GROUP BY rg.id ORDER BY rg.start_date ASC';
+        if (clientId) {
+          const parsedClientId = Number.parseInt(clientId, 10);
+          if (!parsedClientId || Number.isNaN(parsedClientId) || parsedClientId <= 0) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'invalid_client_id' }));
+          }
+
+          query += ` AND rg.client_id = $${params.length + 1}`;
+          params.push(parsedClientId);
+        }
+
+        // Filtro por rango de fechas (reservas que se solapan con [from, to])
+        let fromStr = from || null;
+        let toStr = to || null;
+
+        if (fromStr) {
+          const fromDate = new Date(fromStr);
+          if (Number.isNaN(fromDate.getTime())) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'invalid_from' }));
+          }
+        }
+
+        if (toStr) {
+          const toDate = new Date(toStr);
+          if (Number.isNaN(toDate.getTime())) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'invalid_to' }));
+          }
+        }
+
+        if (fromStr && toStr) {
+          const fromDate = new Date(fromStr);
+          const toDate = new Date(toStr);
+
+          if (toDate < fromDate) {
+            const tmp = fromStr;
+            fromStr = toStr;
+            toStr = tmp;
+          }
+
+          // Reservas que se superponen con el rango [fromStr, toStr]
+          query += ` AND rg.start_date <= $${params.length + 1} AND rg.end_date >= $${params.length + 2}`;
+          params.push(toStr, fromStr);
+        } else if (fromStr) {
+          // Reservas que terminan después o el mismo día de from
+          query += ` AND rg.end_date >= $${params.length + 1}`;
+          params.push(fromStr);
+        } else if (toStr) {
+          // Reservas que comienzan antes o el mismo día de to
+          query += ` AND rg.start_date <= $${params.length + 1}`;
+          params.push(toStr);
+        }
+
+        query += `
+          GROUP BY
+            rg.id,
+            rg.service_type,
+            rg.resource_number,
+            rg.start_date,
+            rg.end_date,
+            rg.customer_name,
+            rg.customer_phone,
+            rg.daily_price,
+            rg.total_price,
+            rg.notes,
+            rg.status,
+            rg.client_id,
+            rg.adults_count,
+            rg.children_count
+          ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
         const result = await db.query(query, params);
 
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({
-          reservationGroups: result.rows.map(row => ({
+          reservationGroups: result.rows.map((row) => ({
             id: row.id,
             serviceType: row.service_type,
             resourceNumber: row.resource_number,
-            startDate: row.start_date instanceof Date ? row.start_date.toISOString().slice(0, 10) : row.start_date,
-            endDate: row.end_date instanceof Date ? row.end_date.toISOString().slice(0, 10) : row.end_date,
+            startDate: row.start_date instanceof Date
+              ? row.start_date.toISOString().slice(0, 10)
+              : row.start_date,
+            endDate: row.end_date instanceof Date
+              ? row.end_date.toISOString().slice(0, 10)
+              : row.end_date,
             customerName: row.customer_name,
             customerPhone: row.customer_phone,
             dailyPrice: row.daily_price,
