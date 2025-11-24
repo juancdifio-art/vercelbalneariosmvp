@@ -902,6 +902,19 @@ function App() {
     const fromStr = format(start, 'yyyy-MM-dd');
     const toStr = format(end, 'yyyy-MM-dd');
 
+    // Calculate days count
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diffMs = end.getTime() - start.getTime();
+    const daysCount = Math.floor(diffMs / msPerDay) + 1;
+
+    // Calculate prices
+    const adults = Number.parseInt(String(poolAdultsCount || '0'), 10);
+    const children = Number.parseInt(String(poolChildrenCount || '0'), 10);
+    const adultPrice = poolAdultPricePerDay ? Number.parseFloat(String(poolAdultPricePerDay).replace(',', '.')) : 0;
+    const childPrice = poolChildPricePerDay ? Number.parseFloat(String(poolChildPricePerDay).replace(',', '.')) : 0;
+    const dailyPrice = adults * adultPrice + children * childPrice;
+    const totalPrice = dailyPrice * daysCount;
+
     setPoolPassError('');
 
     try {
@@ -918,14 +931,12 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice: '',
-          totalPrice: '',
+          dailyPrice: dailyPrice > 0 ? String(dailyPrice) : '',
+          totalPrice: totalPrice > 0 ? String(totalPrice) : '',
           notes: '',
           clientId: clientId ?? '',
-          poolAdultsCount: poolAdultsCount || '0',
-          poolChildrenCount: poolChildrenCount || '0',
-          poolAdultPricePerDay: poolAdultPricePerDay || '0',
-          poolChildPricePerDay: poolChildPricePerDay || '0'
+          adultsCount: adults,
+          childrenCount: children
         })
       });
 
@@ -947,15 +958,7 @@ function App() {
         return false;
       }
 
-      if (data && data.group) {
-        setReservationGroups((prev) => {
-          const exists = prev.some((g) => g.id === data.group.id);
-          if (exists) {
-            return prev.map((g) => (g.id === data.group.id ? data.group : g));
-          }
-          return [...prev, data.group];
-        });
-
+      if (data && data.reservationGroup) {
         const method = (initialPaymentMethod || '').trim();
         const rawAmount = initialPaymentAmount;
 
@@ -971,7 +974,7 @@ function App() {
               const todayStr = `${yyyy}-${mm}-${dd}`;
 
               const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.group.id}/payments`,
+                `${API_BASE_URL}/api/reservation-groups/${data.reservationGroup.id}/payments`,
                 {
                   method: 'POST',
                   headers: {
@@ -987,21 +990,8 @@ function App() {
                 }
               );
 
-              if (paymentResponse.ok) {
-                const paymentData = await paymentResponse.json();
-                if (paymentData.payment) {
-                  setReservationGroups((prev) =>
-                    prev.map((g) =>
-                      g.id === data.group.id
-                        ? {
-                            ...g,
-                            paidAmount:
-                              Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                          }
-                        : g
-                    )
-                  );
-                }
+              if (!paymentResponse.ok) {
+                console.error('Error creating initial payment for pool pass');
               }
             } catch (paymentErr) {
               console.error('Error creating initial payment for pool pass', paymentErr);
@@ -1009,6 +999,9 @@ function App() {
           }
         }
       }
+
+      // Refresh the list from server
+      await fetchReservationGroups(token);
 
       return true;
     } catch (err) {
@@ -1569,14 +1562,10 @@ function App() {
 
       const data = await response.json();
 
-      if (data.group) {
-        setReservationGroups((prev) =>
-          prev.map((g) => (g.id === data.group.id ? data.group : g))
-        );
-
-        if (data.group.serviceType === 'carpa') {
-          const start = parseLocalDateFromInput(data.group.startDate);
-          const end = parseLocalDateFromInput(data.group.endDate);
+      if (data.reservationGroup) {
+        if (data.reservationGroup.serviceType === 'carpa') {
+          const start = parseLocalDateFromInput(data.reservationGroup.startDate);
+          const end = parseLocalDateFromInput(data.reservationGroup.endDate);
 
           if (start && end) {
             let from = start;
@@ -1592,7 +1581,7 @@ function App() {
               const next = { ...prev };
               for (let d = new Date(from); d <= to; d = addDays(d, 1)) {
                 const dateKeyStr = format(d, 'yyyy-MM-dd');
-                const key = `${dateKeyStr}-${data.group.resourceNumber}`;
+                const key = `${dateKeyStr}-${data.reservationGroup.resourceNumber}`;
                 delete next[key];
               }
               return next;
@@ -1600,9 +1589,9 @@ function App() {
           }
         }
 
-        if (data.group.serviceType === 'sombrilla') {
-          const start = parseLocalDateFromInput(data.group.startDate);
-          const end = parseLocalDateFromInput(data.group.endDate);
+        if (data.reservationGroup.serviceType === 'sombrilla') {
+          const start = parseLocalDateFromInput(data.reservationGroup.startDate);
+          const end = parseLocalDateFromInput(data.reservationGroup.endDate);
 
           if (start && end) {
             let from = start;
@@ -1618,7 +1607,7 @@ function App() {
               const next = { ...prev };
               for (let d = new Date(from); d <= to; d = addDays(d, 1)) {
                 const dateKeyStr = format(d, 'yyyy-MM-dd');
-                const key = `${dateKeyStr}-${data.group.resourceNumber}`;
+                const key = `${dateKeyStr}-${data.reservationGroup.resourceNumber}`;
                 delete next[key];
               }
               return next;
@@ -1626,9 +1615,9 @@ function App() {
           }
         }
 
-        if (data.group.serviceType === 'parking') {
-          const start = parseLocalDateFromInput(data.group.startDate);
-          const end = parseLocalDateFromInput(data.group.endDate);
+        if (data.reservationGroup.serviceType === 'parking') {
+          const start = parseLocalDateFromInput(data.reservationGroup.startDate);
+          const end = parseLocalDateFromInput(data.reservationGroup.endDate);
 
           if (start && end) {
             let from = start;
@@ -1644,7 +1633,7 @@ function App() {
               const next = { ...prev };
               for (let d = new Date(from); d <= to; d = addDays(d, 1)) {
                 const dateKeyStr = format(d, 'yyyy-MM-dd');
-                const key = `${dateKeyStr}-${data.group.resourceNumber}`;
+                const key = `${dateKeyStr}-${data.reservationGroup.resourceNumber}`;
                 delete next[key];
               }
               return next;
@@ -1652,6 +1641,9 @@ function App() {
           }
         }
       }
+
+      // Refresh the list from server
+      await fetchReservationGroups(token);
     } catch (err) {
       console.error('Error cancelling reservation group', err);
     }
