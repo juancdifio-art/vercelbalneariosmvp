@@ -656,6 +656,8 @@ module.exports = async (req, res) => {
             notes: row.notes,
             status: row.status,
             clientId: row.client_id,
+            adultsCount: row.adults_count || 0,
+            childrenCount: row.children_count || 0,
             paidAmount: Number(row.paid_amount || 0)
           }))
         }));
@@ -674,7 +676,7 @@ module.exports = async (req, res) => {
 
       try {
         const body = await parseJsonBody(req);
-        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId } = body;
+        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId, adultsCount, childrenCount } = body;
 
         // Validate required fields
         if (!serviceType || !resourceNumber || !startDate || !endDate || !customerName) {
@@ -729,8 +731,8 @@ module.exports = async (req, res) => {
 
         // Insert reservation group
         const insertResult = await db.query(
-          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
-          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null]
+          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0]
         );
 
         const row = insertResult.rows[0];
@@ -750,11 +752,114 @@ module.exports = async (req, res) => {
             notes: row.notes,
             status: row.status,
             clientId: row.client_id,
+            adultsCount: row.adults_count || 0,
+            childrenCount: row.children_count || 0,
             createdAt: row.created_at
           }
         }));
       } catch (error) {
         console.error('Error creating reservation group:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/reservation-groups/:id (PATCH) =============
+    if (first === 'reservation-groups' && second && !segments[3] && method === 'PATCH') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      const reservationGroupId = parseInt(second, 10);
+      if (isNaN(reservationGroupId) || reservationGroupId <= 0) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'invalid_id' }));
+      }
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        // Verify reservation group belongs to this establishment
+        const existingResult = await db.query(
+          'SELECT * FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+          [reservationGroupId, establishmentId]
+        );
+
+        if (existingResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'reservation_group_not_found' }));
+        }
+
+        const current = existingResult.rows[0];
+        const body = await parseJsonBody(req);
+
+        // Allow updating status to cancelled
+        if (body.status === 'cancelled') {
+          const updateResult = await db.query(
+            'UPDATE reservation_groups SET status = $1 WHERE id = $2 RETURNING *',
+            ['cancelled', reservationGroupId]
+          );
+
+          const row = updateResult.rows[0];
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({
+            reservationGroup: {
+              id: row.id,
+              status: row.status
+            }
+          }));
+        }
+
+        // Update other fields
+        const { customerName, customerPhone, dailyPrice, totalPrice, notes, adultsCount, childrenCount } = body;
+
+        const updateResult = await db.query(
+          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7 WHERE id = $8 RETURNING *`,
+          [
+            customerName !== undefined ? customerName : current.customer_name,
+            customerPhone !== undefined ? customerPhone : current.customer_phone,
+            dailyPrice !== undefined ? dailyPrice : current.daily_price,
+            totalPrice !== undefined ? totalPrice : current.total_price,
+            notes !== undefined ? notes : current.notes,
+            adultsCount !== undefined ? adultsCount : current.adults_count,
+            childrenCount !== undefined ? childrenCount : current.children_count,
+            reservationGroupId
+          ]
+        );
+
+        const row = updateResult.rows[0];
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          reservationGroup: {
+            id: row.id,
+            serviceType: row.service_type,
+            resourceNumber: row.resource_number,
+            startDate: row.start_date instanceof Date ? row.start_date.toISOString().slice(0, 10) : row.start_date,
+            endDate: row.end_date instanceof Date ? row.end_date.toISOString().slice(0, 10) : row.end_date,
+            customerName: row.customer_name,
+            customerPhone: row.customer_phone,
+            dailyPrice: row.daily_price,
+            totalPrice: row.total_price,
+            notes: row.notes,
+            status: row.status,
+            clientId: row.client_id,
+            adultsCount: row.adults_count || 0,
+            childrenCount: row.children_count || 0
+          }
+        }));
+      } catch (error) {
+        console.error('Error updating reservation group:', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));
