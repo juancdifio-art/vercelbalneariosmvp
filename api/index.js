@@ -3,16 +3,17 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
 // ============= DB Utilities =============
-let pool;
-
+// Para serverless, no mantener pool global sino crear conexiones efímeras
 function createPool() {
   if (process.env.DATABASE_URL) {
     return new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
       max: 1,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000
+      min: 0,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 30000,
+      allowExitOnIdle: true
     });
   }
   return new Pool({
@@ -20,20 +21,25 @@ function createPool() {
     port: Number(process.env.DB_PORT) || 5432,
     database: process.env.DB_NAME || 'balnearios_mvp',
     user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD
+    password: process.env.DB_PASSWORD,
+    max: 1,
+    min: 0,
+    idleTimeoutMillis: 10000,
+    connectionTimeoutMillis: 30000,
+    allowExitOnIdle: true
   });
 }
 
-function getPool() {
-  if (!pool) {
-    pool = createPool();
-  }
-  return pool;
-}
-
 const db = {
-  query: (text, params) => getPool().query(text, params),
-  getClient: () => getPool().connect()
+  query: async (text, params) => {
+    const pool = createPool();
+    try {
+      const result = await pool.query(text, params);
+      return result;
+    } finally {
+      await pool.end();
+    }
+  }
 };
 
 // ============= Auth Utilities =============
