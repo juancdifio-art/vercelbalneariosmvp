@@ -1,6 +1,8 @@
 const { Pool } = require('pg');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const reportPaymentsHandler = require('./_handlers/reports/payments');
+const reportOccupancyHandler = require('./_handlers/reports/occupancy');
 
 // ============= DB Utilities =============
 // Para serverless, no mantener pool global sino crear conexiones efímeras
@@ -957,6 +959,16 @@ module.exports = async (req, res) => {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/reports/payments & /api/reports/occupancy =============
+    if (first === 'reports') {
+      if (second === 'payments') {
+        return reportPaymentsHandler(req, res);
+      }
+      if (second === 'occupancy') {
+        return reportOccupancyHandler(req, res);
       }
     }
 
