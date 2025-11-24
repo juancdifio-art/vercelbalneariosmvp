@@ -120,8 +120,8 @@ module.exports = async (req, res) => {
         resource_number,
         start_date,
         end_date,
-        pool_adults_count,
-        pool_children_count
+        adults_count,
+        children_count
       FROM reservation_groups
       WHERE establishment_id = $1
         AND status = 'active'
@@ -190,7 +190,7 @@ module.exports = async (req, res) => {
       }
 
       const unitsForPool =
-        Number(row.pool_adults_count || 0) + Number(row.pool_children_count || 0);
+        Number(row.adults_count || 0) + Number(row.children_count || 0);
       const increment = serviceType === 'pileta'
         ? (Number.isFinite(unitsForPool) && unitsForPool > 0 ? unitsForPool : 0)
         : 1;
