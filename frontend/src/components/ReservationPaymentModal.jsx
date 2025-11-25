@@ -113,7 +113,7 @@ function ReservationPaymentModal({
               }
               className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[11px] text-slate-900 focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
             />
-            {parseFloat(tempAmount || 0) > balance && balance > 0.01 && (
+            {parseFloat(tempAmount || 0) - balance > 0.01 && balance > 0.01 && (
               <span className="text-[10px] text-amber-600">
                 ⚠️ El monto supera el saldo pendiente (${balance.toFixed(2)})
               </span>
