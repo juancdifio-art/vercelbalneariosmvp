@@ -254,7 +254,7 @@ function ReservasSection({
             <p className="text-sm text-slate-600 font-medium">
               {reservationFilterService
                 ? 'No hay reservas cargadas'
-                : 'Seleccioná un servicio para ver las reservas'}
+                : 'Seleccionad un servicio para ver las reservas'}
             </p>
             <p className="text-xs text-slate-500 mt-1">
               {reservationFilterService
