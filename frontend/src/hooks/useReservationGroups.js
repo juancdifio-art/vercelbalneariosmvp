@@ -71,46 +71,12 @@ function useReservationGroups(authToken) {
           filters: { service, status, from, to }
         });
 
-        // Cargar pagos para cada grupo de reserva en lotes para evitar muchas conexiones simultáneas
-        const MAX_CONCURRENT_REQUESTS = 20;
-        const groupsWithPayments = [];
-
-        for (let i = 0; i < groups.length; i += MAX_CONCURRENT_REQUESTS) {
-          const slice = groups.slice(i, i + MAX_CONCURRENT_REQUESTS);
-
-          // eslint-disable-next-line no-await-in-loop
-          const sliceResults = await Promise.all(
-            slice.map(async (group) => {
-              try {
-                const paymentsResponse = await fetch(
-                  `${API_BASE_URL}/api/reservation-groups/${group.id}/payments`,
-                  {
-                    headers: {
-                      Authorization: `Bearer ${token}`
-                    }
-                  }
-                );
-
-                if (paymentsResponse.ok) {
-                  const paymentsData = await paymentsResponse.json();
-                  return {
-                    ...group,
-                    payments: Array.isArray(paymentsData.payments) ? paymentsData.payments : []
-                  };
-                }
-
-                return { ...group, payments: [] };
-              } catch (paymentErr) {
-                console.error(`Error fetching payments for group ${group.id}`, paymentErr);
-                return { ...group, payments: [] };
-              }
-            })
-          );
-
-          groupsWithPayments.push(...sliceResults);
-        }
-
-        setReservationGroups(groupsWithPayments);
+        // OPTIMIZACIÓN: No cargar pagos aquí (eliminado N+1 problem)
+        // El backend ya devuelve paidAmount (suma total de pagos)
+        // Los pagos detallados se cargarán lazy solo cuando se necesiten:
+        // - Dashboard "Últimos pagos": endpoint GET /api/reservation-groups/payments?limit=5
+        // - Modal de detalles: endpoint GET /api/reservation-groups/{id}/payments
+        setReservationGroups(groups);
       } catch (err) {
         console.error('Error fetching reservation groups', err);
         setReservationGroups([]);

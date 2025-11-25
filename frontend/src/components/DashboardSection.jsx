@@ -1,8 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { format, isToday, parseISO, differenceInCalendarDays, isTomorrow } from 'date-fns';
+import { getApiBaseUrl } from '../apiConfig';
 
-function DashboardSection({ 
-  establishment, 
+const API_BASE_URL = getApiBaseUrl();
+
+function DashboardSection({
+  establishment,
   reservationGroups,
   onViewReservationDetails,
   onNavigateToReservationsWithFilter
@@ -11,40 +14,63 @@ function DashboardSection({
   const [recentReservationsFilter, setRecentReservationsFilter] = useState(null);
   // Estado para filtrar próximos check-ins (carpas o sombrillas)
   const [checkInsFilter, setCheckInsFilter] = useState('carpa');
+  // Estado para ingresos y pagos (cargados del backend)
+  const [todayIncome, setTodayIncome] = useState(0);
+  const [recentPayments, setRecentPayments] = useState([]);
+  // Cargar ingresos del día y últimos pagos desde el backend
+  useEffect(() => {
+    const token = sessionStorage.getItem('authToken');
+    if (!token) return;
+
+    const today = format(new Date(), 'yyyy-MM-dd');
+
+    // Cargar ingresos del día
+    async function fetchTodayIncome() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/reservation-groups/payments?from=${today}&to=${today}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          const total = (data.payments || []).reduce((sum, p) => sum + Number.parseFloat(p.amount || 0), 0);
+          setTodayIncome(total);
+        }
+      } catch (err) {
+        console.error('Error loading today income', err);
+      }
+    }
+
+    // Cargar últimos 5 pagos
+    async function fetchRecentPayments() {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/reservation-groups/payments?limit=5`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setRecentPayments(data.payments || []);
+        }
+      } catch (err) {
+        console.error('Error loading recent payments', err);
+      }
+    }
+
+    fetchTodayIncome();
+    fetchRecentPayments();
+  }, []);
+
   // Calcular métricas del día
   const todayMetrics = useMemo(() => {
     const today = format(new Date(), 'yyyy-MM-dd');
-    
+
     // Reservas activas hoy
     const activeToday = reservationGroups.filter(group => {
       if (!group || group.status === 'cancelled') return false;
       const start = group.startDate;
       const end = group.endDate;
       return start <= today && end >= today;
-    });
-
-    // Ingresos del día (pagos realizados hoy)
-    let todayIncome = 0;
-    reservationGroups.forEach((group) => {
-      if (group && group.payments && Array.isArray(group.payments)) {
-        group.payments.forEach((payment) => {
-          if (!payment || !payment.paymentDate) return;
-
-          let paymentDateStr = '';
-          if (typeof payment.paymentDate === 'string') {
-            paymentDateStr = payment.paymentDate.slice(0, 10);
-          } else if (payment.paymentDate instanceof Date && !Number.isNaN(payment.paymentDate.getTime())) {
-            paymentDateStr = format(payment.paymentDate, 'yyyy-MM-dd');
-          }
-
-          if (paymentDateStr === today) {
-            const amountNum = Number.parseFloat(payment.amount || 0);
-            if (!Number.isNaN(amountNum)) {
-              todayIncome += amountNum;
-            }
-          }
-        });
-      }
     });
 
     // Clientes únicos hoy
@@ -70,7 +96,6 @@ function DashboardSection({
 
     return {
       activeToday: activeToday.length,
-      todayIncome,
       uniqueClients: uniqueClients.size,
       carpasOccupied,
       carpasTotal,
@@ -100,33 +125,6 @@ function DashboardSection({
       })
       .slice(0, 5);
   }, [reservationGroups, recentReservationsFilter]);
-
-  // Últimos pagos (5 más recientes)
-  const recentPayments = useMemo(() => {
-    const allPayments = [];
-    reservationGroups.forEach(group => {
-      if (group && group.payments && Array.isArray(group.payments)) {
-        group.payments.forEach(payment => {
-          const method = payment.method || payment.paymentMethod || '';
-          allPayments.push({
-            ...payment,
-            method,
-            groupId: group.id,
-            serviceType: group.serviceType,
-            resourceNumber: group.resourceNumber,
-            customerName: group.customerName
-          });
-        });
-      }
-    });
-    return allPayments
-      .sort((a, b) => {
-        const dateA = new Date(a.createdAt || a.paymentDate);
-        const dateB = new Date(b.createdAt || b.paymentDate);
-        return dateB - dateA;
-      })
-      .slice(0, 5);
-  }, [reservationGroups]);
 
   // Próximos check-ins (reservas que empiezan en los próximos 7 días, solo carpas y sombrillas)
   const upcomingCheckIns = useMemo(() => {
@@ -205,7 +203,7 @@ function DashboardSection({
               <span className="text-2xl">💰</span>
               <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Ingresos</span>
             </div>
-            <p className="text-3xl font-bold text-emerald-900">${todayMetrics.todayIncome.toFixed(0)}</p>
+            <p className="text-3xl font-bold text-emerald-900">${todayIncome.toFixed(0)}</p>
             <p className="text-xs text-emerald-700 mt-1">Pagos de hoy</p>
           </div>
 

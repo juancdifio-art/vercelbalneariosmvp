@@ -1,6 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { generateReceipt } from '../utils/generateReceipt';
+import { getApiBaseUrl } from '../apiConfig';
+
+const API_BASE_URL = getApiBaseUrl();
 
 function ReservationDetailsModal({
   reservation,
@@ -14,6 +17,7 @@ function ReservationDetailsModal({
   if (!reservation) return null;
 
   const {
+    id,
     serviceType,
     resourceNumber,
     startDate,
@@ -25,14 +29,44 @@ function ReservationDetailsModal({
     paidAmount,
     notes,
     status,
-    payments,
-    paymentsLoading,
     linkedParkingResourceNumber,
     poolAdultsCount,
     poolChildrenCount,
     adultsCount,
     childrenCount
   } = reservation;
+
+  // Estado para cargar pagos lazy (solo cuando se abre el modal)
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+
+  // Cargar pagos cuando se abre el modal
+  useEffect(() => {
+    if (!id) return;
+
+    const token = sessionStorage.getItem('authToken');
+    if (!token) return;
+
+    async function fetchPayments() {
+      setPaymentsLoading(true);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/reservation-groups/${id}/payments`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setPayments(data.payments || []);
+        }
+      } catch (err) {
+        console.error('Error loading payments', err);
+      } finally {
+        setPaymentsLoading(false);
+      }
+    }
+
+    fetchPayments();
+  }, [id]);
 
   const getDaysCount = () => {
     const start = parseLocalDateFromInput(startDate);
