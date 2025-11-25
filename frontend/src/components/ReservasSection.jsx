@@ -38,6 +38,11 @@ function ReservasSection({
 
   // Filtrar reservas por texto de búsqueda, estado de pago y subestado (reservada/activa/finalizada/cancelada)
   const filteredReservations = useMemo(() => {
+    // Si no hay servicio seleccionado, no mostrar reservas en esta sección
+    if (!reservationFilterService) {
+      return [];
+    }
+
     let filtered = reservationGroups;
     
     // Filtrar por nombre
@@ -106,7 +111,7 @@ function ReservasSection({
     }
 
     return filtered;
-  }, [reservationGroups, searchText, paymentFilter, reservationFilterStatus]);
+  }, [reservationGroups, searchText, paymentFilter, reservationFilterStatus, reservationFilterService]);
 
   return (
     <div className="rounded-xl bg-white border border-slate-200 shadow-sm">
@@ -224,7 +229,7 @@ function ReservasSection({
           </button>
           </div>
         </div>
-        {!reservationGroupsLoading && reservationGroups.length > 0 && (
+        {reservationFilterService && reservationGroups.length > 0 && (
           <div className="mt-3 text-[11px] text-slate-600 flex justify-between items-center">
             <span>
               Mostrando{' '}
@@ -233,11 +238,17 @@ function ReservasSection({
               <span className="font-semibold text-slate-800">{reservationGroups.length}</span>
               {' '}reservas
             </span>
+            {reservationGroupsLoading && (
+              <span className="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                <span className="inline-block h-3 w-3 rounded-full border-b-2 border-slate-400 animate-spin" />
+                Actualizando...
+              </span>
+            )}
           </div>
         )}
         {/* Contenido */}
         <div className="px-5 py-4">
-        {reservationGroupsLoading && (
+        {reservationGroupsLoading && reservationGroups.length === 0 && (
           <div className="flex items-center justify-center py-8">
             <div className="text-center">
               <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-600 mb-2"></div>
@@ -246,7 +257,7 @@ function ReservasSection({
           </div>
         )}
 
-        {!reservationGroupsLoading && reservationGroups.length === 0 && (
+        {!reservationGroupsLoading && (!reservationFilterService || reservationGroups.length === 0) && (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -264,7 +275,7 @@ function ReservasSection({
           </div>
         )}
 
-        {!reservationGroupsLoading && reservationGroups.length > 0 && filteredReservations.length === 0 && (
+        {!reservationGroupsLoading && reservationFilterService && reservationGroups.length > 0 && filteredReservations.length === 0 && (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -274,7 +285,7 @@ function ReservasSection({
           </div>
         )}
 
-        {!reservationGroupsLoading && filteredReservations.length > 0 && (
+        {filteredReservations.length > 0 && (
           <div className="overflow-x-auto -mx-5">
             <table className="min-w-full text-[11px]">
               <thead>
