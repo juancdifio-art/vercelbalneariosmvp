@@ -998,6 +998,92 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/reservation-groups/payments (GET) =============
+    // Obtener pagos agregados (para dashboard, reportes)
+    if (first === 'reservation-groups' && second === 'payments' && !segments[3] && method === 'GET') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const url = new URL(req.url, 'http://localhost');
+        const limit = url.searchParams.get('limit');
+        const from = url.searchParams.get('from');
+        const to = url.searchParams.get('to');
+
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        let query = `
+          SELECT
+            p.id,
+            p.amount,
+            p.payment_date,
+            p.payment_method,
+            p.notes,
+            p.created_at,
+            rg.id AS reservation_group_id,
+            rg.service_type,
+            rg.resource_number,
+            rg.customer_name
+          FROM reservation_payments p
+          JOIN reservation_groups rg ON rg.id = p.reservation_group_id
+          WHERE p.establishment_id = $1`;
+
+        const params = [establishmentId];
+
+        // Filtro por rango de fechas
+        if (from) {
+          query += ` AND p.payment_date >= $${params.length + 1}`;
+          params.push(from);
+        }
+        if (to) {
+          query += ` AND p.payment_date <= $${params.length + 1}`;
+          params.push(to);
+        }
+
+        query += ` ORDER BY p.created_at DESC`;
+
+        // Límite de resultados
+        if (limit) {
+          const limitNum = Number.parseInt(limit, 10);
+          if (!Number.isNaN(limitNum) && limitNum > 0) {
+            query += ` LIMIT $${params.length + 1}`;
+            params.push(limitNum);
+          }
+        }
+
+        const result = await db.query(query, params);
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          payments: result.rows.map((row) => ({
+            id: row.id,
+            amount: row.amount,
+            paymentDate: row.payment_date,
+            method: row.payment_method,
+            notes: row.notes,
+            createdAt: row.created_at,
+            groupId: row.reservation_group_id,
+            serviceType: row.service_type,
+            resourceNumber: row.resource_number,
+            customerName: row.customer_name
+          }))
+        }));
+      } catch (error) {
+        console.error('Error fetching aggregated payments:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // ============= /api/reservation-groups/:id/payments (GET/POST) =============
     if (first === 'reservation-groups' && second && segments[3] === 'payments') {
       const user = authenticateToken(req, res);
