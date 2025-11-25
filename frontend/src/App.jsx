@@ -257,9 +257,12 @@ function App() {
     const token = authToken || sessionStorage.getItem('authToken');
     if (!token) return;
 
-    // Cargar todas las reservas activas para el dashboard
+    // Cargar todas las reservas activas para el dashboard (independiente de los filtros de Reservas)
     fetchReservationGroups(token, {
-      status: 'active'
+      status: 'active',
+      service: '',
+      from: '',
+      to: ''
     });
   }, [isAuthenticated, activeSection, authToken, fetchReservationGroups]);
 
