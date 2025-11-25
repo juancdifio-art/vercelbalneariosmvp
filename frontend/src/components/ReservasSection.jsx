@@ -36,7 +36,7 @@ function ReservasSection({
     return `${year}-${month}-${day}`;
   };
 
-  // Filtrar reservas por texto de búsqueda y estado de pago
+  // Filtrar reservas por texto de búsqueda, estado de pago y subestado (reservada/activa/finalizada/cancelada)
   const filteredReservations = useMemo(() => {
     let filtered = reservationGroups;
     
@@ -58,16 +58,55 @@ function ReservasSection({
         if (paymentFilter === 'paid') {
           // Pagado completo (con margen de error de 1 centavo)
           return paidAmount + 0.01 >= totalPrice;
-        } else if (paymentFilter === 'pending') {
+        }
+        if (paymentFilter === 'pending') {
           // Tiene saldo pendiente
           return paidAmount + 0.01 < totalPrice;
         }
         return true;
       });
     }
-    
+
+    // Filtrar por subestado (reservada/activa/finalizada/cancelada) usando fechas
+    if (reservationFilterStatus) {
+      const todayStr = getTodayString();
+
+      filtered = filtered.filter(group => {
+        const isCancelled = group.status === 'cancelled';
+        const startStr = group.startDate || '';
+        const endStr = group.endDate || '';
+
+        if (reservationFilterStatus === 'cancelled') {
+          return isCancelled;
+        }
+
+        // Para otros subestados, ignorar canceladas
+        if (isCancelled) return false;
+
+        if (reservationFilterStatus === 'active') {
+          // Activas hoy: rango que incluye hoy
+          if (!startStr || !endStr) return false;
+          return startStr <= todayStr && endStr >= todayStr;
+        }
+
+        if (reservationFilterStatus === 'reserved') {
+          // Reservadas: futuras, empiezan después de hoy
+          if (!startStr) return false;
+          return startStr > todayStr;
+        }
+
+        if (reservationFilterStatus === 'finished') {
+          // Finalizadas: terminaron antes de hoy
+          if (!endStr) return false;
+          return endStr < todayStr;
+        }
+
+        return true;
+      });
+    }
+
     return filtered;
-  }, [reservationGroups, searchText, paymentFilter]);
+  }, [reservationGroups, searchText, paymentFilter, reservationFilterStatus]);
 
   return (
     <div className="rounded-xl bg-white border border-slate-200 shadow-sm">
@@ -131,7 +170,9 @@ function ReservasSection({
               className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-[11px] text-slate-900"
             >
               <option value="">Todos</option>
-              <option value="active">Activas</option>
+              <option value="active">Activas hoy</option>
+              <option value="reserved">Reservadas (futuras)</option>
+              <option value="finished">Finalizadas</option>
               <option value="cancelled">Canceladas</option>
             </select>
           </div>

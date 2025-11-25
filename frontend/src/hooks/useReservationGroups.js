@@ -23,14 +23,20 @@ function useReservationGroups(authToken) {
         setReservationGroupsLoading(true);
 
         const service = overrides.service ?? reservationFilterService;
-        const status = overrides.status ?? reservationFilterStatus;
+        let status = overrides.status ?? reservationFilterStatus;
         const from = overrides.from ?? reservationFilterFrom;
         const to = overrides.to ?? reservationFilterTo;
 
         const params = new URLSearchParams();
 
         if (service) params.set('service', service);
-        if (status) params.set('status', status);
+
+        // Map UI sub-statuses to backend statuses
+        let backendStatus = status;
+        if (status === 'reserved' || status === 'finished') {
+          backendStatus = 'active';
+        }
+        if (backendStatus) params.set('status', backendStatus);
         if (from) params.set('from', from);
         if (to) params.set('to', to);
 
