@@ -155,7 +155,7 @@ function ReservasSection({
               onChange={(e) => onFilterServiceChange(e.target.value)}
               className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-[11px] text-slate-900"
             >
-              <option value="">Todos</option>
+              <option value="">Seleccioná un servicio</option>
               <option value="carpa">Carpas</option>
               <option value="sombrilla">Sombrillas</option>
               <option value="parking">Estacionamiento</option>
