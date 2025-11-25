@@ -212,8 +212,23 @@ function App() {
     const token = authToken || sessionStorage.getItem('authToken');
     if (!token) return;
 
+    if (!reservationFilterService) {
+      setReservationGroups([]);
+      return;
+    }
+
     fetchReservationGroups(token);
-  }, [isAuthenticated, activeSection, authToken, reservationFilterService, reservationFilterStatus, reservationFilterFrom, reservationFilterTo]);
+  }, [
+    isAuthenticated,
+    activeSection,
+    authToken,
+    reservationFilterService,
+    reservationFilterStatus,
+    reservationFilterFrom,
+    reservationFilterTo,
+    fetchReservationGroups,
+    setReservationGroups
+  ]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
