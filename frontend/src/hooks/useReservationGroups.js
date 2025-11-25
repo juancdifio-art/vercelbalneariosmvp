@@ -6,8 +6,8 @@ const API_BASE_URL = getApiBaseUrl();
 function useReservationGroups(authToken) {
   const [reservationGroups, setReservationGroups] = useState([]);
   const [reservationGroupsLoading, setReservationGroupsLoading] = useState(false);
-  // Por defecto, mostrar sombrillas activas hoy en la sección Reservas
-  const [reservationFilterService, setReservationFilterService] = useState('sombrilla');
+  // Por defecto, mostrar todas las reservas activas en la sección Reservas
+  const [reservationFilterService, setReservationFilterService] = useState('');
   const [reservationFilterStatus, setReservationFilterStatus] = useState('active');
   const [reservationFilterFrom, setReservationFilterFrom] = useState('');
   const [reservationFilterTo, setReservationFilterTo] = useState('');

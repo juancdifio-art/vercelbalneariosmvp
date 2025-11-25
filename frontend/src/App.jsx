@@ -212,11 +212,7 @@ function App() {
     const token = authToken || sessionStorage.getItem('authToken');
     if (!token) return;
 
-    if (!reservationFilterService) {
-      setReservationGroups([]);
-      return;
-    }
-
+    // Cargar reservas (si no hay servicio seleccionado, carga todas)
     fetchReservationGroups(token);
   }, [
     isAuthenticated,
@@ -2456,7 +2452,8 @@ function App() {
                 onFilterFromChange={(value) => setReservationFilterFrom(value)}
                 onFilterToChange={(value) => setReservationFilterTo(value)}
                 onClearFilters={() => {
-                  setReservationFilterService('');
+                  // Volver al filtro por defecto: sombrillas activas hoy
+                  setReservationFilterService('sombrilla');
                   setReservationFilterStatus('active');
                   setReservationFilterFrom('');
                   setReservationFilterTo('');

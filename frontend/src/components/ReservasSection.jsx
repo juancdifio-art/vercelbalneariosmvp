@@ -38,11 +38,6 @@ function ReservasSection({
 
   // Filtrar reservas por texto de búsqueda, estado de pago y subestado (reservada/activa/finalizada/cancelada)
   const filteredReservations = useMemo(() => {
-    // Si no hay servicio seleccionado, no mostrar reservas en esta sección
-    if (!reservationFilterService) {
-      return [];
-    }
-
     let filtered = reservationGroups;
     
     // Filtrar por nombre
@@ -160,7 +155,7 @@ function ReservasSection({
               onChange={(e) => onFilterServiceChange(e.target.value)}
               className="rounded-lg border border-cyan-200 bg-white px-2 py-1 text-[11px] text-slate-900"
             >
-              <option value="">Seleccioná un servicio</option>
+              <option value="">Todas</option>
               <option value="carpa">Carpas</option>
               <option value="sombrilla">Sombrillas</option>
               <option value="parking">Estacionamiento</option>
