@@ -9,7 +9,9 @@ function ParkingReservationModal({
   onChangeForm,
   onSaveRange,
   onReleaseRange,
-  onClose
+  onClose,
+  establishment,
+  reservationGroups
 }) {
   if (!form) return null;
 
@@ -24,6 +26,32 @@ function ParkingReservationModal({
     customerPhone,
     dailyPrice
   } = form;
+
+  // Calcular plazas disponibles para el rango de fechas seleccionado
+  const totalPlazas = Number.parseInt(establishment?.parkingCapacity ?? '0', 10);
+
+  const getAvailablePlazas = () => {
+    if (!startDate || !endDate || !totalPlazas) return [];
+
+    const available = [];
+    for (let i = 1; i <= totalPlazas; i++) {
+      // Verificar si la plaza está ocupada en el rango de fechas
+      const isOccupied = reservationGroups?.some((g) => {
+        if (g.serviceType !== 'parking') return false;
+        if (g.resourceNumber !== i) return false;
+        if (g.status !== 'active') return false;
+        // Verificar solapamiento de fechas
+        return g.startDate <= endDate && g.endDate >= startDate;
+      });
+
+      if (!isOccupied || i === plazaNumero) {
+        available.push(i);
+      }
+    }
+    return available;
+  };
+
+  const availablePlazas = getAvailablePlazas();
 
   const startStr = startDate || format(day, 'yyyy-MM-dd');
   const endStr = endDate || '';
@@ -75,6 +103,55 @@ function ParkingReservationModal({
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex-1">
+
+          {/* Selector de plaza */}
+          {!isReserved && totalPlazas > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
+                <span>🅿️</span>
+                <span>Plaza de estacionamiento</span>
+              </h3>
+              <div className="space-y-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Número de plaza</span>
+                  <select
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    value={plazaNumero || ''}
+                    onChange={(e) => {
+                      const value = Number.parseInt(e.target.value, 10);
+                      onChangeForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              plazaNumero: value
+                            }
+                          : prev
+                      );
+                    }}
+                  >
+                    {Array.from({ length: totalPlazas }, (_, i) => i + 1).map((num) => {
+                      const isAvailable = availablePlazas.includes(num);
+                      const isCurrent = num === plazaNumero;
+                      return (
+                        <option
+                          key={num}
+                          value={num}
+                          disabled={!isAvailable && !isCurrent}
+                        >
+                          Plaza {num}{!isAvailable && !isCurrent ? ' (ocupada)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                {endDate && availablePlazas.length > 0 && (
+                  <p className="text-[10px] text-slate-500">
+                    {availablePlazas.length} {availablePlazas.length === 1 ? 'plaza disponible' : 'plazas disponibles'} para las fechas seleccionadas
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {!isReserved && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">

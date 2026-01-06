@@ -10,7 +10,8 @@ function CarpaReservationModal({
   onChangeForm,
   onSaveRange,
   onReleaseRange,
-  onClose
+  onClose,
+  reservationGroups
 }) {
   if (!form) return null;
 
@@ -39,8 +40,22 @@ function CarpaReservationModal({
     : 0;
   const parkingUnits = parkingCapacity > 0 ? Array.from({ length: parkingCapacity }, (_, i) => i + 1) : [];
 
+  // Calcular carpas disponibles para el rango de fechas seleccionado
+  const totalCarpas = Number.parseInt(establishment?.carpasCapacity ?? '0', 10);
+
   const startStr = startDate || format(day, 'yyyy-MM-dd');
   const endStr = endDate || '';
+
+  // Función para verificar si una unidad está ocupada en un rango de fechas
+  const isUnitOccupied = (serviceType, unitNumber, start, end) => {
+    if (!start || !end) return false;
+    return reservationGroups?.some((g) => {
+      if (g.serviceType !== serviceType) return false;
+      if (Number(g.resourceNumber) !== unitNumber) return false;
+      if (g.status !== 'active') return false;
+      return g.startDate <= end && g.endDate >= start;
+    }) || false;
+  };
 
   const startDateObj = parseLocalDateFromInput(startStr);
   const endDateObj = parseLocalDateFromInput(endStr);
@@ -110,6 +125,49 @@ function CarpaReservationModal({
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex-1">
+
+          {/* Selector de carpa */}
+          {!isReserved && totalCarpas > 0 && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
+                <span>🏖️</span>
+                <span>Carpa</span>
+              </h3>
+              <div className="space-y-2">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Número de carpa</span>
+                  <select
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    value={carpaNumero || ''}
+                    onChange={(e) => {
+                      const value = Number.parseInt(e.target.value, 10);
+                      onChangeForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              carpaNumero: value
+                            }
+                          : prev
+                      );
+                    }}
+                  >
+                    {Array.from({ length: totalCarpas }, (_, i) => i + 1).map((num) => {
+                      const isOccupied = isUnitOccupied('carpa', num, startStr, endStr);
+                      return (
+                        <option
+                          key={num}
+                          value={num}
+                          disabled={isOccupied}
+                        >
+                          Carpa {num}{isOccupied ? ' (ocupada)' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              </div>
+            </div>
+          )}
 
           {!isReserved && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
@@ -371,6 +429,38 @@ function CarpaReservationModal({
 
               {includeParking && (
                 <div className="space-y-3 pl-6">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-semibold text-slate-700">Plaza de estacionamiento</span>
+                    <select
+                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      value={parkingSpotNumber || ''}
+                      onChange={(e) => {
+                        const value = e.target.value ? Number.parseInt(e.target.value, 10) : null;
+                        onChangeForm((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                parkingSpotNumber: value
+                              }
+                            : prev
+                        );
+                      }}
+                    >
+                      <option value="">Seleccionar plaza...</option>
+                      {parkingUnits.map((num) => {
+                        const isOccupied = isUnitOccupied('parking', num, startStr, endStr);
+                        return (
+                          <option
+                            key={num}
+                            value={num}
+                            disabled={isOccupied}
+                          >
+                            Plaza {num}{isOccupied ? ' (ocupada)' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold text-slate-700">Valor por día estacionamiento (ARS)</span>
                     <input

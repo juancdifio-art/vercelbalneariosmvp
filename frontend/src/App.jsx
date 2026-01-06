@@ -2036,11 +2036,45 @@ function App() {
       tempCustomerName,
       tempCustomerPhone,
       tempTotalPrice,
-      tempNotes
+      tempNotes,
+      tempResourceNumber,
+      resourceNumber,
+      serviceType,
+      startDate,
+      endDate,
+      tempStartDate,
+      tempEndDate
     } = reservationEditModal;
 
     try {
       setReservationEditSaving(true);
+
+      // Preparar el body con los campos actualizables
+      const updateBody = {
+        customerName: tempCustomerName || '',
+        customerPhone: tempCustomerPhone || '',
+        totalPrice:
+          tempTotalPrice === undefined || tempTotalPrice === null || tempTotalPrice === ''
+            ? ''
+            : String(tempTotalPrice),
+        notes: tempNotes || ''
+      };
+
+      // Agregar resourceNumber solo si cambió
+      const resourceNumberChanged = tempResourceNumber !== undefined && tempResourceNumber !== resourceNumber;
+      if (resourceNumberChanged) {
+        updateBody.resourceNumber = tempResourceNumber;
+      }
+
+      // Agregar fechas solo si cambiaron
+      const startDateChanged = tempStartDate && tempStartDate !== startDate;
+      const endDateChanged = tempEndDate && tempEndDate !== endDate;
+      if (startDateChanged) {
+        updateBody.startDate = tempStartDate;
+      }
+      if (endDateChanged) {
+        updateBody.endDate = tempEndDate;
+      }
 
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups/${id}`, {
         method: 'PATCH',
@@ -2048,15 +2082,7 @@ function App() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`
         },
-        body: JSON.stringify({
-          customerName: tempCustomerName || '',
-          customerPhone: tempCustomerPhone || '',
-          totalPrice:
-            tempTotalPrice === undefined || tempTotalPrice === null || tempTotalPrice === ''
-              ? ''
-              : String(tempTotalPrice),
-          notes: tempNotes || ''
-        })
+        body: JSON.stringify(updateBody)
       });
 
       if (!response.ok) {
@@ -2064,13 +2090,50 @@ function App() {
         return;
       }
 
-      const data = await response.json();
+      // Si cambió el resourceNumber o las fechas, actualizar el mapa visual de reservas
+      const datesChanged = startDateChanged || endDateChanged;
+      if ((resourceNumberChanged || datesChanged) && startDate && endDate) {
+        const oldStart = parseLocalDateFromInput(startDate);
+        const oldEnd = parseLocalDateFromInput(endDate);
+        const newStart = parseLocalDateFromInput(tempStartDate || startDate);
+        const newEnd = parseLocalDateFromInput(tempEndDate || endDate);
+        const finalResourceNumber = tempResourceNumber ?? resourceNumber;
 
-      if (data.group) {
-        setReservationGroups((prev) =>
-          prev.map((g) => (g.id === data.group.id ? data.group : g))
-        );
+        if (oldStart && oldEnd && newStart && newEnd) {
+          // Determinar qué setter usar según el tipo de servicio
+          const setReservationsMap =
+            serviceType === 'carpa' ? setCarpasReservations :
+            serviceType === 'sombrilla' ? setSombrillasReservations :
+            serviceType === 'parking' ? setParkingReservations : null;
+
+          if (setReservationsMap) {
+            setReservationsMap((prev) => {
+              const next = { ...prev };
+              // Eliminar las claves del rango/recurso anterior
+              for (let d = new Date(oldStart); d <= oldEnd; d = addDays(d, 1)) {
+                const dateKeyStr = format(d, 'yyyy-MM-dd');
+                const oldKey = `${dateKeyStr}-${resourceNumber}`;
+                delete next[oldKey];
+              }
+              // Agregar las claves del nuevo rango/recurso
+              for (let d = new Date(newStart); d <= newEnd; d = addDays(d, 1)) {
+                const dateKeyStr = format(d, 'yyyy-MM-dd');
+                const newKey = `${dateKeyStr}-${finalResourceNumber}`;
+                next[newKey] = true;
+              }
+              return next;
+            });
+          }
+        }
       }
+
+      // Refrescar la lista de reservas con los mismos filtros actuales
+      await fetchReservationGroups(token, {
+        service: reservationFilterService,
+        status: reservationFilterStatus,
+        from: reservationFilterFrom,
+        to: reservationFilterTo
+      });
 
       setReservationEditModal(null);
     } catch (err) {
@@ -2297,6 +2360,7 @@ function App() {
               onSaveRange={handleSaveCarpaReservationRange}
               onReleaseRange={handleReleaseCarpaReservationRange}
               onClose={() => setCarpaReservationForm(null)}
+              reservationGroups={reservationGroups}
             />
           )}
 
@@ -2311,6 +2375,8 @@ function App() {
               onSaveRange={handleSaveParkingReservationRange}
               onReleaseRange={handleReleaseParkingReservationRange}
               onClose={() => setParkingReservationForm(null)}
+              establishment={establishment}
+              reservationGroups={reservationGroups}
             />
           )}
 
@@ -2326,6 +2392,7 @@ function App() {
               onSaveRange={handleSaveSombrillaReservationRange}
               onReleaseRange={handleReleaseSombrillaReservationRange}
               onClose={() => setSombrillaReservationForm(null)}
+              reservationGroups={reservationGroups}
             />
           )}
 
@@ -2337,6 +2404,8 @@ function App() {
               saving={reservationEditSaving}
               onSave={handleSaveReservationEdit}
               onClose={() => setReservationEditModal(null)}
+              establishment={establishment}
+              reservationGroups={reservationGroups}
             />
           )}
 

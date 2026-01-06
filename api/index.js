@@ -953,10 +953,48 @@ module.exports = async (req, res) => {
         }
 
         // Update other fields
-        const { customerName, customerPhone, dailyPrice, totalPrice, notes, adultsCount, childrenCount } = body;
+        const { customerName, customerPhone, dailyPrice, totalPrice, notes, adultsCount, childrenCount, resourceNumber, startDate, endDate } = body;
+
+        // Calcular las fechas finales (nuevas o actuales)
+        const finalStartDate = startDate !== undefined ? startDate : current.start_date;
+        const finalEndDate = endDate !== undefined ? endDate : current.end_date;
+        const finalResourceNumber = resourceNumber !== undefined ? resourceNumber : current.resource_number;
+
+        // Si se quiere cambiar el resourceNumber o las fechas, verificar disponibilidad
+        const resourceChanged = resourceNumber !== undefined && resourceNumber !== current.resource_number;
+        const datesChanged = (startDate !== undefined && startDate !== current.start_date) ||
+                            (endDate !== undefined && endDate !== current.end_date);
+
+        if (resourceChanged || datesChanged) {
+          // Verificar que no haya conflicto con otra reserva
+          const conflictCheck = await db.query(
+            `SELECT id FROM reservation_groups
+             WHERE establishment_id = $1
+             AND service_type = $2
+             AND resource_number = $3
+             AND status = 'active'
+             AND id != $4
+             AND start_date <= $5
+             AND end_date >= $6`,
+            [
+              establishmentId,
+              current.service_type,
+              finalResourceNumber,
+              reservationGroupId,
+              finalEndDate,
+              finalStartDate
+            ]
+          );
+
+          if (conflictCheck.rows.length > 0) {
+            res.statusCode = 409;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'resource_conflict', message: 'La unidad seleccionada ya está ocupada en ese rango de fechas' }));
+          }
+        }
 
         const updateResult = await db.query(
-          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7 WHERE id = $8 RETURNING *`,
+          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10 WHERE id = $11 RETURNING *`,
           [
             customerName !== undefined ? customerName : current.customer_name,
             customerPhone !== undefined ? customerPhone : current.customer_phone,
@@ -965,6 +1003,9 @@ module.exports = async (req, res) => {
             notes !== undefined ? notes : current.notes,
             adultsCount !== undefined ? adultsCount : current.adults_count,
             childrenCount !== undefined ? childrenCount : current.children_count,
+            finalResourceNumber,
+            finalStartDate,
+            finalEndDate,
             reservationGroupId
           ]
         );

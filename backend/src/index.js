@@ -1213,7 +1213,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
       poolAdultsCount,
       poolChildrenCount,
       poolAdultPricePerDay,
-      poolChildPricePerDay
+      poolChildPricePerDay,
+      resourceNumber
     } = req.body;
 
     const allowedStatus = ['active', 'cancelled'];
@@ -1297,8 +1298,41 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
       nextClientId = current.client_id;
     }
 
+    // Manejar cambio de resourceNumber
+    let nextResourceNumber = current.resource_number;
+    if (resourceNumber !== undefined && resourceNumber !== null && resourceNumber !== current.resource_number) {
+      // Verificar que no haya conflicto con otra reserva en el nuevo recurso
+      const conflictCheck = await pool.query(
+        `SELECT id FROM reservation_groups
+         WHERE establishment_id = $1
+         AND service_type = $2
+         AND resource_number = $3
+         AND status = 'active'
+         AND id != $4
+         AND start_date <= $5
+         AND end_date >= $6`,
+        [
+          establishmentId,
+          current.service_type,
+          resourceNumber,
+          groupId,
+          current.end_date,
+          current.start_date
+        ]
+      );
+
+      if (conflictCheck.rows.length > 0) {
+        return res.status(409).json({
+          error: 'resource_conflict',
+          message: 'La unidad seleccionada ya está ocupada en ese rango de fechas'
+        });
+      }
+
+      nextResourceNumber = resourceNumber;
+    }
+
     const updateResult = await pool.query(
-      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, pool_adults_count = $8, pool_children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, updated_at = NOW() WHERE id = $12 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day',
+      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, pool_adults_count = $8, pool_children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, updated_at = NOW() WHERE id = $13 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day',
       [
         nextCustomerName || null,
         nextCustomerPhone || null,
@@ -1311,6 +1345,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         nextPoolChildrenCount,
         nextPoolAdultPricePerDay,
         nextPoolChildPricePerDay,
+        nextResourceNumber,
         groupId
       ]
     );
@@ -1345,6 +1380,87 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     });
   } catch (error) {
     console.error('Error updating reservation group', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Endpoint para obtener pagos agregados (dashboard, reportes)
+// IMPORTANTE: Este endpoint debe estar ANTES de /api/reservation-groups/:id/payments
+app.get('/api/reservation-groups/payments', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { limit, from, to } = req.query;
+
+    const estResult = await pool.query(
+      'SELECT id FROM establishments WHERE user_id = $1',
+      [userId]
+    );
+
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'establishment_not_found' });
+    }
+
+    const establishmentId = estResult.rows[0].id;
+
+    let query = `
+      SELECT
+        p.id,
+        p.amount,
+        p.payment_date,
+        p.method AS payment_method,
+        p.notes,
+        p.created_at,
+        rg.id AS reservation_group_id,
+        rg.service_type,
+        rg.resource_number,
+        rg.customer_name
+      FROM reservation_payments p
+      JOIN reservation_groups rg ON rg.id = p.reservation_group_id
+      WHERE p.establishment_id = $1`;
+
+    const params = [establishmentId];
+
+    // Filtro por rango de fechas
+    if (from) {
+      query += ` AND p.payment_date >= $${params.length + 1}`;
+      params.push(from);
+    }
+    if (to) {
+      query += ` AND p.payment_date <= $${params.length + 1}`;
+      params.push(to);
+    }
+
+    query += ` ORDER BY p.created_at DESC`;
+
+    // Límite de resultados
+    if (limit) {
+      const limitNum = Number.parseInt(limit, 10);
+      if (!Number.isNaN(limitNum) && limitNum > 0) {
+        query += ` LIMIT $${params.length + 1}`;
+        params.push(limitNum);
+      }
+    }
+
+    const result = await pool.query(query, params);
+
+    return res.json({
+      payments: result.rows.map((row) => ({
+        id: row.id,
+        amount: row.amount,
+        paymentDate: row.payment_date instanceof Date
+          ? row.payment_date.toISOString().slice(0, 10)
+          : row.payment_date,
+        method: row.payment_method,
+        notes: row.notes,
+        createdAt: row.created_at,
+        groupId: row.reservation_group_id,
+        serviceType: row.service_type,
+        resourceNumber: row.resource_number,
+        customerName: row.customer_name
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching aggregated payments:', error);
     res.status(500).json({ error: 'server_error' });
   }
 });
