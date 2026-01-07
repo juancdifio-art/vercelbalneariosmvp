@@ -6,6 +6,7 @@
 - [2025-11-17 - Configuración y panel interno](#2025-11-17---configuración-y-panel-interno)
 - [2025-11-17 - Reservas y vista de reservas](#2025-11-17---reservas-y-vista-de-reservas)
 - [2025-11-18 - Pagos de reservas y mejoras de UI](#2025-11-18---pagos-de-reservas-y-mejoras-de-ui)
+- [2026-01-06 - Correcciones de pileta y mejoras en modal de edición](#2026-01-06---correcciones-de-pileta-y-mejoras-en-modal-de-edición)
 
 ## 2025-11-16 - Inicio del proyecto
 
@@ -285,6 +286,54 @@
   - Efectos hover y transiciones suaves
   - Cards clickeables con feedback visual (bordes de color, rings, sombras)
   - Badges y chips con colores semánticos
+
+## 2026-01-06 - Correcciones de pileta y mejoras en modal de edición
+
+- **Fix: Visualización de adultos y niños en pases de pileta**
+  - Corregido bug donde la tabla de pases de pileta mostraba "0 adultos" y "0 niños" para reservas existentes.
+  - El problema era una inconsistencia en los nombres de campos: el backend devolvía `poolAdultsCount`/`poolChildrenCount` pero el frontend buscaba `adultsCount`/`childrenCount`.
+  - Actualizado `PiletaSection.jsx` para usar los nombres correctos de campos con fallback a los nombres alternativos.
+  - Corregido tanto en el cálculo de estadísticas de ocupación como en el renderizado de la tabla.
+
+- **Feature: Resumen financiero en modal de edición de reservas**
+  - Agregado resumen financiero para carpas, sombrillas y estacionamiento en `ReservationEditModal.jsx`.
+  - El resumen muestra:
+    - Tarifa por día actual
+    - Duración en días (con indicador si cambió respecto al original)
+    - Total sugerido calculado automáticamente (tarifa × días)
+  - Incluye botón "Aplicar total sugerido" que aparece cuando el total actual no coincide con el calculado.
+  - Permite ver inmediatamente cómo afecta al precio total el cambio de fechas o tarifa diaria.
+
+- **Feature: Edición completa de pases de pileta**
+  - Agregada sección "Composición del pase" en `ReservationEditModal.jsx` para editar pases de pileta.
+  - Campos editables: cantidad de adultos, cantidad de niños, precio por adulto/día, precio por niño/día.
+  - Para pases de pileta se ocultan los campos genéricos de "Tarifa por día" y "Precio total".
+  - El total se calcula automáticamente y se muestra con desglose: `(X adultos × $precio + Y niños × $precio) × días`.
+
+- **Fix: Cálculo correcto de días para recálculo de precio**
+  - Corregido bug en `backend/src/index.js` donde el cálculo de días entre fechas fallaba por problemas de timezone.
+  - Agregada función `normalizeDate()` que normaliza las fechas a UTC puro (solo año-mes-día).
+  - Cambiado `Math.floor` a `Math.round` para evitar errores de redondeo en el cálculo de días.
+
+- **Fix: Persistencia de campos de pileta al guardar ediciones**
+  - Actualizado `handleSaveReservationEdit` en `App.jsx` para enviar campos de pileta al backend.
+  - Campos incluidos: `poolAdultsCount`, `poolChildrenCount`, `poolAdultPricePerDay`, `poolChildPricePerDay`.
+  - El `dailyPrice` y `totalPrice` se recalculan automáticamente basándose en la composición del pase.
+
+- **Feature: Separadores de miles en campos monetarios**
+  - Agregado formateo con separadores de miles en `PoolPassModal.jsx` para nuevo pase de pileta.
+  - Campos formateados: precio por adulto/día, precio por niño/día, monto de pago inicial.
+  - Los totales mostrados usan formato argentino (ej: `$1.000,00`).
+
+- **Feature: Desglose de tarifa en modal de nuevo pase de pileta**
+  - Agregado desglose de la fórmula de cálculo en `PoolPassModal.jsx`.
+  - Muestra: Total por día, Total estadía (con días), y fórmula completa.
+  - Ejemplo: `(1 adulto × $500 + 2 niños × $250) × 1 día`.
+
+- **Fix: Campo "Tarifa por día" agregado al modal de edición**
+  - Agregado campo editable para "Tarifa por día" en `ReservationEditModal.jsx`.
+  - Inicialización de `tempDailyPrice` al abrir el modal de edición.
+  - El valor se envía al backend y se usa para recalcular el total si cambian las fechas.
 
 ## Próximos pasos
 

@@ -1214,7 +1214,9 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
       poolChildrenCount,
       poolAdultPricePerDay,
       poolChildPricePerDay,
-      resourceNumber
+      resourceNumber,
+      startDate,
+      endDate
     } = req.body;
 
     const allowedStatus = ['active', 'cancelled'];
@@ -1253,7 +1255,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
           ? null
           : Number.parseFloat(dailyPrice))
         : current.daily_price;
-    const nextTotalPrice =
+    let nextTotalPrice =
       totalPrice !== undefined
         ? (totalPrice === null || totalPrice === ''
           ? null
@@ -1298,10 +1300,21 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
       nextClientId = current.client_id;
     }
 
-    // Manejar cambio de resourceNumber
+    // Manejar cambio de resourceNumber o fechas
     let nextResourceNumber = current.resource_number;
-    if (resourceNumber !== undefined && resourceNumber !== null && resourceNumber !== current.resource_number) {
-      // Verificar que no haya conflicto con otra reserva en el nuevo recurso
+    let nextStartDate = startDate !== undefined ? startDate : current.start_date;
+    let nextEndDate = endDate !== undefined ? endDate : current.end_date;
+
+    const resourceChanged = resourceNumber !== undefined && resourceNumber !== null && resourceNumber !== current.resource_number;
+    const startDateChanged = startDate !== undefined && startDate !== current.start_date;
+    const endDateChanged = endDate !== undefined && endDate !== current.end_date;
+
+    if (resourceChanged || startDateChanged || endDateChanged) {
+      const finalResourceNumber = resourceNumber !== undefined && resourceNumber !== null ? resourceNumber : current.resource_number;
+      const finalStartDate = startDate !== undefined ? startDate : current.start_date;
+      const finalEndDate = endDate !== undefined ? endDate : current.end_date;
+
+      // Verificar que no haya conflicto con otra reserva
       const conflictCheck = await pool.query(
         `SELECT id FROM reservation_groups
          WHERE establishment_id = $1
@@ -1314,10 +1327,10 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         [
           establishmentId,
           current.service_type,
-          resourceNumber,
+          finalResourceNumber,
           groupId,
-          current.end_date,
-          current.start_date
+          finalEndDate,
+          finalStartDate
         ]
       );
 
@@ -1328,11 +1341,34 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         });
       }
 
-      nextResourceNumber = resourceNumber;
+      nextResourceNumber = finalResourceNumber;
+      nextStartDate = finalStartDate;
+      nextEndDate = finalEndDate;
+
+      // Recalcular el precio total si cambiaron las fechas y hay un precio por día
+      if ((startDateChanged || endDateChanged) && nextDailyPrice !== null && nextDailyPrice > 0) {
+        // Normalizar fechas a solo año-mes-día para evitar problemas de timezone
+        const normalizeDate = (d) => {
+          if (d instanceof Date) {
+            return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+          }
+          // Si es string "2026-01-10", parsear manualmente
+          const parts = String(d).split('-');
+          return new Date(Date.UTC(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10)));
+        };
+        const startForCalc = normalizeDate(nextStartDate);
+        const endForCalc = normalizeDate(nextEndDate);
+        const msPerDay = 24 * 60 * 60 * 1000;
+        let daysCount = Math.round((endForCalc - startForCalc) / msPerDay) + 1;
+        if (!Number.isFinite(daysCount) || daysCount <= 0) {
+          daysCount = 1;
+        }
+        nextTotalPrice = nextDailyPrice * daysCount;
+      }
     }
 
     const updateResult = await pool.query(
-      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, pool_adults_count = $8, pool_children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, updated_at = NOW() WHERE id = $13 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day',
+      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, pool_adults_count = $8, pool_children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, updated_at = NOW() WHERE id = $15 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day',
       [
         nextCustomerName || null,
         nextCustomerPhone || null,
@@ -1346,6 +1382,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         nextPoolAdultPricePerDay,
         nextPoolChildPricePerDay,
         nextResourceNumber,
+        nextStartDate,
+        nextEndDate,
         groupId
       ]
     );

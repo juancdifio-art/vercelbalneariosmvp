@@ -332,9 +332,9 @@ function App() {
           for (const r of data.reservations) {
             const start = parseLocalDateFromInput(r.startDate);
             const end = parseLocalDateFromInput(r.endDate);
-            
+
             if (!start || !end) continue;
-            
+
             // Iterar por cada día del rango
             let current = new Date(start);
             while (current <= end) {
@@ -424,9 +424,9 @@ function App() {
           for (const r of data.reservations) {
             const start = parseLocalDateFromInput(r.startDate);
             const end = parseLocalDateFromInput(r.endDate);
-            
+
             if (!start || !end) continue;
-            
+
             // Iterar por cada día del rango
             let current = new Date(start);
             while (current <= end) {
@@ -516,9 +516,9 @@ function App() {
           for (const r of data.reservations) {
             const start = parseLocalDateFromInput(r.startDate);
             const end = parseLocalDateFromInput(r.endDate);
-            
+
             if (!start || !end) continue;
-            
+
             // Iterar por cada día del rango
             let current = new Date(start);
             while (current <= end) {
@@ -783,10 +783,10 @@ function App() {
                     prev.map((g) =>
                       g.id === data.group.id
                         ? {
-                            ...g,
-                            paidAmount:
-                              Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                          }
+                          ...g,
+                          paidAmount:
+                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
+                        }
                         : g
                     )
                   );
@@ -1183,10 +1183,10 @@ function App() {
                     prev.map((g) =>
                       g.id === data.group.id
                         ? {
-                            ...g,
-                            paidAmount:
-                              Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                          }
+                          ...g,
+                          paidAmount:
+                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
+                        }
                         : g
                     )
                   );
@@ -1389,10 +1389,10 @@ function App() {
                     prev.map((g) =>
                       g.id === data.group.id
                         ? {
-                            ...g,
-                            paidAmount:
-                              Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                          }
+                          ...g,
+                          paidAmount:
+                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
+                        }
                         : g
                     )
                   );
@@ -1711,6 +1711,7 @@ function App() {
       ...group,
       tempCustomerName: group.customerName || '',
       tempCustomerPhone: group.customerPhone || '',
+      tempDailyPrice: group.dailyPrice ?? '',
       tempTotalPrice: group.totalPrice ?? '',
       tempNotes: group.notes || ''
     });
@@ -1840,13 +1841,13 @@ function App() {
             setReservationDetailsModal((prev) =>
               prev && prev.id === group.id
                 ? {
-                    ...prev,
-                    linkedParkingResourceNumber: maybeParking.resourceNumber,
-                    linkedParkingData: {
-                      totalPrice: maybeParking.totalPrice,
-                      paidAmount: maybeParking.paidAmount
-                    }
+                  ...prev,
+                  linkedParkingResourceNumber: maybeParking.resourceNumber,
+                  linkedParkingData: {
+                    totalPrice: maybeParking.totalPrice,
+                    paidAmount: maybeParking.paidAmount
                   }
+                }
                 : prev
             );
           }
@@ -1882,10 +1883,10 @@ function App() {
         setReservationDetailsModal((prev) =>
           prev && prev.id === group.id
             ? {
-                ...prev,
-                payments: Array.isArray(data.payments) ? data.payments : [],
-                paymentsLoading: false
-              }
+              ...prev,
+              payments: Array.isArray(data.payments) ? data.payments : [],
+              paymentsLoading: false
+            }
             : prev
         );
       } catch (err) {
@@ -1902,12 +1903,12 @@ function App() {
   const handleNavigateToReservationsWithFilter = (serviceType) => {
     // Cambiar a la sección de reservas
     setActiveSection('reservas');
-    
+
     // Aplicar el filtro de servicio
     if (serviceType) {
       setReservationFilterService(serviceType);
     }
-    
+
     // Limpiar otros filtros para mostrar todas las reservas de ese servicio
     setReservationFilterStatus('');
     setReservationFilterFrom('');
@@ -1942,15 +1943,15 @@ function App() {
 
     const totalPriceNum =
       reservationPaymentModal.totalPrice !== null &&
-      reservationPaymentModal.totalPrice !== undefined &&
-      reservationPaymentModal.totalPrice !== ''
+        reservationPaymentModal.totalPrice !== undefined &&
+        reservationPaymentModal.totalPrice !== ''
         ? Number.parseFloat(String(reservationPaymentModal.totalPrice))
         : null;
 
     const paidAmountNum =
       reservationPaymentModal.paidAmount !== null &&
-      reservationPaymentModal.paidAmount !== undefined &&
-      reservationPaymentModal.paidAmount !== ''
+        reservationPaymentModal.paidAmount !== undefined &&
+        reservationPaymentModal.paidAmount !== ''
         ? Number.parseFloat(String(reservationPaymentModal.paidAmount))
         : 0;
 
@@ -2000,13 +2001,13 @@ function App() {
           prev.map((g) =>
             g.id === id
               ? {
-                  ...g,
-                  paidAmount:
-                    Number(g.paidAmount || 0) + Number(data.payment.amount || 0),
-                  payments: Array.isArray(g.payments)
-                    ? [...g.payments, data.payment]
-                    : [data.payment]
-                }
+                ...g,
+                paidAmount:
+                  Number(g.paidAmount || 0) + Number(data.payment.amount || 0),
+                payments: Array.isArray(g.payments)
+                  ? [...g.payments, data.payment]
+                  : [data.payment]
+              }
               : g
           )
         );
@@ -2035,6 +2036,7 @@ function App() {
       id,
       tempCustomerName,
       tempCustomerPhone,
+      tempDailyPrice,
       tempTotalPrice,
       tempNotes,
       tempResourceNumber,
@@ -2043,7 +2045,17 @@ function App() {
       startDate,
       endDate,
       tempStartDate,
-      tempEndDate
+      tempEndDate,
+      dailyPrice,
+      // Pool-specific fields
+      tempPoolAdultsCount,
+      tempPoolChildrenCount,
+      tempPoolAdultPricePerDay,
+      tempPoolChildPricePerDay,
+      poolAdultsCount,
+      poolChildrenCount,
+      poolAdultPricePerDay,
+      poolChildPricePerDay
     } = reservationEditModal;
 
     try {
@@ -2053,12 +2065,56 @@ function App() {
       const updateBody = {
         customerName: tempCustomerName || '',
         customerPhone: tempCustomerPhone || '',
+        dailyPrice:
+          tempDailyPrice === undefined || tempDailyPrice === null || tempDailyPrice === ''
+            ? (dailyPrice ?? '')
+            : String(tempDailyPrice),
         totalPrice:
           tempTotalPrice === undefined || tempTotalPrice === null || tempTotalPrice === ''
             ? ''
             : String(tempTotalPrice),
         notes: tempNotes || ''
       };
+
+      // Agregar campos de pileta solo si el servicio es pileta
+      if (serviceType === 'pileta') {
+        const finalPoolAdultsCount = tempPoolAdultsCount !== undefined ? tempPoolAdultsCount : (poolAdultsCount ?? 0);
+        const finalPoolChildrenCount = tempPoolChildrenCount !== undefined ? tempPoolChildrenCount : (poolChildrenCount ?? 0);
+        const finalPoolAdultPricePerDay = tempPoolAdultPricePerDay !== undefined ? tempPoolAdultPricePerDay : (poolAdultPricePerDay ?? 0);
+        const finalPoolChildPricePerDay = tempPoolChildPricePerDay !== undefined ? tempPoolChildPricePerDay : (poolChildPricePerDay ?? 0);
+
+        updateBody.poolAdultsCount = finalPoolAdultsCount;
+        updateBody.poolChildrenCount = finalPoolChildrenCount;
+        updateBody.poolAdultPricePerDay = finalPoolAdultPricePerDay;
+        updateBody.poolChildPricePerDay = finalPoolChildPricePerDay;
+
+        // Calcular dailyPrice y totalPrice automáticamente para pileta
+        const adults = Number.parseInt(String(finalPoolAdultsCount), 10) || 0;
+        const children = Number.parseInt(String(finalPoolChildrenCount), 10) || 0;
+        const adultPrice = Number.parseFloat(String(finalPoolAdultPricePerDay)) || 0;
+        const childPrice = Number.parseFloat(String(finalPoolChildPricePerDay)) || 0;
+
+        const calculatedDailyTotal = adults * adultPrice + children * childPrice;
+
+        // Calcular días
+        const finalStartDate = tempStartDate || startDate;
+        const finalEndDate = tempEndDate || endDate;
+        let daysCount = 1;
+        if (finalStartDate && finalEndDate) {
+          const startParts = String(finalStartDate).split('-');
+          const endParts = String(finalEndDate).split('-');
+          const sDate = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
+          const eDate = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
+          const msPerDay = 24 * 60 * 60 * 1000;
+          daysCount = Math.round((eDate - sDate) / msPerDay) + 1;
+          if (daysCount <= 0) daysCount = 1;
+        }
+
+        const calculatedTotalPrice = calculatedDailyTotal * daysCount;
+
+        updateBody.dailyPrice = String(calculatedDailyTotal);
+        updateBody.totalPrice = String(calculatedTotalPrice);
+      }
 
       // Agregar resourceNumber solo si cambió
       const resourceNumberChanged = tempResourceNumber !== undefined && tempResourceNumber !== resourceNumber;
@@ -2103,8 +2159,8 @@ function App() {
           // Determinar qué setter usar según el tipo de servicio
           const setReservationsMap =
             serviceType === 'carpa' ? setCarpasReservations :
-            serviceType === 'sombrilla' ? setSombrillasReservations :
-            serviceType === 'parking' ? setParkingReservations : null;
+              serviceType === 'sombrilla' ? setSombrillasReservations :
+                serviceType === 'parking' ? setParkingReservations : null;
 
           if (setReservationsMap) {
             setReservationsMap((prev) => {
@@ -2272,7 +2328,7 @@ function App() {
                 <span className="hidden sm:inline">Cerrar sesión</span>
               </button>
             </div>
-            
+
             <EstablishmentConfigForm
               variant="dark"
               estName={estName}
@@ -2517,6 +2573,8 @@ function App() {
                 reservationGroups={reservationGroups}
                 onViewReservationDetails={handleViewReservationDetails}
                 onOpenNewCarpaReservation={handleOpenCarpaReservationFromQuickView}
+                onOpenNewSombrillaReservation={handleOpenSombrillaReservationFromQuickView}
+                onOpenNewParkingReservation={handleOpenParkingReservationFromQuickView}
                 onFilterStatusChange={(value) => setReservationFilterStatus(value)}
                 onFilterFromChange={(value) => setReservationFilterFrom(value)}
                 onFilterToChange={(value) => setReservationFilterTo(value)}

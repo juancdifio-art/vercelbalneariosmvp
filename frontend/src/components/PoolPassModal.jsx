@@ -1,6 +1,33 @@
 import React, { useEffect } from 'react';
 import { format } from 'date-fns';
 
+// Función para formatear moneda para visualización
+const formatCurrency = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '0,00';
+  return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Función para formatear el valor del input con separadores de miles (versión optimizada)
+const formatInputValue = (value) => {
+  if (!value && value !== 0) return '';
+  const numStr = String(value).replace(/\D/g, '');
+  if (!numStr) return '';
+  let result = '';
+  for (let i = numStr.length - 1, count = 0; i >= 0; i--, count++) {
+    if (count > 0 && count % 3 === 0) {
+      result = '.' + result;
+    }
+    result = numStr[i] + result;
+  }
+  return result;
+};
+
+// Función para parsear el valor formateado a número
+const parseInputValue = (formattedValue) => {
+  if (!formattedValue) return '';
+  return formattedValue.replace(/\./g, '');
+};
+
 function PoolPassModal({
   form,
   clients,
@@ -103,11 +130,11 @@ function PoolPassModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            clientId: id,
-                            customerName: selected ? selected.fullName : '',
-                            customerPhone: selected ? selected.phone || '' : ''
-                          }
+                          ...prev,
+                          clientId: id,
+                          customerName: selected ? selected.fullName : '',
+                          customerPhone: selected ? selected.phone || '' : ''
+                        }
                         : prev
                     );
                   }}
@@ -133,9 +160,9 @@ function PoolPassModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              customerName: value
-                            }
+                            ...prev,
+                            customerName: value
+                          }
                           : prev
                       );
                     }}
@@ -152,9 +179,9 @@ function PoolPassModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              customerPhone: value
-                            }
+                            ...prev,
+                            customerPhone: value
+                          }
                           : prev
                       );
                     }}
@@ -182,9 +209,9 @@ function PoolPassModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            startDate: value
-                          }
+                          ...prev,
+                          startDate: value
+                        }
                         : prev
                     );
                   }}
@@ -201,9 +228,9 @@ function PoolPassModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            endDate: value
-                          }
+                          ...prev,
+                          endDate: value
+                        }
                         : prev
                     );
                   }}
@@ -248,9 +275,9 @@ function PoolPassModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            poolAdultsCount: value
-                          }
+                          ...prev,
+                          poolAdultsCount: value
+                        }
                         : prev
                     );
                   }}
@@ -268,9 +295,9 @@ function PoolPassModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            poolChildrenCount: value
-                          }
+                          ...prev,
+                          poolChildrenCount: value
+                        }
                         : prev
                     );
                   }}
@@ -283,42 +310,42 @@ function PoolPassModal({
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold text-slate-700">Precio por adulto por día (ARS)</span>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={poolAdultPricePerDay || ''}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatInputValue(poolAdultPricePerDay)}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const rawValue = parseInputValue(e.target.value);
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            poolAdultPricePerDay: value
-                          }
+                          ...prev,
+                          poolAdultPricePerDay: rawValue
+                        }
                         : prev
                     );
                   }}
+                  placeholder="0"
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 />
               </label>
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold text-slate-700">Precio por niño por día (ARS)</span>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={poolChildPricePerDay || ''}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatInputValue(poolChildPricePerDay)}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const rawValue = parseInputValue(e.target.value);
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            poolChildPricePerDay: value
-                          }
+                          ...prev,
+                          poolChildPricePerDay: rawValue
+                        }
                         : prev
                     );
                   }}
+                  placeholder="0"
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 />
               </label>
@@ -328,11 +355,14 @@ function PoolPassModal({
               <div className="bg-cyan-50 rounded-lg px-3 py-2 border border-cyan-200 text-[11px] text-slate-700 space-y-1">
                 <p>
                   <span className="font-semibold text-slate-800">Total por día: </span>
-                  ${dailyTotal.toFixed(2)} ARS
+                  ${formatCurrency(dailyTotal)} ARS
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-800">Total estadía: </span>
-                  ${totalPreview.toFixed(2)} ARS
+                  <span className="font-semibold text-slate-800">Total estadía ({daysCount} {daysCount === 1 ? 'día' : 'días'}): </span>
+                  ${formatCurrency(totalPreview)} ARS
+                </p>
+                <p className="text-[10px] text-slate-500 pt-1">
+                  ({adults} {adults === 1 ? 'adulto' : 'adultos'} × ${formatInputValue(adultPrice)} + {children} {children === 1 ? 'niño' : 'niños'} × ${formatInputValue(childPrice)}) × {daysCount} {daysCount === 1 ? 'día' : 'días'}
                 </p>
               </div>
             )}
@@ -348,21 +378,21 @@ function PoolPassModal({
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora (ARS)</span>
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={initialPaymentAmount || ''}
+                  type="text"
+                  inputMode="numeric"
+                  value={formatInputValue(initialPaymentAmount)}
                   onChange={(e) => {
-                    const value = e.target.value;
+                    const rawValue = parseInputValue(e.target.value);
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            initialPaymentAmount: value
-                          }
+                          ...prev,
+                          initialPaymentAmount: rawValue
+                        }
                         : prev
                     );
                   }}
+                  placeholder="0"
                   className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                 />
               </label>
@@ -375,9 +405,9 @@ function PoolPassModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            initialPaymentMethod: value
-                          }
+                          ...prev,
+                          initialPaymentMethod: value
+                        }
                         : prev
                     );
                   }}
@@ -398,7 +428,7 @@ function PoolPassModal({
             <div className="bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-xl border-2 border-emerald-200 p-4 mb-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">Monto total estimado</span>
-                <span className="text-2xl font-bold text-emerald-700">${totalPreview.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-emerald-700">${formatCurrency(totalPreview)}</span>
               </div>
             </div>
           )}

@@ -80,9 +80,9 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                       setModal((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              tempResourceNumber: value
-                            }
+                            ...prev,
+                            tempResourceNumber: value
+                          }
                           : prev
                       );
                     }}
@@ -127,9 +127,9 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                     setModal((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            tempStartDate: e.target.value
-                          }
+                          ...prev,
+                          tempStartDate: e.target.value
+                        }
                         : prev
                     )
                   }
@@ -145,9 +145,9 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                     setModal((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            tempEndDate: e.target.value
-                          }
+                          ...prev,
+                          tempEndDate: e.target.value
+                        }
                         : prev
                     )
                   }
@@ -157,10 +157,10 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
             </div>
             {((modal.tempStartDate && modal.tempStartDate !== modal.startDate) ||
               (modal.tempEndDate && modal.tempEndDate !== modal.endDate)) && (
-              <p className="text-[10px] text-amber-600 bg-amber-50 rounded px-2 py-1 mt-2">
-                Las fechas serán modificadas de {modal.startDate} - {modal.endDate} a {modal.tempStartDate || modal.startDate} - {modal.tempEndDate || modal.endDate}
-              </p>
-            )}
+                <p className="text-[10px] text-amber-600 bg-amber-50 rounded px-2 py-1 mt-2">
+                  Las fechas serán modificadas de {modal.startDate} - {modal.endDate} a {modal.tempStartDate || modal.startDate} - {modal.tempEndDate || modal.endDate}
+                </p>
+              )}
           </div>
 
           {/* Información del cliente y precio */}
@@ -179,9 +179,9 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                     setModal((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            tempCustomerName: e.target.value
-                          }
+                          ...prev,
+                          tempCustomerName: e.target.value
+                        }
                         : prev
                     )
                   }
@@ -198,9 +198,165 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                       setModal((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              tempCustomerPhone: e.target.value
-                            }
+                            ...prev,
+                            tempCustomerPhone: e.target.value
+                          }
+                          : prev
+                      )
+                    }
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </label>
+                {/* Solo mostrar tarifa y total para servicios que no son pileta */}
+                {modal.serviceType !== 'pileta' && (
+                  <>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-slate-700">Tarifa por día (ARS)</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={modal.tempDailyPrice ?? modal.dailyPrice ?? ''}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          setModal((prev) =>
+                            prev
+                              ? {
+                                ...prev,
+                                tempDailyPrice: value
+                              }
+                              : prev
+                          );
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                      <span className="text-[11px] font-semibold text-slate-700">Precio total (ARS)</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={modal.tempTotalPrice}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9]/g, '');
+                          setModal((prev) =>
+                            prev
+                              ? {
+                                ...prev,
+                                tempTotalPrice: value
+                              }
+                              : prev
+                          );
+                        }}
+                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      />
+                    </label>
+                  </>
+                )}
+              </div>
+              {/* Resumen financiero para carpa, sombrilla y estacionamiento */}
+              {modal.serviceType !== 'pileta' && (() => {
+                const dailyPrice = Number.parseFloat(String(modal.tempDailyPrice ?? modal.dailyPrice ?? '0')) || 0;
+                const currentTotal = Number.parseFloat(String(modal.tempTotalPrice ?? '0')) || 0;
+
+                // Calcular días con las nuevas fechas
+                const startStr = modal.tempStartDate || modal.startDate;
+                const endStr = modal.tempEndDate || modal.endDate;
+                let newDaysCount = 1;
+                if (startStr && endStr) {
+                  const startParts = String(startStr).split('-');
+                  const endParts = String(endStr).split('-');
+                  const startDate = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
+                  const endDate = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
+                  const msPerDay = 24 * 60 * 60 * 1000;
+                  newDaysCount = Math.round((endDate - startDate) / msPerDay) + 1;
+                  if (newDaysCount <= 0) newDaysCount = 1;
+                }
+
+                // Calcular días originales
+                let originalDaysCount = 1;
+                if (modal.startDate && modal.endDate) {
+                  const origStartParts = String(modal.startDate).split('-');
+                  const origEndParts = String(modal.endDate).split('-');
+                  const origStartDate = new Date(parseInt(origStartParts[0], 10), parseInt(origStartParts[1], 10) - 1, parseInt(origStartParts[2], 10));
+                  const origEndDate = new Date(parseInt(origEndParts[0], 10), parseInt(origEndParts[1], 10) - 1, parseInt(origEndParts[2], 10));
+                  const msPerDay = 24 * 60 * 60 * 1000;
+                  originalDaysCount = Math.round((origEndDate - origStartDate) / msPerDay) + 1;
+                  if (originalDaysCount <= 0) originalDaysCount = 1;
+                }
+
+                const suggestedTotal = dailyPrice * newDaysCount;
+                const daysChanged = newDaysCount !== originalDaysCount;
+                const priceChanged = modal.tempDailyPrice !== undefined && modal.tempDailyPrice !== null;
+
+                if (!dailyPrice || dailyPrice <= 0) return null;
+
+                return (
+                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-4 py-3 border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-slate-600">Tarifa por día:</span>
+                      <span className="text-sm font-bold text-slate-800">${dailyPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-slate-600">Duración:</span>
+                      <span className="text-sm font-bold text-slate-800">
+                        {newDaysCount} {newDaysCount === 1 ? 'día' : 'días'}
+                        {daysChanged && (
+                          <span className="text-amber-600 ml-1">(antes: {originalDaysCount})</span>
+                        )}
+                      </span>
+                    </div>
+                    <div className="h-px bg-blue-200 my-2" />
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">Total sugerido:</span>
+                      <span className="text-lg font-bold text-blue-700">${suggestedTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    {(daysChanged || priceChanged) && currentTotal !== suggestedTotal && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setModal((prev) =>
+                            prev
+                              ? {
+                                ...prev,
+                                tempTotalPrice: String(suggestedTotal)
+                              }
+                              : prev
+                          )
+                        }
+                        className="mt-2 w-full text-center text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-white rounded-lg px-3 py-1.5 border border-blue-300 hover:bg-blue-50 transition"
+                      >
+                        Aplicar total sugerido (${suggestedTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })})
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+
+          {/* Detalles de pileta (solo para pases de pileta) */}
+          {modal.serviceType === 'pileta' && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
+                <span>👨‍👩‍👧‍👦</span>
+                <span>Composición del pase</span>
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Adultos</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={modal.tempPoolAdultsCount ?? modal.poolAdultsCount ?? ''}
+                    onChange={(e) =>
+                      setModal((prev) =>
+                        prev
+                          ? {
+                            ...prev,
+                            tempPoolAdultsCount: e.target.value
+                          }
                           : prev
                       )
                     }
@@ -208,29 +364,107 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                   />
                 </label>
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-slate-700">Precio total (ARS)</span>
+                  <span className="text-[11px] font-semibold text-slate-700">Niños</span>
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
-                    value={modal.tempTotalPrice}
+                    value={modal.tempPoolChildrenCount ?? modal.poolChildrenCount ?? ''}
                     onChange={(e) =>
                       setModal((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              tempTotalPrice: e.target.value
-                            }
+                            ...prev,
+                            tempPoolChildrenCount: e.target.value
+                          }
                           : prev
                       )
                     }
                     className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                   />
                 </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Precio adulto/día</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={modal.tempPoolAdultPricePerDay ?? modal.poolAdultPricePerDay ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setModal((prev) =>
+                        prev
+                          ? {
+                            ...prev,
+                            tempPoolAdultPricePerDay: value
+                          }
+                          : prev
+                      );
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Precio niño/día</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={modal.tempPoolChildPricePerDay ?? modal.poolChildPricePerDay ?? ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      setModal((prev) =>
+                        prev
+                          ? {
+                            ...prev,
+                            tempPoolChildPricePerDay: value
+                          }
+                          : prev
+                      );
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </label>
               </div>
-            </div>
-          </div>
+              {/* Total calculado para pileta */}
+              {(() => {
+                const adults = Number.parseInt(String(modal.tempPoolAdultsCount ?? modal.poolAdultsCount ?? '0'), 10) || 0;
+                const children = Number.parseInt(String(modal.tempPoolChildrenCount ?? modal.poolChildrenCount ?? '0'), 10) || 0;
+                const adultPrice = Number.parseFloat(String(modal.tempPoolAdultPricePerDay ?? modal.poolAdultPricePerDay ?? '0')) || 0;
+                const childPrice = Number.parseFloat(String(modal.tempPoolChildPricePerDay ?? modal.poolChildPricePerDay ?? '0')) || 0;
 
+                // Calcular días
+                const startStr = modal.tempStartDate || modal.startDate;
+                const endStr = modal.tempEndDate || modal.endDate;
+                let daysCount = 1;
+                if (startStr && endStr) {
+                  const startParts = String(startStr).split('-');
+                  const endParts = String(endStr).split('-');
+                  const startDate = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
+                  const endDate = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
+                  const msPerDay = 24 * 60 * 60 * 1000;
+                  daysCount = Math.round((endDate - startDate) / msPerDay) + 1;
+                  if (daysCount <= 0) daysCount = 1;
+                }
+
+                const dailyTotal = adults * adultPrice + children * childPrice;
+                const totalPreview = dailyTotal * daysCount;
+
+                return (
+                  <div className="mt-4 bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-lg px-4 py-3 border border-emerald-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[11px] font-semibold text-slate-600">Total por día:</span>
+                      <span className="text-sm font-bold text-slate-800">${dailyTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-700">Total estadía ({daysCount} {daysCount === 1 ? 'día' : 'días'}):</span>
+                      <span className="text-lg font-bold text-emerald-700">${totalPreview.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500 mt-2">({adults} adultos × ${adultPrice.toLocaleString('es-AR')} + {children} niños × ${childPrice.toLocaleString('es-AR')}) × {daysCount} días</p>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
           {/* Notas */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
@@ -244,9 +478,9 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                 setModal((prev) =>
                   prev
                     ? {
-                        ...prev,
-                        tempNotes: e.target.value
-                      }
+                      ...prev,
+                      tempNotes: e.target.value
+                    }
                     : prev
                 )
               }

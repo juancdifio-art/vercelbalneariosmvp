@@ -1,6 +1,34 @@
 import React, { useEffect } from 'react';
 import { format } from 'date-fns';
 
+// Función para formatear montos con separadores de miles (formato argentino)
+const formatCurrency = (value) => {
+  if (value === null || value === undefined || Number.isNaN(value)) return '0,00';
+  return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// Función para formatear el valor del input con separadores de miles (versión optimizada)
+const formatInputValue = (value) => {
+  if (!value && value !== 0) return '';
+  const numStr = String(value).replace(/\D/g, '');
+  if (!numStr) return '';
+  // Agregar puntos como separadores de miles manualmente (más rápido que toLocaleString)
+  let result = '';
+  for (let i = numStr.length - 1, count = 0; i >= 0; i--, count++) {
+    if (count > 0 && count % 3 === 0) {
+      result = '.' + result;
+    }
+    result = numStr[i] + result;
+  }
+  return result;
+};
+
+// Función para parsear el valor formateado a número
+const parseInputValue = (formattedValue) => {
+  if (!formattedValue) return '';
+  return formattedValue.replace(/\./g, '');
+};
+
 function SombrillaReservationModal({
   form,
   clients,
@@ -96,6 +124,15 @@ function SombrillaReservationModal({
     return Number.isFinite(sum) && sum > 0 ? sum : null;
   })();
 
+  // Validación de pagos que no excedan el total
+  const paymentExceedsTotal = initialPaymentAmount && totalPreview !== null &&
+    Number.parseFloat(initialPaymentAmount) > totalPreview;
+
+  const parkingPaymentExceedsTotal = parkingInitialPaymentAmount && parkingTotalPreview !== null &&
+    Number.parseFloat(parkingInitialPaymentAmount) > parkingTotalPreview;
+
+  const hasPaymentError = paymentExceedsTotal || (includeParking && parkingPaymentExceedsTotal);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -144,9 +181,9 @@ function SombrillaReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              sombrillaNumero: value
-                            }
+                            ...prev,
+                            sombrillaNumero: value
+                          }
                           : prev
                       );
                     }}
@@ -188,11 +225,11 @@ function SombrillaReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              clientId: id,
-                              customerName: selected ? selected.fullName : '',
-                              customerPhone: selected ? selected.phone || '' : ''
-                            }
+                            ...prev,
+                            clientId: id,
+                            customerName: selected ? selected.fullName : '',
+                            customerPhone: selected ? selected.phone || '' : ''
+                          }
                           : prev
                       );
                     }}
@@ -218,9 +255,9 @@ function SombrillaReservationModal({
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                customerName: value
-                              }
+                              ...prev,
+                              customerName: value
+                            }
                             : prev
                         );
                       }}
@@ -237,9 +274,9 @@ function SombrillaReservationModal({
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                customerPhone: value
-                              }
+                              ...prev,
+                              customerPhone: value
+                            }
                             : prev
                         );
                       }}
@@ -267,9 +304,9 @@ function SombrillaReservationModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            startDate: value
-                          }
+                          ...prev,
+                          startDate: value
+                        }
                         : prev
                     );
                   }}
@@ -286,9 +323,9 @@ function SombrillaReservationModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            endDate: value
-                          }
+                          ...prev,
+                          endDate: value
+                        }
                         : prev
                     );
                   }}
@@ -325,28 +362,28 @@ function SombrillaReservationModal({
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold text-slate-700">Valor por día (ARS)</span>
                   <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={dailyPrice || ''}
+                    type="text"
+                    inputMode="numeric"
+                    value={formatInputValue(dailyPrice)}
                     onChange={(e) => {
-                      const value = e.target.value;
+                      const rawValue = parseInputValue(e.target.value);
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              dailyPrice: value
-                            }
+                            ...prev,
+                            dailyPrice: rawValue
+                          }
                           : prev
                       );
                     }}
                     className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    placeholder="0"
                   />
                 </label>
                 {totalPreview !== null && daysCount > 0 && (
                   <div className="bg-cyan-50 rounded-lg px-3 py-2 border border-cyan-200">
                     <p className="text-xs font-semibold text-cyan-900">
-                      💜 Total sombrilla: ${totalPreview.toFixed(2)} ARS
+                      💜 Total sombrilla: ${formatCurrency(totalPreview)} ARS
                     </p>
                   </div>
                 )}
@@ -354,23 +391,34 @@ function SombrillaReservationModal({
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora por sombrilla (ARS)</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={initialPaymentAmount || ''}
+                      type="text"
+                      inputMode="numeric"
+                      value={formatInputValue(initialPaymentAmount)}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const rawValue = parseInputValue(e.target.value);
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                initialPaymentAmount: value
-                              }
+                              ...prev,
+                              initialPaymentAmount: rawValue
+                            }
                             : prev
                         );
                       }}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      className={`rounded-lg border bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${paymentExceedsTotal ? 'border-red-500 bg-red-50' : 'border-slate-300'
+                        }`}
+                      placeholder="0"
                     />
+                    {paymentExceedsTotal && (
+                      <p className="text-[10px] text-red-600 bg-red-50 rounded px-2 py-1">
+                        ⚠️ El pago no puede exceder el total de ${formatCurrency(totalPreview)}
+                      </p>
+                    )}
+                    {initialPaymentAmount && totalPreview !== null && !paymentExceedsTotal && Number.parseFloat(initialPaymentAmount) > 0 && (
+                      <p className="text-[10px] text-emerald-600 bg-emerald-50 rounded px-2 py-1">
+                        ✅ Pendiente: ${formatCurrency(totalPreview - Number.parseFloat(initialPaymentAmount || 0))}
+                      </p>
+                    )}
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold text-slate-700">Método de pago sombrilla</span>
@@ -381,9 +429,9 @@ function SombrillaReservationModal({
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                initialPaymentMethod: value
-                              }
+                              ...prev,
+                              initialPaymentMethod: value
+                            }
                             : prev
                         );
                       }}
@@ -414,9 +462,9 @@ function SombrillaReservationModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            includeParking: checked
-                          }
+                          ...prev,
+                          includeParking: checked
+                        }
                         : prev
                     );
                   }}
@@ -439,9 +487,9 @@ function SombrillaReservationModal({
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                parkingSpotNumber: value
-                              }
+                              ...prev,
+                              parkingSpotNumber: value
+                            }
                             : prev
                         );
                       }}
@@ -464,29 +512,29 @@ function SombrillaReservationModal({
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold text-slate-700">Valor por día estacionamiento (ARS)</span>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={parkingDailyPrice || ''}
+                      type="text"
+                      inputMode="numeric"
+                      value={formatInputValue(parkingDailyPrice)}
                       onChange={(e) => {
-                        const value = e.target.value;
+                        const rawValue = parseInputValue(e.target.value);
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                parkingDailyPrice: value
-                              }
+                              ...prev,
+                              parkingDailyPrice: rawValue
+                            }
                             : prev
                         );
                       }}
                       className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                      placeholder="0"
                     />
                   </label>
 
                   {parkingTotalPreview !== null && daysCount > 0 && (
                     <div className="bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
                       <p className="text-xs font-semibold text-blue-900">
-                        🅿️ Total estacionamiento: ${parkingTotalPreview.toFixed(2)} ARS
+                        🅿️ Total estacionamiento: ${formatCurrency(parkingTotalPreview)} ARS
                       </p>
                     </div>
                   )}
@@ -497,23 +545,34 @@ function SombrillaReservationModal({
                         Monto a pagar ahora por estacionamiento (ARS)
                       </span>
                       <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={parkingInitialPaymentAmount || ''}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatInputValue(parkingInitialPaymentAmount)}
                         onChange={(e) => {
-                          const value = e.target.value;
+                          const rawValue = parseInputValue(e.target.value);
                           onChangeForm((prev) =>
                             prev
                               ? {
-                                  ...prev,
-                                  parkingInitialPaymentAmount: value
-                                }
+                                ...prev,
+                                parkingInitialPaymentAmount: rawValue
+                              }
                               : prev
                           );
                         }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        className={`rounded-lg border bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${parkingPaymentExceedsTotal ? 'border-red-500 bg-red-50' : 'border-slate-300'
+                          }`}
+                        placeholder="0"
                       />
+                      {parkingPaymentExceedsTotal && (
+                        <p className="text-[10px] text-red-600 bg-red-50 rounded px-2 py-1">
+                          ⚠️ El pago no puede exceder el total de ${formatCurrency(parkingTotalPreview)}
+                        </p>
+                      )}
+                      {parkingInitialPaymentAmount && parkingTotalPreview !== null && !parkingPaymentExceedsTotal && Number.parseFloat(parkingInitialPaymentAmount) > 0 && (
+                        <p className="text-[10px] text-emerald-600 bg-emerald-50 rounded px-2 py-1">
+                          ✅ Pendiente: ${formatCurrency(parkingTotalPreview - Number.parseFloat(parkingInitialPaymentAmount || 0))}
+                        </p>
+                      )}
                     </label>
                     <label className="flex flex-col gap-1">
                       <span className="text-[11px] font-semibold text-slate-700">Método de pago estacionamiento</span>
@@ -524,9 +583,9 @@ function SombrillaReservationModal({
                           onChangeForm((prev) =>
                             prev
                               ? {
-                                  ...prev,
-                                  parkingInitialPaymentMethod: value
-                                }
+                                ...prev,
+                                parkingInitialPaymentMethod: value
+                              }
                               : prev
                           );
                         }}
@@ -549,12 +608,12 @@ function SombrillaReservationModal({
             <div className="bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-xl border-2 border-emerald-200 p-4 mb-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">💰 Monto total</span>
-                <span className="text-2xl font-bold text-emerald-700">${combinedTotalPreview.toFixed(2)}</span>
+                <span className="text-2xl font-bold text-emerald-700">${formatCurrency(combinedTotalPreview)}</span>
               </div>
               {includeParking && (
                 <div className="mt-2 pt-2 border-t border-emerald-200 text-[10px] text-slate-600 space-y-0.5">
-                  <p>☂️ Sombrilla: ${totalPreview !== null ? totalPreview.toFixed(2) : '0.00'}</p>
-                  <p>🚗 Estacionamiento: ${parkingTotalPreview !== null ? parkingTotalPreview.toFixed(2) : '0.00'}</p>
+                  <p>☂️ Sombrilla: ${totalPreview !== null ? formatCurrency(totalPreview) : '0,00'}</p>
+                  <p>🚗 Estacionamiento: ${parkingTotalPreview !== null ? formatCurrency(parkingTotalPreview) : '0,00'}</p>
                 </div>
               )}
             </div>
@@ -564,7 +623,11 @@ function SombrillaReservationModal({
             {!isReserved && (
               <button
                 type="button"
-                className="inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all"
+                disabled={hasPaymentError}
+                className={`inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${hasPaymentError
+                  ? 'bg-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
+                  }`}
                 onClick={async () => {
                   const ok = await onSaveRange(sombrillaNumero, startStr, endStr, {
                     customerName,
