@@ -871,7 +871,8 @@ module.exports = async (req, res) => {
         res.statusCode = 201;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({
-          reservationGroup: {
+          status: 'created',
+          group: {
             id: row.id,
             serviceType: row.service_type,
             resourceNumber: row.resource_number,
@@ -886,6 +887,7 @@ module.exports = async (req, res) => {
             clientId: row.client_id,
             adultsCount: row.adults_count || 0,
             childrenCount: row.children_count || 0,
+            paidAmount: 0,
             createdAt: row.created_at
           }
         }));
@@ -963,7 +965,7 @@ module.exports = async (req, res) => {
         // Si se quiere cambiar el resourceNumber o las fechas, verificar disponibilidad
         const resourceChanged = resourceNumber !== undefined && resourceNumber !== current.resource_number;
         const datesChanged = (startDate !== undefined && startDate !== current.start_date) ||
-                            (endDate !== undefined && endDate !== current.end_date);
+          (endDate !== undefined && endDate !== current.end_date);
 
         if (resourceChanged || datesChanged) {
           // Verificar que no haya conflicto con otra reserva
