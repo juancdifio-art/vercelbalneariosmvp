@@ -335,8 +335,17 @@
   - Inicialización de `tempDailyPrice` al abrir el modal de edición.
   - El valor se envía al backend y se usa para recalcular el total si cambian las fechas.
 
+- **Fix: Pago inicial en reservas de estacionamiento**
+  - Corregido bug donde los pagos iniciales de estacionamiento no se registraban.
+  - El modal `ParkingReservationModal.jsx` no tenía campos de pago inicial (a diferencia de carpas y sombrillas).
+  - Agregada sección de UI "Pago inicial (opcional)" con campos para monto y método de pago.
+  - Agregada validación que advierte si el pago supera el total.
+  - Actualizada inicialización del formulario en `App.jsx` para incluir `initialPaymentAmount` e `initialPaymentMethod`.
+  - El campo de precio por día ahora solo acepta números enteros (consistente con otros modales).
+
 ## Próximos pasos
 
 - Mantener el script interno `npm run create-user -- <email> <password>` para gestión de usuarios sin registro público.
 - Profundizar la sección **Clientes** para mostrar información detallada de cada cliente y permitir la búsqueda y filtrado de clientes.
 - Profundizar en la "Vista diaria" para mostrar capacidad/ocupación agregada por día, combinando información de reservas madre, reservas diarias y pagos.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        

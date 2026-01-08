@@ -1499,7 +1499,9 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
-      dailyPrice: ''
+      dailyPrice: '',
+      initialPaymentAmount: '',
+      initialPaymentMethod: ''
     });
   };
 

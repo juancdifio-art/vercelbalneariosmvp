@@ -24,7 +24,9 @@ function ParkingReservationModal({
     clientId,
     customerName,
     customerPhone,
-    dailyPrice
+    dailyPrice,
+    initialPaymentAmount,
+    initialPaymentMethod
   } = form;
 
   // Calcular plazas disponibles para el rango de fechas seleccionado
@@ -311,10 +313,10 @@ function ParkingReservationModal({
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="1"
                     value={dailyPrice || ''}
                     onChange={(e) => {
-                      const value = e.target.value;
+                      const value = e.target.value.replace(/[^0-9]/g, '');
                       onChangeForm((prev) =>
                         prev
                           ? {
@@ -338,6 +340,72 @@ function ParkingReservationModal({
             </div>
           )}
 
+          {/* Pago inicial */}
+          {!isReserved && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
+                <span>💳</span>
+                <span>Pago inicial (opcional)</span>
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora (ARS)</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={initialPaymentAmount || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^0-9]/g, '');
+                      onChangeForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              initialPaymentAmount: value
+                            }
+                          : prev
+                      );
+                    }}
+                    placeholder="0"
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-[11px] font-semibold text-slate-700">Método de pago</span>
+                  <select
+                    value={initialPaymentMethod || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      onChangeForm((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              initialPaymentMethod: value
+                            }
+                          : prev
+                      );
+                    }}
+                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                  >
+                    <option value="">Sin pago ahora</option>
+                    <option value="cash">Efectivo</option>
+                    <option value="transfer">Transferencia</option>
+                    <option value="card">Tarjeta de crédito</option>
+                    <option value="other">Otro</option>
+                  </select>
+                </label>
+              </div>
+              {initialPaymentAmount && initialPaymentMethod && totalPreview !== null && Number(initialPaymentAmount) > totalPreview && (
+                <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  <p className="text-xs text-red-700 flex items-center gap-2">
+                    <span>⚠️</span>
+                    <span>El pago inicial no puede superar el total (${totalPreview.toFixed(2)})</span>
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
             {!isReserved && (
               <button
@@ -347,7 +415,9 @@ function ParkingReservationModal({
                   const ok = await onSaveRange(plazaNumero, startStr, endStr, {
                     customerName,
                     customerPhone,
-                    dailyPrice
+                    dailyPrice,
+                    initialPaymentAmount,
+                    initialPaymentMethod
                   });
 
                   if (ok) {
