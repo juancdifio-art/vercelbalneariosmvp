@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { format } from 'date-fns';
+import ClientSearchInput from './ClientSearchInput';
 
 // Función para formatear montos con separadores de miles (formato argentino)
 const formatCurrency = (value) => {
@@ -221,34 +222,23 @@ function SombrillaReservationModal({
               </h3>
               <div className="space-y-3">
                 <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-slate-700">Cliente guardado</span>
-                  <select
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    value={clientId || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      const id = value ? Number.parseInt(value, 10) : null;
-                      const selected = clients.find((c) => c.id === id);
+                  <span className="text-[11px] font-semibold text-slate-700">Buscar cliente guardado</span>
+                  <ClientSearchInput
+                    clients={clients}
+                    selectedClientId={clientId}
+                    onSelect={(client) => {
                       onChangeForm((prev) =>
                         prev
                           ? {
                             ...prev,
-                            clientId: id,
-                            customerName: selected ? selected.fullName : '',
-                            customerPhone: selected ? selected.phone || '' : ''
+                            clientId: client ? client.id : null,
+                            customerName: client ? client.fullName : '',
+                            customerPhone: client ? client.phone || '' : ''
                           }
                           : prev
                       );
                     }}
-                  >
-                    <option value="">Buscar cliente guardado...</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.fullName}
-                        {c.phone ? ` - ${c.phone}` : ''}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
