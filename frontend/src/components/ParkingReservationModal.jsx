@@ -76,6 +76,16 @@ function ParkingReservationModal({
     }
   }
 
+  // Validación de pago que no exceda el total
+  const paymentExceedsTotal = initialPaymentAmount && totalPreview !== null &&
+    Number.parseFloat(initialPaymentAmount) > totalPreview;
+
+  // Validación de método de pago faltante
+  const paymentAmountNum = initialPaymentAmount ? Number.parseFloat(String(initialPaymentAmount).replace(',', '.')) : 0;
+  const paymentMissingMethod = paymentAmountNum > 0 && !initialPaymentMethod;
+
+  const hasPaymentError = paymentExceedsTotal || paymentMissingMethod;
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -124,9 +134,9 @@ function ParkingReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              plazaNumero: value
-                            }
+                            ...prev,
+                            plazaNumero: value
+                          }
                           : prev
                       );
                     }}
@@ -174,11 +184,11 @@ function ParkingReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              clientId: id,
-                              customerName: selected ? selected.fullName : '',
-                              customerPhone: selected ? selected.phone || '' : ''
-                            }
+                            ...prev,
+                            clientId: id,
+                            customerName: selected ? selected.fullName : '',
+                            customerPhone: selected ? selected.phone || '' : ''
+                          }
                           : prev
                       );
                     }}
@@ -204,9 +214,9 @@ function ParkingReservationModal({
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                customerName: value
-                              }
+                              ...prev,
+                              customerName: value
+                            }
                             : prev
                         );
                       }}
@@ -223,9 +233,9 @@ function ParkingReservationModal({
                         onChangeForm((prev) =>
                           prev
                             ? {
-                                ...prev,
-                                customerPhone: value
-                              }
+                              ...prev,
+                              customerPhone: value
+                            }
                             : prev
                         );
                       }}
@@ -253,9 +263,9 @@ function ParkingReservationModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            startDate: value
-                          }
+                          ...prev,
+                          startDate: value
+                        }
                         : prev
                     );
                   }}
@@ -272,9 +282,9 @@ function ParkingReservationModal({
                     onChangeForm((prev) =>
                       prev
                         ? {
-                            ...prev,
-                            endDate: value
-                          }
+                          ...prev,
+                          endDate: value
+                        }
                         : prev
                     );
                   }}
@@ -320,9 +330,9 @@ function ParkingReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              dailyPrice: value
-                            }
+                            ...prev,
+                            dailyPrice: value
+                          }
                           : prev
                       );
                     }}
@@ -360,9 +370,9 @@ function ParkingReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              initialPaymentAmount: value
-                            }
+                            ...prev,
+                            initialPaymentAmount: value
+                          }
                           : prev
                       );
                     }}
@@ -379,9 +389,9 @@ function ParkingReservationModal({
                       onChangeForm((prev) =>
                         prev
                           ? {
-                              ...prev,
-                              initialPaymentMethod: value
-                            }
+                            ...prev,
+                            initialPaymentMethod: value
+                          }
                           : prev
                       );
                     }}
@@ -406,11 +416,22 @@ function ParkingReservationModal({
             </div>
           )}
 
+          {/* Mensaje de error de pago */}
+          {paymentMissingMethod && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago.
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
             {!isReserved && (
               <button
                 type="button"
-                className="inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all"
+                disabled={hasPaymentError}
+                className={`inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${hasPaymentError
+                  ? 'bg-slate-400 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
+                  }`}
                 onClick={async () => {
                   const ok = await onSaveRange(plazaNumero, startStr, endStr, {
                     customerName,

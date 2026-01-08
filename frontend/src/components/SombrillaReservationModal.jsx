@@ -131,7 +131,14 @@ function SombrillaReservationModal({
   const parkingPaymentExceedsTotal = parkingInitialPaymentAmount && parkingTotalPreview !== null &&
     Number.parseFloat(parkingInitialPaymentAmount) > parkingTotalPreview;
 
-  const hasPaymentError = paymentExceedsTotal || (includeParking && parkingPaymentExceedsTotal);
+  // Validación de método de pago faltante
+  const paymentAmountNum = initialPaymentAmount ? Number.parseFloat(String(initialPaymentAmount).replace(',', '.')) : 0;
+  const paymentMissingMethod = paymentAmountNum > 0 && !initialPaymentMethod;
+
+  const parkingPaymentAmountNum = parkingInitialPaymentAmount ? Number.parseFloat(String(parkingInitialPaymentAmount).replace(',', '.')) : 0;
+  const parkingPaymentMissingMethod = includeParking && parkingPaymentAmountNum > 0 && !parkingInitialPaymentMethod;
+
+  const hasPaymentError = paymentExceedsTotal || (includeParking && parkingPaymentExceedsTotal) || paymentMissingMethod || parkingPaymentMissingMethod;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -616,6 +623,18 @@ function SombrillaReservationModal({
                   <p>🚗 Estacionamiento: ${parkingTotalPreview !== null ? formatCurrency(parkingTotalPreview) : '0,00'}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Mensajes de error de pago */}
+          {paymentMissingMethod && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para la sombrilla.
+            </div>
+          )}
+          {parkingPaymentMissingMethod && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para el estacionamiento.
             </div>
           )}
 

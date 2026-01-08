@@ -82,6 +82,16 @@ function PoolPassModal({
   const dailyTotal = adults * adultPrice + children * childPrice;
   const totalPreview = daysCount > 0 ? dailyTotal * daysCount : 0;
 
+  // Validación de pago que no exceda el total
+  const paymentExceedsTotal = initialPaymentAmount && totalPreview > 0 &&
+    Number.parseFloat(String(initialPaymentAmount).replace(',', '.')) > totalPreview;
+
+  // Validación de método de pago faltante
+  const paymentAmountNum = initialPaymentAmount ? Number.parseFloat(String(initialPaymentAmount).replace(',', '.')) : 0;
+  const paymentMissingMethod = paymentAmountNum > 0 && !initialPaymentMethod;
+
+  const hasPaymentError = paymentExceedsTotal || paymentMissingMethod;
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -434,6 +444,13 @@ function PoolPassModal({
           )}
         </div>
 
+        {/* Mensaje de error de pago */}
+        {paymentMissingMethod && (
+          <div className="mx-5 mb-3 bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200">
+            ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago.
+          </div>
+        )}
+
         {/* Acciones */}
         <div className="px-5 py-3 border-t border-slate-200 flex items-center justify-between gap-3">
           <button
@@ -445,7 +462,11 @@ function PoolPassModal({
           </button>
           <button
             type="button"
-            className="ml-auto inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all"
+            disabled={hasPaymentError}
+            className={`ml-auto inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${hasPaymentError
+              ? 'bg-slate-400 cursor-not-allowed'
+              : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
+              }`}
             onClick={async () => {
               const ok = await onSave(form);
               if (ok) {
