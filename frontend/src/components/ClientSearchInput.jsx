@@ -110,7 +110,11 @@ function ClientSearchInput({ clients, selectedClientId, onSelect, disabled }) {
                                 <button
                                     key={client.id}
                                     type="button"
-                                    onClick={() => handleSelect(client)}
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        e.preventDefault();
+                                        handleSelect(client);
+                                    }}
                                     className="w-full text-left px-3 py-2 text-xs hover:bg-cyan-50 transition flex items-center justify-between border-b border-slate-100 last:border-b-0"
                                 >
                                     <div>

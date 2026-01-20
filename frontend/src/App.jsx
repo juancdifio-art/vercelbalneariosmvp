@@ -2534,7 +2534,7 @@ function App() {
             {activeSection !== 'pileta' && (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>
-                  {activeSection !== 'clientes' && (
+                  {activeSection !== 'clientes' && activeSection !== 'reservas' && (
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-700 mb-1">
                       {sectionTitleMap[activeSection] || 'Panel'}
                     </p>
