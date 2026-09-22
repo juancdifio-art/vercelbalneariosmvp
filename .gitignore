@@ -46,3 +46,8 @@ coverage/
 *.tmp
 *.temp
 .cache/
+.vercel
+.env*
+
+# Artefactos de Playwright MCP (capturas y snapshots de sesiones de prueba)
+.playwright-mcp/
