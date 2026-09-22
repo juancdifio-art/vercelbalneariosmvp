@@ -252,6 +252,8 @@ function SombrillasSection({
                                 clientId: null,
                                 customerName: '',
                                 customerPhone: '',
+                                adultsCount: '',
+                                childrenCount: '',
                                 dailyPrice: '',
                                 includeParking: false,
                                 parkingSpotNumber: '',

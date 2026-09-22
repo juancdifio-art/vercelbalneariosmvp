@@ -680,6 +680,8 @@ function App() {
     const {
       customerName,
       customerPhone,
+      adultsCount,
+      childrenCount,
       dailyPrice,
       clientId,
       includeParking,
@@ -720,7 +722,9 @@ function App() {
               : '',
           totalPrice: totalPrice !== null ? String(totalPrice) : '',
           notes: '',
-          clientId: clientId ?? ''
+          clientId: clientId ?? '',
+          adultsCount: String(adultsCount ?? ''),
+          childrenCount: String(childrenCount ?? '')
         })
       });
 
@@ -829,6 +833,8 @@ function App() {
           await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
             customerName,
             customerPhone,
+            adultsCount,
+            childrenCount,
             dailyPrice: parkingDailyPrice ?? '',
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
@@ -1076,6 +1082,8 @@ function App() {
     const {
       customerName,
       customerPhone,
+      adultsCount,
+      childrenCount,
       dailyPrice,
       clientId,
       includeParking,
@@ -1116,7 +1124,9 @@ function App() {
               : '',
           totalPrice: totalPrice !== null ? String(totalPrice) : '',
           notes: '',
-          clientId: clientId ?? ''
+          clientId: clientId ?? '',
+          adultsCount: String(adultsCount ?? ''),
+          childrenCount: String(childrenCount ?? '')
         })
       });
 
@@ -1224,6 +1234,8 @@ function App() {
           await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
             customerName,
             customerPhone,
+            adultsCount,
+            childrenCount,
             dailyPrice: parkingDailyPrice ?? '',
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
@@ -1287,6 +1299,8 @@ function App() {
     const {
       customerName,
       customerPhone,
+      adultsCount,
+      childrenCount,
       dailyPrice,
       clientId,
       initialPaymentAmount,
@@ -1322,7 +1336,9 @@ function App() {
               : '',
           totalPrice: totalPrice !== null ? String(totalPrice) : '',
           notes: '',
-          clientId: clientId ?? ''
+          clientId: clientId ?? '',
+          adultsCount: String(adultsCount ?? ''),
+          childrenCount: String(childrenCount ?? '')
         })
       });
 
@@ -1443,6 +1459,8 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
       dailyPrice: '',
       includeParking: false,
       parkingSpotNumber: '',
@@ -1472,6 +1490,8 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
       dailyPrice: '',
       includeParking: false,
       parkingSpotNumber: '',
@@ -1501,6 +1521,8 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
       dailyPrice: '',
       initialPaymentAmount: '',
       initialPaymentMethod: ''

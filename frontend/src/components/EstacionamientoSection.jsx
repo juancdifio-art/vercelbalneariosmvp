@@ -251,6 +251,8 @@ function EstacionamientoSection({
                                 clientId: null,
                                 customerName: '',
                                 customerPhone: '',
+                                adultsCount: '',
+                                childrenCount: '',
                                 dailyPrice: ''
                               });
                             }}
