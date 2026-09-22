@@ -79,6 +79,23 @@ ALTER TABLE reservation_groups
   ADD COLUMN IF NOT EXISTS pool_adult_price_per_day NUMERIC(12, 2),
   ADD COLUMN IF NOT EXISTS pool_child_price_per_day NUMERIC(12, 2);
 
+-- Las personas que ocupan una reserva. Solo full_name es obligatorio.
+-- age y birth_date conviven: si esta la fecha, la edad se calcula de ahi.
+CREATE TABLE IF NOT EXISTS reservation_guests (
+  id SERIAL PRIMARY KEY,
+  establishment_id INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+  reservation_group_id INTEGER NOT NULL REFERENCES reservation_groups(id) ON DELETE CASCADE,
+  full_name VARCHAR(255) NOT NULL,
+  document_number VARCHAR(50),
+  age INTEGER,
+  birth_date DATE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reservation_guests_group
+  ON reservation_guests(reservation_group_id);
+
 CREATE TABLE IF NOT EXISTS reservation_payments (
   id SERIAL PRIMARY KEY,
   establishment_id INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,

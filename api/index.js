@@ -127,6 +127,26 @@ async function parseJsonBody(req) {
   });
 }
 
+// Una fila de reservation_guests como la devuelve la API.
+function mapGuest(row) {
+  return {
+    id: row.id,
+    fullName: row.full_name,
+    documentNumber: row.document_number,
+    age: row.age,
+    birthDate: row.birth_date,
+    createdAt: row.created_at
+  };
+}
+
+// La edad se escribe a mano en el mostrador: un texto vacio no es cero.
+function parseGuestAge(age) {
+  if (age === undefined || age === null || age === '') return null;
+  const parsed = Number.parseInt(age, 10);
+  if (Number.isNaN(parsed) || parsed < 0) return null;
+  return parsed;
+}
+
 // ============= Main Handler =============
 module.exports = async (req, res) => {
   try {
@@ -1405,6 +1425,164 @@ module.exports = async (req, res) => {
         }
       } catch (error) {
         console.error('Error with payments:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/reservation-groups/:id/guests (GET/POST) =============
+    // Las personas que ocupan la reserva. Solo el nombre es obligatorio: un
+    // dato a medias sirve mas que ninguno.
+    if (first === 'reservation-groups' && second && segments[3] === 'guests') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      const reservationGroupId = parseInt(second, 10);
+      if (isNaN(reservationGroupId) || reservationGroupId <= 0) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'invalid_id' }));
+      }
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        const rgCheck = await db.query(
+          'SELECT id FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+          [reservationGroupId, establishmentId]
+        );
+
+        if (rgCheck.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'not_found' }));
+        }
+
+        if (method === 'GET') {
+          const result = await db.query(
+            'SELECT id, full_name, document_number, age, birth_date, created_at FROM reservation_guests WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY id ASC',
+            [establishmentId, reservationGroupId]
+          );
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ guests: result.rows.map(mapGuest) }));
+        }
+
+        if (method === 'POST') {
+          const body = await parseJsonBody(req);
+          const { fullName, documentNumber, age, birthDate } = body;
+
+          if (!fullName || String(fullName).trim() === '') {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: 'missing_fields' }));
+          }
+
+          const insertResult = await db.query(
+            'INSERT INTO reservation_guests (establishment_id, reservation_group_id, full_name, document_number, age, birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, document_number, age, birth_date, created_at',
+            [
+              establishmentId,
+              reservationGroupId,
+              String(fullName).trim(),
+              documentNumber || null,
+              parseGuestAge(age),
+              birthDate || null
+            ]
+          );
+
+          res.statusCode = 201;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ guest: mapGuest(insertResult.rows[0]) }));
+        }
+      } catch (error) {
+        console.error('Error with reservation guests:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/reservation-guests/:guestId (PATCH/DELETE) =============
+    if (first === 'reservation-guests' && second) {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      const guestId = parseInt(second, 10);
+      if (isNaN(guestId) || guestId <= 0) {
+        res.statusCode = 400;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'invalid_id' }));
+      }
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'not_found' }));
+        }
+
+        const establishmentId = estResult.rows[0].id;
+
+        const actual = await db.query(
+          'SELECT id, full_name, document_number, age, birth_date FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+          [guestId, establishmentId]
+        );
+
+        if (actual.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'not_found' }));
+        }
+
+        if (method === 'PATCH') {
+          const body = await parseJsonBody(req);
+          const { fullName, documentNumber, age, birthDate } = body;
+          const previo = actual.rows[0];
+
+          // Lo que no viene en el body queda como estaba.
+          const nombre =
+            fullName !== undefined && String(fullName).trim() !== ''
+              ? String(fullName).trim()
+              : previo.full_name;
+
+          const updateResult = await db.query(
+            'UPDATE reservation_guests SET full_name = $1, document_number = $2, age = $3, birth_date = $4, updated_at = NOW() WHERE id = $5 RETURNING id, full_name, document_number, age, birth_date, created_at',
+            [
+              nombre,
+              documentNumber !== undefined ? documentNumber || null : previo.document_number,
+              age !== undefined ? parseGuestAge(age) : previo.age,
+              birthDate !== undefined ? birthDate || null : previo.birth_date,
+              guestId
+            ]
+          );
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ guest: mapGuest(updateResult.rows[0]) }));
+        }
+
+        if (method === 'DELETE') {
+          await db.query('DELETE FROM reservation_guests WHERE id = $1 AND establishment_id = $2', [
+            guestId,
+            establishmentId
+          ]);
+
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ success: true }));
+        }
+      } catch (error) {
+        console.error('Error with reservation guest:', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));

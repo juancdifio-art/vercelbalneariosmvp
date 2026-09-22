@@ -1764,6 +1764,210 @@ app.post('/api/reservation-groups/:id/payments', authenticateToken, async (req, 
   }
 });
 
+// ===== Personas que ocupan la reserva =====
+// Solo el nombre es obligatorio: un dato a medias sirve mas que ninguno.
+
+// Una fila de reservation_guests como la devuelve la API.
+const mapGuest = (row) => ({
+  id: row.id,
+  fullName: row.full_name,
+  documentNumber: row.document_number,
+  age: row.age,
+  birthDate: row.birth_date instanceof Date
+    ? row.birth_date.toISOString().slice(0, 10)
+    : row.birth_date,
+  createdAt: row.created_at
+});
+
+// La edad se escribe a mano en el mostrador: un texto vacio no es cero.
+const parseGuestAge = (age) => {
+  if (age === undefined || age === null || age === '') return null;
+  const parsed = Number.parseInt(age, 10);
+  if (Number.isNaN(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+// Devuelve el establecimiento del usuario y valida que la reserva sea suya.
+const resolveGuestScope = async (userId, groupId) => {
+  const estResult = await pool.query(
+    'SELECT id FROM establishments WHERE user_id = $1',
+    [userId]
+  );
+
+  if (estResult.rows.length === 0) return null;
+
+  const establishmentId = estResult.rows[0].id;
+
+  const groupResult = await pool.query(
+    'SELECT id FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+    [groupId, establishmentId]
+  );
+
+  if (groupResult.rows.length === 0) return null;
+
+  return establishmentId;
+};
+
+app.get('/api/reservation-groups/:id/guests', authenticateToken, async (req, res) => {
+  try {
+    const groupId = Number.parseInt(req.params.id, 10);
+
+    if (!groupId || Number.isNaN(groupId) || groupId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const establishmentId = await resolveGuestScope(req.user.id, groupId);
+
+    if (!establishmentId) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const result = await pool.query(
+      'SELECT id, full_name, document_number, age, birth_date, created_at FROM reservation_guests WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY id ASC',
+      [establishmentId, groupId]
+    );
+
+    return res.json({ guests: result.rows.map(mapGuest) });
+  } catch (error) {
+    console.error('Error fetching reservation guests', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.post('/api/reservation-groups/:id/guests', authenticateToken, async (req, res) => {
+  try {
+    const groupId = Number.parseInt(req.params.id, 10);
+
+    if (!groupId || Number.isNaN(groupId) || groupId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const establishmentId = await resolveGuestScope(req.user.id, groupId);
+
+    if (!establishmentId) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const { fullName, documentNumber, age, birthDate } = req.body || {};
+
+    if (!fullName || String(fullName).trim() === '') {
+      return res.status(400).json({ error: 'missing_fields' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO reservation_guests (establishment_id, reservation_group_id, full_name, document_number, age, birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, document_number, age, birth_date, created_at',
+      [
+        establishmentId,
+        groupId,
+        String(fullName).trim(),
+        documentNumber || null,
+        parseGuestAge(age),
+        birthDate || null
+      ]
+    );
+
+    return res.status(201).json({ guest: mapGuest(result.rows[0]) });
+  } catch (error) {
+    console.error('Error creating reservation guest', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.patch('/api/reservation-guests/:guestId', authenticateToken, async (req, res) => {
+  try {
+    const guestId = Number.parseInt(req.params.guestId, 10);
+
+    if (!guestId || Number.isNaN(guestId) || guestId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const estResult = await pool.query(
+      'SELECT id FROM establishments WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const establishmentId = estResult.rows[0].id;
+
+    const actual = await pool.query(
+      'SELECT id, full_name, document_number, age, birth_date FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+      [guestId, establishmentId]
+    );
+
+    if (actual.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const previo = actual.rows[0];
+    const { fullName, documentNumber, age, birthDate } = req.body || {};
+
+    // Lo que no viene en el body queda como estaba.
+    const nombre =
+      fullName !== undefined && String(fullName).trim() !== ''
+        ? String(fullName).trim()
+        : previo.full_name;
+
+    const result = await pool.query(
+      'UPDATE reservation_guests SET full_name = $1, document_number = $2, age = $3, birth_date = $4, updated_at = NOW() WHERE id = $5 RETURNING id, full_name, document_number, age, birth_date, created_at',
+      [
+        nombre,
+        documentNumber !== undefined ? documentNumber || null : previo.document_number,
+        age !== undefined ? parseGuestAge(age) : previo.age,
+        birthDate !== undefined ? birthDate || null : previo.birth_date,
+        guestId
+      ]
+    );
+
+    return res.json({ guest: mapGuest(result.rows[0]) });
+  } catch (error) {
+    console.error('Error updating reservation guest', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.delete('/api/reservation-guests/:guestId', authenticateToken, async (req, res) => {
+  try {
+    const guestId = Number.parseInt(req.params.guestId, 10);
+
+    if (!guestId || Number.isNaN(guestId) || guestId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const estResult = await pool.query(
+      'SELECT id FROM establishments WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const establishmentId = estResult.rows[0].id;
+
+    const existe = await pool.query(
+      'SELECT id FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+      [guestId, establishmentId]
+    );
+
+    if (existe.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    await pool.query('DELETE FROM reservation_guests WHERE id = $1 AND establishment_id = $2', [
+      guestId,
+      establishmentId
+    ]);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting reservation guest', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 app.get('/api/reports/payments', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
