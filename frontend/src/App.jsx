@@ -18,6 +18,7 @@ import PoolPassModal from './components/PoolPassModal';
 import ReservationEditModal from './components/ReservationEditModal';
 import EstablishmentConfigForm from './components/EstablishmentConfigForm';
 import PanelUsuarioSection from './components/PanelUsuarioSection';
+import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
 import DashboardSection from './components/DashboardSection';
@@ -175,6 +176,9 @@ function App() {
     fetchReservationGroups
   } = useReservationGroups(authToken);
   const [reservationDetailsModal, setReservationDetailsModal] = useState(null);
+  // Ficha del cliente abierta desde una reserva: { id, nombre }. El nombre es
+  // el respaldo por si la lista de clientes todavia no esta cargada.
+  const [fichaCliente, setFichaCliente] = useState(null);
   const [reservationPaymentModal, setReservationPaymentModal] = useState(null);
   const [reservationPaymentSaving, setReservationPaymentSaving] = useState(false);
   const [reservationEditModal, setReservationEditModal] = useState(null);
@@ -2541,6 +2545,26 @@ function App() {
                 handleAddPaymentForReservationGroup(group);
                 setReservationDetailsModal(null);
               }}
+              onViewReservation={(group) => setReservationDetailsModal(group)}
+              onViewClient={(clientId) => {
+                // No se apilan los modales: se cierra la reserva y se abre la
+                // ficha. Desde la ficha, tocar una reserva hace el camino inverso.
+                setFichaCliente({ id: clientId, nombre: reservationDetailsModal.customerName });
+                setReservationDetailsModal(null);
+              }}
+            />
+          )}
+
+          {fichaCliente && (
+            <ClientDetailsModal
+              client={
+                (clients || []).find((c) => Number(c.id) === Number(fichaCliente.id)) || {
+                  id: fichaCliente.id,
+                  fullName: fichaCliente.nombre
+                }
+              }
+              onClose={() => setFichaCliente(null)}
+              onViewReservation={(group) => setReservationDetailsModal(group)}
             />
           )}
 

@@ -2,8 +2,23 @@ import React, { useEffect, useState } from 'react';
 import { format } from '../lib/dates';
 import { generateReceipt } from '../utils/generateReceipt';
 import { getApiBaseUrl } from '../apiConfig';
+import { formatPesos } from '../lib/money';
+import { otrasReservasVigentes, saldoDe } from '../lib/reservas';
+import { ServiceIcon, COLOR_SERVICIO } from './icons';
 
 const API_BASE_URL = getApiBaseUrl();
+
+const ETIQUETA_SERVICIO = {
+  carpa: 'Carpa',
+  sombrilla: 'Sombrilla',
+  parking: 'Estacionamiento',
+  pileta: 'Pileta'
+};
+
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 function ReservationDetailsModal({
   reservation,
@@ -12,7 +27,9 @@ function ReservationDetailsModal({
   onClose,
   onEdit,
   onCancel,
-  onAddPayment
+  onAddPayment,
+  onViewReservation,
+  onViewClient
 }) {
   if (!reservation) return null;
 
@@ -67,6 +84,40 @@ function ReservationDetailsModal({
 
     fetchPayments();
   }, [id]);
+
+  // Reservas del mismo cliente. Se piden aca y no se toman de la lista que ya
+  // tiene la app, porque esa lista depende de la seccion: abierta desde Carpas
+  // trae solo carpas, y el estacionamiento del mismo cliente no aparecia.
+  const clienteId = reservation.clientId;
+  const [reservasCliente, setReservasCliente] = useState([]);
+
+  useEffect(() => {
+    setReservasCliente([]);
+    if (clienteId === null || clienteId === undefined || clienteId === '') return;
+
+    const token = sessionStorage.getItem('authToken');
+    if (!token) return;
+
+    let cancelado = false;
+    (async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/reservation-groups?clientId=${encodeURIComponent(clienteId)}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!cancelado) setReservasCliente(data.reservationGroups || []);
+      } catch (err) {
+        // Sin esta lista solo se pierde la seccion de otras reservas.
+        console.error('Error loading client reservations', err);
+      }
+    })();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [id, clienteId]);
 
   const getDaysCount = () => {
     const start = parseLocalDateFromInput(startDate);
@@ -169,14 +220,14 @@ function ReservationDetailsModal({
                 <span className="text-base">📅</span>
                 <div className="flex-1">
                   <p className="text-[10px] text-slate-500 font-medium">Entrada</p>
-                  <p className="text-xs font-semibold text-slate-900">{startDate}</p>
+                  <p className="text-xs font-semibold text-slate-900">{format(startDate, 'dd/MM/yyyy')}</p>
                 </div>
               </div>
               <div className="flex items-start gap-2">
                 <span className="text-base">📅</span>
                 <div className="flex-1">
                   <p className="text-[10px] text-slate-500 font-medium">Salida</p>
-                  <p className="text-xs font-semibold text-slate-900">{endDate}</p>
+                  <p className="text-xs font-semibold text-slate-900">{format(endDate, 'dd/MM/yyyy')}</p>
                 </div>
               </div>
               {daysCount !== null && (
@@ -197,6 +248,15 @@ function ReservationDetailsModal({
                   <p className="text-xs font-semibold text-slate-900 truncate" title={customerName || ''}>
                     {customerName || '—'}
                   </p>
+                  {reservation.clientId && onViewClient && (
+                    <button
+                      type="button"
+                      onClick={() => onViewClient(reservation.clientId)}
+                      className="mt-0.5 text-[11px] font-semibold text-cyan-700 hover:text-cyan-900 hover:underline"
+                    >
+                      Ver ficha del cliente →
+                    </button>
+                  )}
                 </div>
               </div>
               <div className="flex items-start gap-2">
@@ -246,26 +306,26 @@ function ReservationDetailsModal({
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-slate-600">Precio por día</span>
                   <span className="text-sm font-bold text-slate-900">
-                    {dailyPrice !== null && dailyPrice !== undefined ? `$${dailyPrice}` : '—'}
+                    {dailyPrice !== null && dailyPrice !== undefined ? formatPesos(dailyPrice, 0) : '—'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-slate-600">Total estadía</span>
                   <span className="text-sm font-bold text-cyan-600">
-                    {totalPrice !== null && totalPrice !== undefined ? `$${totalPrice}` : '—'}
+                    {totalPrice !== null && totalPrice !== undefined ? formatPesos(totalPrice, 0) : '—'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-slate-600">Pagos realizados</span>
                   <span className="text-sm font-bold text-emerald-600">
-                    {paidAmount !== null && paidAmount !== undefined ? `$${paidAmount}` : '—'}
+                    {paidAmount !== null && paidAmount !== undefined ? formatPesos(paidAmount, 0) : '—'}
                   </span>
                 </div>
                 <div className="h-px bg-slate-200 my-2"></div>
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-semibold text-slate-700">Saldo pendiente</span>
                   <span className={`text-lg font-bold ${balance !== null && balance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-                    {balance !== null ? `$${balance.toFixed(2)}` : '—'}
+                    {balance !== null ? formatPesos(balance, 0) : '—'}
                   </span>
                 </div>
               </div>
@@ -287,6 +347,56 @@ function ReservationDetailsModal({
               )}
             </div>
           </div>
+
+          {/* Otras reservas del mismo cliente: una familia suele alquilar carpa y
+              estacionamiento juntos, y desde una hay que poder ver las demas. */}
+          {(() => {
+            // otrasReservasVigentes vuelve a filtrar por clientId: si algun backend
+            // ignorara el parametro, igual no se mezclan clientes.
+            const otras = otrasReservasVigentes(reservasCliente, reservation, hoyISO());
+            if (otras.length === 0) return null;
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">
+                  Otras reservas activas de {customerName || 'este cliente'}
+                </h3>
+                <div className="space-y-1.5">
+                  {otras.map((g) => {
+                    const saldo = saldoDe(g);
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => onViewReservation && onViewReservation(g)}
+                        className="w-full flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left hover:border-cyan-300 hover:bg-cyan-50/60 transition"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ServiceIcon
+                            serviceId={g.serviceType}
+                            className={`h-5 w-5 shrink-0 ${COLOR_SERVICIO[g.serviceType] || 'text-slate-500'}`}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900">
+                              {ETIQUETA_SERVICIO[g.serviceType] || g.serviceType}
+                              {g.serviceType !== 'pileta' && g.resourceNumber ? ` ${g.resourceNumber}` : ''}
+                            </p>
+                            <p className="text-[10px] text-slate-500">
+                              {format(g.startDate, 'dd/MM/yyyy')} - {format(g.endDate, 'dd/MM/yyyy')}
+                            </p>
+                          </div>
+                        </div>
+                        <span
+                          className={`text-[11px] font-semibold whitespace-nowrap ${saldo > 0 ? 'text-rose-700' : 'text-emerald-700'}`}
+                        >
+                          {saldo > 0 ? `Debe ${formatPesos(saldo, 0)}` : 'Pagada'}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Payments section */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -337,16 +447,12 @@ function ReservationDetailsModal({
                     methodIcon = '💰';
                   }
 
-                  let paymentDateLabel = '';
-                  if (p.paymentDate) {
-                    const dateObj =
-                      typeof p.paymentDate === 'string'
-                        ? new Date(p.paymentDate)
-                        : p.paymentDate;
-                    if (!Number.isNaN(dateObj.getTime())) {
-                      paymentDateLabel = format(dateObj, 'dd/MM/yyyy');
-                    }
-                  }
+                  // La API manda '2026-09-22'. Con new Date() eso es medianoche
+                  // UTC, que en Argentina cae el dia anterior: todos los pagos se
+                  // veian un dia antes. format() de lib/dates lo toma en hora local.
+                  const paymentDateLabel = p.paymentDate
+                    ? format(String(p.paymentDate).slice(0, 10), 'dd/MM/yyyy')
+                    : '';
 
                   return (
                     <div
@@ -357,7 +463,7 @@ function ReservationDetailsModal({
                         <span className="text-lg">{methodIcon}</span>
                         <div>
                           <p className="text-[11px] font-semibold text-slate-900">
-                            ${p.amount}
+                            {formatPesos(p.amount, 0)}
                           </p>
                           <p className="text-[10px] text-slate-500">
                             {paymentDateLabel}
@@ -400,7 +506,9 @@ function ReservationDetailsModal({
               <button
                 type="button"
                 className="inline-flex items-center rounded-lg border border-blue-300 px-4 py-2 text-xs font-semibold text-blue-700 bg-white hover:bg-blue-50 transition shadow-sm"
-                onClick={() => generateReceipt(reservation, establishment)}
+                // La reserva de la lista no trae el array de pagos: sin esto el
+                // comprobante salia sin fecha ni metodo de pago y sin historial.
+                onClick={() => generateReceipt({ ...reservation, payments }, establishment)}
               >
                 📄 Descargar comprobante
               </button>

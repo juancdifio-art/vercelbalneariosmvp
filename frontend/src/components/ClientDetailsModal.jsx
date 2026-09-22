@@ -1,7 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { getApiBaseUrl } from '../apiConfig';
+import { reservasDelCliente, estadoDeCuenta, saldoDe } from '../lib/reservas';
+import { formatPesos } from '../lib/money';
+import { format } from '../lib/dates';
 
 const API_BASE_URL = getApiBaseUrl();
+
+const ETIQUETA_SERVICIO = {
+  carpa: 'Carpa',
+  sombrilla: 'Sombrilla',
+  parking: 'Estacionamiento',
+  pileta: 'Pileta'
+};
+
+// Local devuelve `method` y produccion a veces `paymentMethod`.
+function metodoDePago(pago) {
+  const m = pago.method || pago.paymentMethod;
+  if (m === 'cash') return 'Efectivo';
+  if (m === 'transfer') return 'Transferencia';
+  if (m === 'card') return 'Tarjeta';
+  return 'Otro';
+}
 
 function ClientDetailsModal({ client, onClose, onViewReservation }) {
   if (!client) return null;
@@ -31,6 +50,7 @@ function ClientDetailsModal({ client, onClose, onViewReservation }) {
   const [clientReservations, setClientReservations] = useState([]);
   const [clientReservationsLoading, setClientReservationsLoading] = useState(false);
   const [clientReservationsError, setClientReservationsError] = useState('');
+  const [clientPayments, setClientPayments] = useState([]);
 
   const formatDateTime = (value) => {
     if (!value) return '—';
@@ -163,49 +183,37 @@ function ClientDetailsModal({ client, onClose, onViewReservation }) {
         setClientReservationsLoading(true);
         setClientReservationsError('');
 
-        const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        });
+        const headers = { Authorization: `Bearer ${token}` };
+        const [resReservas, resPagos] = await Promise.all([
+          fetch(`${API_BASE_URL}/api/reservation-groups?clientId=${encodeURIComponent(id)}`, { headers }),
+          fetch(`${API_BASE_URL}/api/reservation-groups/payments`, { headers })
+        ]);
 
-        if (!response.ok) {
+        if (!resReservas.ok) {
           throw new Error('Error fetching client reservations');
         }
 
-        const data = await response.json();
+        const data = await resReservas.json();
         const groups = Array.isArray(data.reservationGroups) ? data.reservationGroups : [];
 
-        const normalizedName = (fullName || '').trim().toLowerCase();
-        const clientIdNumber = Number(id) || null;
+        // Solo por clientId: el match por nombre mezclaba clientes homonimos.
+        // El backend ya filtra por clientId; se repite aca como segunda barrera.
+        const groupsForClient = reservasDelCliente(groups, id);
 
-        const groupsForClient = groups.filter((group) => {
-          const groupClientId =
-            group.clientId !== null &&
-            group.clientId !== undefined &&
-            group.clientId !== ''
-              ? Number(group.clientId)
-              : null;
-
-          const matchesId =
-            clientIdNumber !== null &&
-            groupClientId !== null &&
-            !Number.isNaN(groupClientId) &&
-            groupClientId === clientIdNumber;
-
-          const groupName = (group.customerName || '').trim().toLowerCase();
-
-          const matchesName =
-            normalizedName &&
-            (groupName === normalizedName ||
-              groupName.includes(normalizedName) ||
-              normalizedName.includes(groupName));
-
-          return matchesId || matchesName;
-        });
+        // Los pagos no traen clientId: se toman los de las reservas del cliente.
+        // Si el endpoint de pagos falla, la ficha sigue mostrando las reservas.
+        let pagosDelCliente = [];
+        if (resPagos.ok) {
+          const dataPagos = await resPagos.json();
+          const idsReservas = new Set(groupsForClient.map((g) => Number(g.id)));
+          pagosDelCliente = (dataPagos.payments || [])
+            .filter((pg) => idsReservas.has(Number(pg.groupId ?? pg.reservationGroupId)))
+            .sort((a, b) => String(b.paymentDate).localeCompare(String(a.paymentDate)));
+        }
 
         if (!cancelled) {
           setClientReservations(groupsForClient);
+          setClientPayments(pagosDelCliente);
         }
       } catch (err) {
         console.error('Error fetching client reservation history', err);
@@ -363,6 +371,28 @@ function ClientDetailsModal({ client, onClose, onViewReservation }) {
               </div>
             )}
 
+            {!clientReservationsLoading && !clientReservationsError && clientReservations.length > 0 && (() => {
+              const cuenta = estadoDeCuenta(clientReservations);
+              return (
+                <div className="mb-2 grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-white border border-slate-200 px-2.5 py-2">
+                    <p className="text-[10px] text-slate-500">Total reservado</p>
+                    <p className="text-sm font-bold text-slate-900">{formatPesos(cuenta.total, 0)}</p>
+                  </div>
+                  <div className="rounded-lg bg-white border border-slate-200 px-2.5 py-2">
+                    <p className="text-[10px] text-slate-500">Pagado</p>
+                    <p className="text-sm font-bold text-emerald-700">{formatPesos(cuenta.pagado, 0)}</p>
+                  </div>
+                  <div className={`rounded-lg border px-2.5 py-2 ${cuenta.saldo > 0 ? 'bg-rose-50 border-rose-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <p className="text-[10px] text-slate-500">Saldo pendiente</p>
+                    <p className={`text-sm font-bold ${cuenta.saldo > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                      {formatPesos(cuenta.saldo, 0)}
+                    </p>
+                  </div>
+                </div>
+              );
+            })()}
+
             {!clientReservationsLoading && !clientReservationsError && clientReservations.length > 0 && (
               <div className="mt-1 max-h-60 overflow-y-auto space-y-1.5">
                 {clientReservations
@@ -424,7 +454,12 @@ function ClientDetailsModal({ client, onClose, onViewReservation }) {
                           <span className={`text-[10px] ${paymentClasses}`}>{paymentLabel}</span>
                           {group.totalPrice && (
                             <span className="text-[10px] text-slate-500">
-                              Total ${Number.parseFloat(String(group.totalPrice)).toFixed(2)}
+                              Total {formatPesos(group.totalPrice, 0)}
+                            </span>
+                          )}
+                          {group.status !== 'cancelled' && saldoDe(group) > 0 && (
+                            <span className="text-[10px] font-semibold text-rose-700">
+                              Debe {formatPesos(saldoDe(group), 0)}
                             </span>
                           )}
                         </div>
@@ -434,6 +469,42 @@ function ClientDetailsModal({ client, onClose, onViewReservation }) {
               </div>
             )}
           </div>
+
+          {/* Pagos */}
+          {clientPayments.length > 0 && (
+            <div className="bg-slate-50 rounded-xl border border-slate-200 p-3">
+              <div className="flex items-center justify-between gap-2 mb-2.5">
+                <h3 className="text-sm font-bold text-slate-800">Pagos</h3>
+                <span className="text-[11px] text-slate-500">
+                  {clientPayments.length} {clientPayments.length === 1 ? 'pago' : 'pagos'}
+                </span>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {clientPayments.map((pago) => (
+                  <div
+                    key={pago.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[11px]"
+                  >
+                    <div className="min-w-0">
+                      <span className="font-semibold text-slate-900">
+                        {format(String(pago.paymentDate).slice(0, 10), 'dd/MM/yyyy')}
+                      </span>
+                      <span className="text-slate-500">
+                        {' · '}
+                        {ETIQUETA_SERVICIO[pago.serviceType] || pago.serviceType}
+                        {pago.resourceNumber ? ` ${pago.resourceNumber}` : ''}
+                        {' · '}
+                        {metodoDePago(pago)}
+                      </span>
+                    </div>
+                    <span className="font-semibold text-emerald-700 whitespace-nowrap">
+                      {formatPesos(pago.amount, 0)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Vehículo */}
           {(vehicleBrand || vehicleModel || vehiclePlate) && (
