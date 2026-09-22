@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import ClientDetailsModal from './ClientDetailsModal';
+import useDeudasClientes from '../hooks/useDeudasClientes';
+import { formatPesos } from '../lib/money';
 
 function ClientsSection({
   clients,
@@ -12,13 +14,25 @@ function ClientsSection({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClient, setSelectedClient] = useState(null);
+  const [soloConDeuda, setSoloConDeuda] = useState(false);
+
+  // Deuda de reservas ya terminadas: lo que se fue sin pagar.
+  const deudas = useDeudasClientes();
+  const cantidadConDeuda = useMemo(
+    () => (clients || []).filter((c) => deudas.has(Number(c.id))).length,
+    [clients, deudas]
+  );
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
   const filteredClients = useMemo(() => {
-    if (!normalizedQuery) return clients;
+    const base = soloConDeuda
+      ? clients.filter((client) => deudas.has(Number(client.id)))
+      : clients;
 
-    return clients.filter((client) => {
+    if (!normalizedQuery) return base;
+
+    return base.filter((client) => {
       const fields = [
         client.fullName,
         client.phone,
@@ -29,7 +43,7 @@ function ClientsSection({
       ];
       return fields.some((field) => (field || '').toLowerCase().includes(normalizedQuery));
     });
-  }, [clients, normalizedQuery]);
+  }, [clients, normalizedQuery, soloConDeuda, deudas]);
 
   const hasClients = clients && clients.length > 0;
   const hasFilteredClients = filteredClients && filteredClients.length > 0;
@@ -94,8 +108,23 @@ function ClientsSection({
             )}
           </div>
 
+          <label className="mt-3 inline-flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={soloConDeuda}
+              onChange={(e) => setSoloConDeuda(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500"
+            />
+            <span className="text-sm text-slate-700">
+              Solo con deuda de reservas terminadas
+              <span className="ml-1.5 rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                {cantidadConDeuda}
+              </span>
+            </span>
+          </label>
+
           {/* Indicador de resultados */}
-          {searchQuery && (
+          {(searchQuery || soloConDeuda) && (
             <div className="mt-3 flex items-center gap-2">
               <div className="h-1 w-1 rounded-full bg-purple-500"></div>
               <p className="text-xs text-slate-600">
@@ -194,6 +223,14 @@ function ClientsSection({
                         </span>
                         {client.documentNumber && (
                           <span className="text-xs text-slate-500 truncate">DNI {client.documentNumber}</span>
+                        )}
+                        {deudas.has(Number(client.id)) && (
+                          <span
+                            className="mt-1 self-start rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700"
+                            title="Saldo impago de reservas ya terminadas"
+                          >
+                            Debe {formatPesos(deudas.get(Number(client.id)).monto, 0)}
+                          </span>
                         )}
                       </div>
                     </td>

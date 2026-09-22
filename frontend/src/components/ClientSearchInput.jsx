@@ -1,9 +1,25 @@
 import React, { useState, useRef, useEffect } from 'react';
+import useDeudasClientes from '../hooks/useDeudasClientes';
+import { formatPesos } from '../lib/money';
+import { saldoDe } from '../lib/reservas';
+import { format } from '../lib/dates';
+import { AvisoIcon } from './icons';
+
+const ETIQUETA_SERVICIO = {
+    carpa: 'Carpa',
+    sombrilla: 'Sombrilla',
+    parking: 'Estacionamiento',
+    pileta: 'Pileta'
+};
 
 function ClientSearchInput({ clients, selectedClientId, onSelect, disabled }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef(null);
+
+    // Deuda de reservas ya terminadas, para avisar antes de tomarle otra
+    // reserva al mismo cliente. Solo avisa: la reserva se puede cargar igual.
+    const deudas = useDeudasClientes();
 
     // Filtrar clientes basado en el término de búsqueda
     const filteredClients = searchTerm.trim()
@@ -19,6 +35,7 @@ function ClientSearchInput({ clients, selectedClientId, onSelect, disabled }) {
 
     // Obtener el cliente seleccionado para mostrar su nombre
     const selectedClient = clients.find((c) => c.id === selectedClientId);
+    const deudaSeleccionado = selectedClient ? deudas.get(Number(selectedClient.id)) : null;
 
     // Cerrar dropdown al hacer clic fuera
     useEffect(() => {
@@ -92,6 +109,36 @@ function ClientSearchInput({ clients, selectedClientId, onSelect, disabled }) {
                 </div>
             )}
 
+            {deudaSeleccionado && (
+                <div
+                    role="alert"
+                    className="mt-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] text-rose-800"
+                >
+                    <p className="flex items-center gap-1.5 font-semibold">
+                        <AvisoIcon className="h-4 w-4 shrink-0" />
+                        Debe {formatPesos(deudaSeleccionado.monto, 0)} de{' '}
+                        {deudaSeleccionado.reservas.length === 1
+                            ? '1 reserva ya terminada'
+                            : `${deudaSeleccionado.reservas.length} reservas ya terminadas`}
+                    </p>
+                    <ul className="mt-1 space-y-0.5 pl-5 text-rose-700">
+                        {deudaSeleccionado.reservas.slice(0, 3).map((g) => (
+                            <li key={g.id}>
+                                {ETIQUETA_SERVICIO[g.serviceType] || g.serviceType}
+                                {g.serviceType !== 'pileta' && g.resourceNumber ? ` ${g.resourceNumber}` : ''}
+                                {' · terminó el '}
+                                {format(g.endDate, 'dd/MM/yyyy')}
+                                {' · debe '}
+                                {formatPesos(saldoDe(g), 0)}
+                            </li>
+                        ))}
+                        {deudaSeleccionado.reservas.length > 3 && (
+                            <li>y {deudaSeleccionado.reservas.length - 3} más</li>
+                        )}
+                    </ul>
+                </div>
+            )}
+
             {/* Dropdown de resultados */}
             {isOpen && !selectedClient && (
                 <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
@@ -123,10 +170,16 @@ function ClientSearchInput({ clients, selectedClientId, onSelect, disabled }) {
                                             <span className="text-slate-500 ml-2">• {client.phone}</span>
                                         )}
                                     </div>
-                                    {client.email && (
-                                        <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
-                                            {client.email}
+                                    {deudas.has(Number(client.id)) ? (
+                                        <span className="shrink-0 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
+                                            Debe {formatPesos(deudas.get(Number(client.id)).monto, 0)}
                                         </span>
+                                    ) : (
+                                        client.email && (
+                                            <span className="text-[10px] text-slate-400 truncate max-w-[120px]">
+                                                {client.email}
+                                            </span>
+                                        )
                                     )}
                                 </button>
                             ))}

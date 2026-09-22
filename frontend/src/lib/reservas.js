@@ -20,6 +20,13 @@ function numero(valor) {
   return Number.isFinite(n) ? n : 0;
 }
 
+/** Hoy en yyyy-mm-dd, en hora local: en Argentina, despues de las 21 hs UTC ya es manana. */
+export function hoyISO(ahora = new Date()) {
+  const m = String(ahora.getMonth() + 1).padStart(2, '0');
+  const d = String(ahora.getDate()).padStart(2, '0');
+  return `${ahora.getFullYear()}-${m}-${d}`;
+}
+
 /** Dias entre dos fechas contando los dos extremos: del 23 al 29 son 7. */
 export function diasInclusivos(desde, hasta) {
   return Math.round((aUTC(hasta) - aUTC(desde)) / 86400000) + 1;
@@ -103,4 +110,37 @@ export function diasOcupadaDesde(reservas, serviceType, resourceNumber, fecha) {
   }
 
   return diasInclusivos(fecha, fin);
+}
+
+/**
+ * Deuda vencida: lo que quedo sin pagar de reservas que ya terminaron.
+ *
+ * Las reservas en curso con saldo no cuentan: es normal que se paguen durante
+ * la estadia. Lo que interesa avisar es el cliente que se fue debiendo.
+ */
+function esDeudaVencida(reserva, hoy) {
+  return reserva.status !== 'cancelled' && (reserva.endDate || '') < hoy && saldoDe(reserva) > 0.01;
+}
+
+/**
+ * Deuda vencida de cada cliente que tiene alguna, en un Map por clientId.
+ * Cada entrada trae el monto total y las reservas que la componen, de la mas
+ * reciente a la mas vieja. Las reservas sin cliente se ignoran: no hay a quien
+ * atribuirselas.
+ */
+export function deudasPorCliente(reservas, hoy) {
+  const porCliente = new Map();
+  for (const g of reservas || []) {
+    if (g.clientId === null || g.clientId === undefined || g.clientId === '') continue;
+    if (!esDeudaVencida(g, hoy)) continue;
+    const id = Number(g.clientId);
+    const actual = porCliente.get(id) || { monto: 0, reservas: [] };
+    actual.monto += saldoDe(g);
+    actual.reservas.push(g);
+    porCliente.set(id, actual);
+  }
+  for (const deuda of porCliente.values()) {
+    deuda.reservas.sort((a, b) => (b.endDate || '').localeCompare(a.endDate || ''));
+  }
+  return porCliente;
 }

@@ -3,7 +3,7 @@ import { format } from '../lib/dates';
 import { generateReceipt } from '../utils/generateReceipt';
 import { getApiBaseUrl } from '../apiConfig';
 import { formatPesos } from '../lib/money';
-import { otrasReservasVigentes, saldoDe } from '../lib/reservas';
+import { otrasReservasVigentes, saldoDe, hoyISO } from '../lib/reservas';
 import { ServiceIcon, COLOR_SERVICIO } from './icons';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -14,11 +14,6 @@ const ETIQUETA_SERVICIO = {
   parking: 'Estacionamiento',
   pileta: 'Pileta'
 };
-
-function hoyISO() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
 
 function ReservationDetailsModal({
   reservation,

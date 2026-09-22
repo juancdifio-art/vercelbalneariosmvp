@@ -18,7 +18,8 @@ import {
   Gauge,
   ClipboardList,
   Banknote,
-  X
+  X,
+  TriangleAlert
 } from 'lucide-react';
 
 /**
@@ -116,6 +117,7 @@ export const UltimasReservasIcon = conTrazo(ClipboardList);
 export const PagosIcon = conTrazo(Banknote);
 export const CheckInsIcon = conTrazo(CalendarClock);
 export const CerrarIcon = conTrazo(X);
+export const AvisoIcon = conTrazo(TriangleAlert);
 
 /**
  * Color de cada servicio. Unica fuente: si el naranja de carpas se define en

@@ -5,7 +5,9 @@ import {
   otrasReservasVigentes,
   saldoDe,
   estadoDeCuenta,
-  diasOcupadaDesde
+  diasOcupadaDesde,
+  deudasPorCliente,
+  hoyISO
 } from './reservas';
 
 const HOY = '2026-09-22';
@@ -138,5 +140,57 @@ describe('diasOcupadaDesde', () => {
 
   it('si la unidad esta libre hoy devuelve 0', () => {
     expect(diasOcupadaDesde([carpa(1, '2026-10-01', '2026-10-05')], 'carpa', 1, HOY)).toBe(0);
+  });
+});
+
+describe('hoyISO', () => {
+  it('usa la fecha local, no la UTC', () => {
+    // 22/09 a las 22 hs en Argentina ya es 23/09 en UTC.
+    expect(hoyISO(new Date(2026, 8, 22, 22, 30))).toBe('2026-09-22');
+  });
+});
+
+describe('deudasPorCliente', () => {
+  const r = (id, clientId, endDate, total, pagado, status = 'active') => ({
+    id, clientId, status, startDate: '2026-08-01', endDate, totalPrice: String(total), paidAmount: pagado
+  });
+
+  it('suma lo impago de las reservas que ya terminaron', () => {
+    const deudas = deudasPorCliente(
+      [r(1, 5, '2026-09-10', 100000, 40000), r(2, 5, '2026-09-15', 50000, 0)],
+      HOY
+    );
+    expect(deudas.get(5).monto).toBe(110000);
+    expect(deudas.get(5).reservas.map((g) => g.id)).toEqual([2, 1]);
+  });
+
+  it('no cuenta las reservas en curso: se pagan durante la estadia', () => {
+    const deudas = deudasPorCliente([r(1, 5, '2026-09-30', 100000, 0)], HOY);
+    expect(deudas.has(5)).toBe(false);
+  });
+
+  it('una reserva que termina hoy todavia esta en curso', () => {
+    expect(deudasPorCliente([r(1, 5, HOY, 100000, 0)], HOY).has(5)).toBe(false);
+  });
+
+  it('no cuenta las pagadas ni las canceladas', () => {
+    const deudas = deudasPorCliente(
+      [r(1, 5, '2026-09-10', 100000, 100000), r(2, 5, '2026-09-10', 100000, 0, 'cancelled')],
+      HOY
+    );
+    expect(deudas.has(5)).toBe(false);
+  });
+
+  it('ignora las reservas sin cliente', () => {
+    expect(deudasPorCliente([r(1, null, '2026-09-10', 100000, 0)], HOY).size).toBe(0);
+  });
+
+  it('separa por cliente', () => {
+    const deudas = deudasPorCliente(
+      [r(1, 5, '2026-09-10', 100000, 0), r(2, 9, '2026-09-10', 30000, 10000)],
+      HOY
+    );
+    expect(deudas.get(5).monto).toBe(100000);
+    expect(deudas.get(9).monto).toBe(20000);
   });
 });
