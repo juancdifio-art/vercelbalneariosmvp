@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { addDays, format } from 'date-fns';
-
+import { addDays } from 'date-fns';
+import { format } from '../lib/dates';
+import { ServiceIcon } from './icons';
 function DailyViewSection({
   establishment,
   carpasReservations,
@@ -132,6 +133,14 @@ function DailyViewSection({
 
   const visibleServices = services.filter((service) => service.id === selectedServiceId);
 
+  // Con mas de un servicio la navegacion son solapas: el borde y el redondeo
+  // los pone el contenedor, asi la solapa activa y el panel forman una sola
+  // superficie continua.
+  const hasTabs = services.length > 1;
+  const panelClasses = hasTabs
+    ? 'rounded-b-xl bg-white px-3 py-3 text-[11px] text-slate-700'
+    : 'rounded-xl border border-slate-200 bg-white px-3 py-3 text-[11px] text-slate-700';
+
   if (services.length === 0) {
     return (
       <div className="rounded-xl bg-sky-50 border border-cyan-100 px-4 py-4 text-sm">
@@ -145,56 +154,81 @@ function DailyViewSection({
   return (
     <div className="rounded-xl bg-sky-50 border border-cyan-100 px-3 py-3 sm:px-4 sm:py-4 text-sm">
       <p className="text-[11px] text-slate-600 mb-2">
-        Plano simplificado del balneario para un día, mostrando qué unidades están ocupadas y cuáles libres.
+        Vista simplificada del balneario para un día, mostrando qué unidades están ocupadas y cuáles libres.
       </p>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
         <div className="text-[11px] text-slate-600">
           <span className="font-medium text-slate-800 mr-2">Día seleccionado:</span>
           <span className="inline-flex items-center rounded-full bg-cyan-50 border border-cyan-200 px-2 py-0.5">
             {format(currentDay, 'dd/MM/yyyy')}
           </span>
         </div>
-        <div className="flex gap-1.5 text-[10px]">
+        <div className="flex flex-wrap gap-1.5 text-[11px]">
           <button
             type="button"
             onClick={() => setDayOffset((prev) => prev - 1)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             ◀ Día anterior
           </button>
           <button
             type="button"
             onClick={() => setDayOffset(-baseOffset)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             Hoy
           </button>
           <button
             type="button"
             onClick={() => setDayOffset((prev) => prev + 1)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             Día siguiente ▶
           </button>
         </div>
       </div>
 
-      {services.length > 1 && (
-        <div className="flex flex-wrap gap-1.5 mb-3 text-[10px]">
-          {services.map((service) => (
-            <button
-              key={service.id}
-              type="button"
-              onClick={() => setSelectedServiceId(service.id)}
-              className={`inline-flex items-center rounded-full border px-2 py-0.5 ${
-                selectedServiceId === service.id
-                  ? 'bg-cyan-600 border-cyan-700 text-white'
-                  : 'bg-white border-cyan-300 text-cyan-800 hover:bg-cyan-50'
-              }`}
-            >
-              {service.label}
-            </button>
-          ))}
+      <div className={hasTabs ? 'rounded-xl border border-slate-200 bg-white' : ''}>
+      {hasTabs && (
+        <div className="border-b border-slate-200 p-2 sm:hidden">
+          <select
+            aria-label="Servicio"
+            value={selectedServiceId ?? ''}
+            onChange={(event) => setSelectedServiceId(event.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-semibold text-slate-900 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          >
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {hasTabs && (
+        <div role="tablist" aria-label="Servicio" className="hidden gap-1 border-b border-slate-200 px-2 pt-2 sm:flex">
+          {services.map((service) => {
+            const isActive = selectedServiceId === service.id;
+            return (
+              <button
+                key={service.id}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={`panel-${service.id}`}
+                onClick={() => setSelectedServiceId(service.id)}
+                className={
+                  '-mb-px whitespace-nowrap rounded-t-lg px-2.5 py-2 text-[12px] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:px-4 sm:text-[13px] ' +
+                  (isActive
+                    ? 'border border-slate-200 border-b-white bg-white font-semibold text-slate-900'
+                    : 'border border-transparent font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800')
+                }
+              >
+                {service.label}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -204,11 +238,8 @@ function DailyViewSection({
 
           if (!capacity) {
             return (
-              <div
-                key={id}
-                className="rounded-xl bg-white border border-slate-200 px-3 py-3 text-[11px] text-slate-700"
-              >
-                <p className="font-semibold text-slate-900 mb-1">{label}</p>
+              <div key={id} id={`panel-${id}`} role={hasTabs ? 'tabpanel' : undefined} className={panelClasses}>
+                {!hasTabs && <p className="font-semibold text-slate-900 mb-1">{label}</p>}
                 <p className="text-[10px] text-slate-500">Sin capacidad configurada para este servicio.</p>
               </div>
             );
@@ -240,13 +271,11 @@ function DailyViewSection({
               : 'parking';
 
           return (
-            <div
-              key={id}
-              className="rounded-xl bg-white border border-slate-200 px-3 py-3 text-[11px] text-slate-700"
-            >
+            <div key={id} id={`panel-${id}`} role={hasTabs ? 'tabpanel' : undefined} className={panelClasses}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                 <div>
-                  <p className="font-semibold text-slate-900">{label}</p>
+                  {/* Con solapas el nombre del servicio ya lo dice la solapa activa. */}
+                  {!hasTabs && <p className="font-semibold text-slate-900">{label}</p>}
                   <p className="text-[10px] text-slate-500">
                     {capacity} unidades totales. Vista rápida de ocupación para el día seleccionado.
                   </p>
@@ -257,7 +286,22 @@ function DailyViewSection({
                 </div>
               </div>
 
-              <div className="mt-1 grid grid-cols-8 sm:grid-cols-10 md:grid-cols-12 gap-1">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-slate-100 pt-2 text-[10px] text-slate-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-sm border border-emerald-700 bg-emerald-600" />
+                  Ocupada
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-sm border border-amber-200 bg-amber-50" />
+                  Libre, con reserva próxima
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-sm border border-slate-200 bg-white" />
+                  Libre
+                </span>
+              </div>
+
+              <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
                 {unidades.map((numero) => {
                   const key = `${currentDateStr}-${numero}`;
                   const ocupada = Boolean(reservations[key]);
@@ -269,39 +313,37 @@ function DailyViewSection({
                     ocupada
                   );
 
-                  const boxClasses = ocupada
-                    ? 'bg-emerald-500 border-emerald-600 text-white cursor-pointer hover:bg-emerald-600'
-                    : 'bg-slate-50 border-slate-300 text-slate-600 cursor-pointer hover:bg-slate-100';
-
                   const diasTexto = diasMismoEstado === 1 ? 'día' : 'días';
+                  const libreSinReservas = !ocupada && diasMismoEstado >= quickViewLookaheadDays;
 
                   let title;
                   let secondaryLabel;
+                  let boxClasses;
+                  let numberClasses;
+                  let labelClasses;
 
                   if (ocupada) {
                     title = `${unidadLabelPrefix} ${numero} - Ocupada ${diasMismoEstado} ${diasTexto} (incluyendo hoy)`;
-                    secondaryLabel = `${diasMismoEstado} ${diasTexto}`;
-                  } else if (diasMismoEstado >= quickViewLookaheadDays) {
-                    title = `${unidadLabelPrefix} ${numero} - Sin reservas próximas (al menos en los próximos ${quickViewLookaheadDays} días desde hoy)`;
-                    secondaryLabel = 'Sin reserva';
+                    secondaryLabel = `Ocupada ${diasMismoEstado} ${diasTexto}`;
+                    boxClasses = 'bg-emerald-600 border-emerald-700 hover:bg-emerald-700';
+                    numberClasses = 'text-white';
+                    labelClasses = 'text-emerald-50';
+                  } else if (libreSinReservas) {
+                    title = `${unidadLabelPrefix} ${numero} - Libre, sin reservas en los próximos ${quickViewLookaheadDays} días`;
+                    secondaryLabel = 'Libre';
+                    boxClasses = 'bg-white border-slate-200 hover:border-slate-400 hover:bg-slate-50';
+                    numberClasses = 'text-slate-900';
+                    labelClasses = 'text-slate-500';
                   } else {
-                    title = `${unidadLabelPrefix} ${numero} - Libre ${diasMismoEstado} ${diasTexto} hasta la próxima reserva (a partir de hoy)`;
+                    title = `${unidadLabelPrefix} ${numero} - Libre ${diasMismoEstado} ${diasTexto} hasta la próxima reserva`;
                     secondaryLabel = `Libre ${diasMismoEstado} ${diasTexto}`;
+                    boxClasses = 'bg-amber-50 border-amber-200 hover:border-amber-400 hover:bg-amber-100';
+                    numberClasses = 'text-slate-900';
+                    labelClasses = 'text-amber-700';
                   }
 
                   const handleClick = () => {
                     if (ocupada) {
-                      console.log('[DailyViewSection] Click on occupied cell:', {
-                        serviceType: serviceTypeForGroups,
-                        numero,
-                        currentDateStr,
-                        totalGroups: reservationGroups.length,
-                        groupsByService: {
-                          carpa: reservationGroups.filter(g => g.serviceType === 'carpa').length,
-                          sombrilla: reservationGroups.filter(g => g.serviceType === 'sombrilla').length,
-                          parking: reservationGroups.filter(g => g.serviceType === 'parking').length
-                        }
-                      });
 
                       if (!onViewReservationDetails) return;
                       if (!Array.isArray(reservationGroups) || reservationGroups.length === 0) return;
@@ -315,7 +357,6 @@ function DailyViewSection({
                           g.endDate >= currentDateStr
                       );
 
-                      console.log('[DailyViewSection] Found group:', group);
 
                       if (group) {
                         onViewReservationDetails(group);
@@ -332,23 +373,28 @@ function DailyViewSection({
                   };
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={numero}
-                      className={`h-7 rounded-sm text-[9px] flex items-center justify-center border ${boxClasses}`}
+                      className={`flex h-9 items-center gap-2 rounded-md border px-2.5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-1 ${boxClasses}`}
                       title={title}
                       onClick={handleClick}
                     >
-                      <div className="flex flex-col items-center leading-tight">
-                        <span>{numero}</span>
-                        <span className="text-[8px] font-semibold">{secondaryLabel}</span>
-                      </div>
-                    </div>
+                      <span className={`text-[15px] font-semibold leading-none tabular-nums ${numberClasses}`}>
+                        {numero}
+                      </span>
+                      <span className={`ml-auto truncate text-[11px] font-medium leading-none ${labelClasses}`}>
+                        {secondaryLabel}
+                      </span>
+                      <ServiceIcon serviceId={id} className={`h-3.5 w-3.5 shrink-0 opacity-80 ${labelClasses}`} />
+                    </button>
                   );
                 })}
               </div>
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

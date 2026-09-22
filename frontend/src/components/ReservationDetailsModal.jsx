@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { format } from 'date-fns';
+import { format } from '../lib/dates';
 import { generateReceipt } from '../utils/generateReceipt';
 import { getApiBaseUrl } from '../apiConfig';
 

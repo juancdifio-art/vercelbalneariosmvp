@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import Sidebar from './Sidebar';
+import { isWideSection, DEFAULT_MAX_WIDTH, groupNavItems } from '../config/sections';
+import { NavIcon, SalirIcon } from './icons';
 
 function AuthenticatedShell({
   establishment,
@@ -13,6 +15,13 @@ function AuthenticatedShell({
   children
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Las grillas operativas usan todo el monitor; el resto mantiene linea corta.
+  const contentWidthClass = isWideSection(activeSection) ? 'max-w-none' : DEFAULT_MAX_WIDTH;
+
+  // Misma fuente que el menu de escritorio: antes este menu repetia a mano
+  // los items de configuracion y habia que tocar dos archivos por seccion.
+  const grupos = groupNavItems(navItems);
 
   const handleSectionChange = (sectionId) => {
     onChangeSection(sectionId);
@@ -50,64 +59,49 @@ function AuthenticatedShell({
 
         {/* Mobile Menu Dropdown */}
         {mobileMenuOpen && (
-          <nav className="bg-sky-800 border-t border-sky-700 px-4 py-3 space-y-1 max-h-[70vh] overflow-y-auto">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => handleSectionChange(item.id)}
-                className={
-                  'w-full flex items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm transition ' +
-                  (activeSection === item.id
-                    ? 'bg-sky-700 text-amber-200 border border-amber-300/80'
-                    : 'text-cyan-50 hover:bg-sky-700 hover:text-amber-200')
-                }
-              >
-                <span>{item.label}</span>
-                {activeSection === item.id && <span className="text-amber-300">●</span>}
-              </button>
+          <nav className="max-h-[70vh] space-y-4 overflow-y-auto border-t border-sky-800 bg-sky-950 px-4 py-3">
+            {grupos.map((grupo) => (
+              <div key={grupo.id} className="space-y-1">
+                {grupo.label && (
+                  <p className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-400/90">
+                    {grupo.label}
+                  </p>
+                )}
+                {grupo.items.map((item) => {
+                  const activo = activeSection === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => handleSectionChange(item.id)}
+                      aria-current={activo ? 'page' : undefined}
+                      className={
+                        'relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition ' +
+                        (activo
+                          ? 'bg-sky-900 text-white'
+                          : 'text-sky-100/75 hover:bg-sky-900/60 hover:text-white')
+                      }
+                    >
+                      {activo && (
+                        <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-cyan-400" aria-hidden="true" />
+                      )}
+                      <NavIcon sectionId={item.id} className="h-[18px] w-[18px] shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
             ))}
 
-            <div className="border-t border-sky-600 mt-3 pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-cyan-300 mb-2 px-1">
-                Configuración
-              </p>
-              <button
-                type="button"
-                onClick={() => handleSectionChange('config-establecimiento')}
-                className={
-                  'w-full flex items-center rounded-lg px-3 py-2.5 text-left text-sm transition ' +
-                  (activeSection === 'config-establecimiento'
-                    ? 'bg-sky-700 text-amber-200'
-                    : 'text-cyan-50 hover:bg-sky-700')
-                }
-              >
-                Configurar establecimiento
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSectionChange('panel-usuario')}
-                className={
-                  'w-full flex items-center rounded-lg px-3 py-2.5 text-left text-sm transition ' +
-                  (activeSection === 'panel-usuario'
-                    ? 'bg-sky-700 text-amber-200'
-                    : 'text-cyan-50 hover:bg-sky-700')
-                }
-              >
-                Panel de usuario
-              </button>
-            </div>
-
-            <div className="border-t border-sky-600 mt-3 pt-3">
-              <p className="text-[11px] text-slate-300 mb-2 px-1">
-                {userEmail}
-              </p>
+            <div className="border-t border-white/10 pt-3">
+              <p className="mb-2 truncate px-1 text-[11px] text-sky-200/80">{userEmail}</p>
               <button
                 type="button"
                 onClick={onLogout}
-                className="w-full rounded-lg border border-cyan-400 px-3 py-2 text-sm font-medium text-cyan-50 hover:bg-sky-700 transition"
+                className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sky-100/75 transition hover:bg-sky-900 hover:text-white"
               >
-                Cerrar sesión
+                <SalirIcon className="h-[18px] w-[18px] shrink-0" />
+                <span>Cerrar sesión</span>
               </button>
             </div>
           </nav>
@@ -136,8 +130,8 @@ function AuthenticatedShell({
       />
 
       {/* Main content */}
-      <main className="flex-1 flex justify-center px-4 py-6 md:py-8 mt-14 md:mt-0 overflow-x-hidden">
-        <div className="w-full max-w-4xl">
+      <main className="flex-1 flex justify-center px-4 lg:px-6 py-6 md:py-8 mt-14 md:mt-0 overflow-x-hidden">
+        <div className={`w-full ${contentWidthClass}`}>
           {children}
         </div>
       </main>

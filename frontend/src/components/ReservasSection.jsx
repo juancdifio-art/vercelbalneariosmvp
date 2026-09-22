@@ -108,6 +108,43 @@ function ReservasSection({
     return filtered;
   }, [reservationGroups, searchText, paymentFilter, reservationFilterStatus, reservationFilterService]);
 
+  // Filtros activos en formato legible: se muestran en el estado vacio para que
+  // el operador entienda por que no ve nada, en vez de encontrarse la pantalla en blanco.
+  const activeFilterLabels = useMemo(() => {
+    const serviceLabels = {
+      carpa: 'Carpas',
+      sombrilla: 'Sombrillas',
+      parking: 'Estacionamiento',
+      pileta: 'Pileta'
+    };
+    const statusLabels = {
+      active: 'Activas hoy',
+      reserved: 'Reservadas (futuras)',
+      finished: 'Finalizadas',
+      cancelled: 'Canceladas'
+    };
+    const paymentLabels = {
+      paid: 'Pagado completo',
+      pending: 'Pago pendiente'
+    };
+
+    const labels = [];
+    if (searchText.trim()) labels.push(`Búsqueda: "${searchText.trim()}"`);
+    if (reservationFilterService) labels.push(`Servicio: ${serviceLabels[reservationFilterService] || reservationFilterService}`);
+    if (reservationFilterStatus) labels.push(`Estado: ${statusLabels[reservationFilterStatus] || reservationFilterStatus}`);
+    if (paymentFilter) labels.push(`Pagos: ${paymentLabels[paymentFilter] || paymentFilter}`);
+    if (reservationFilterFrom) labels.push(`Desde: ${formatShortDate(reservationFilterFrom)}`);
+    if (reservationFilterTo) labels.push(`Hasta: ${formatShortDate(reservationFilterTo)}`);
+    return labels;
+  }, [
+    searchText,
+    reservationFilterService,
+    reservationFilterStatus,
+    paymentFilter,
+    reservationFilterFrom,
+    reservationFilterTo
+  ]);
+
   return (
     <div className="rounded-xl bg-white border border-slate-200 shadow-sm">
       {/* Header */}
@@ -262,13 +299,38 @@ function ReservasSection({
           </div>
         )}
 
-        {!reservationGroupsLoading && reservationFilterService && reservationGroups.length > 0 && filteredReservations.length === 0 && (
+        {!reservationGroupsLoading && reservationGroups.length > 0 && filteredReservations.length === 0 && (
           <div className="text-center py-12">
             <svg className="mx-auto h-12 w-12 text-slate-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <p className="text-sm text-slate-600 font-medium">No se encontraron resultados</p>
-            <p className="text-xs text-slate-500 mt-1">Intenta ajustar los filtros de búsqueda</p>
+            <p className="text-xs text-slate-500 mt-1">
+              Hay {reservationGroups.length} reservas cargadas, pero ninguna coincide con los filtros actuales.
+            </p>
+            {activeFilterLabels.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
+                {activeFilterLabels.map((label) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2.5 py-1 text-[11px] text-slate-700"
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setSearchText('');
+                setPaymentFilter('');
+                onClearFilters();
+              }}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-cyan-500 px-4 py-1.5 text-xs font-medium text-cyan-700 hover:bg-cyan-50 transition"
+            >
+              Limpiar filtros
+            </button>
           </div>
         )}
 

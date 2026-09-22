@@ -2,6 +2,20 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Geist estaba declarado como font-family pero el archivo nunca se cargaba:
+ * la app venia cayendo a system-ui. Se usa la variable font (un solo archivo
+ * para todos los pesos) y sus numerales tabulares, que son los que alinean
+ * las grillas de unidades.
+ */
+@font-face {
+  font-family: 'Geist';
+  src: url('../node_modules/geist/dist/fonts/geist-sans/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 body {
   font-family: 'Geist', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }

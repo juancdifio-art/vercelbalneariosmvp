@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { format, addDays, isSameDay } from 'date-fns';
+import { addDays, isSameDay } from 'date-fns';
+import { format } from './lib/dates';
 import ReservationDetailsModal from './components/ReservationDetailsModal';
 import ReservationPaymentModal from './components/ReservationPaymentModal';
 import ClientFormModal from './components/ClientFormModal';
@@ -237,7 +238,6 @@ function App() {
     const from = format(today, 'yyyy-MM-dd');
     const to = format(addDays(today, QUICK_VIEW_LOOKAHEAD_DAYS - 1), 'yyyy-MM-dd');
 
-    console.log('[App.jsx] Fetching reservationGroups for vista-diaria:', { from, to, status: 'active' });
 
     fetchReservationGroups(token, {
       status: 'active',
@@ -2360,27 +2360,31 @@ function App() {
         </div>
       );
     }
+    // Unica fuente de la navegacion: la consumen el menu de escritorio y el
+    // de mobile. El 'group' define bajo que encabezado cae cada item.
     const navItems = [
-      { id: 'inicio', label: 'Inicio' },
-      { id: 'vista-diaria', label: 'Vista rápida' },
-      { id: 'reservas', label: 'Reservas' }
+      { id: 'inicio', label: 'Inicio', group: 'principal' },
+      { id: 'vista-diaria', label: 'Vista rápida', group: 'principal' },
+      { id: 'reservas', label: 'Reservas', group: 'principal' }
     ];
 
     if (establishment?.hasCarpas) {
-      navItems.push({ id: 'carpas', label: 'Carpas' });
+      navItems.push({ id: 'carpas', label: 'Carpas', group: 'servicios' });
     }
     if (establishment?.hasSombrillas) {
-      navItems.push({ id: 'sombrillas', label: 'Sombrillas' });
+      navItems.push({ id: 'sombrillas', label: 'Sombrillas', group: 'servicios' });
     }
     if (establishment?.hasParking) {
-      navItems.push({ id: 'estacionamiento', label: 'Estacionamiento' });
+      navItems.push({ id: 'estacionamiento', label: 'Estacionamiento', group: 'servicios' });
     }
     if (establishment?.hasPileta) {
-      navItems.push({ id: 'pileta', label: 'Pileta' });
+      navItems.push({ id: 'pileta', label: 'Pileta', group: 'servicios' });
     }
 
-    navItems.push({ id: 'clientes', label: 'Clientes' });
-    navItems.push({ id: 'reportes', label: 'Reportes' });
+    navItems.push({ id: 'clientes', label: 'Clientes', group: 'admin' });
+    navItems.push({ id: 'reportes', label: 'Reportes', group: 'admin' });
+    navItems.push({ id: 'config-establecimiento', label: 'Establecimiento', group: 'admin' });
+    navItems.push({ id: 'panel-usuario', label: 'Panel de usuario', group: 'admin' });
 
     const sectionTitleMap = {
       inicio: 'Resumen general',
@@ -2392,6 +2396,25 @@ function App() {
       sombrillas: 'Capacidades y reservas',
       estacionamiento: 'Capacidades y reservas',
       pileta: 'Pileta'
+    };
+
+    // Props de la vista rapida: la grilla de ocupacion por dia.
+    const propsVistaRapida = {
+      establishment,
+      carpasReservations,
+      sombrillasReservations,
+      parkingReservations,
+      carpasDayOffset,
+      sombrillasDayOffset,
+      parkingDayOffset,
+      quickViewLookaheadDays: QUICK_VIEW_LOOKAHEAD_DAYS,
+      reservationGroups,
+      onViewReservationDetails: handleViewReservationDetails,
+      onOpenNewCarpaReservation: handleOpenCarpaReservationFromQuickView,
+      onOpenNewSombrillaReservation: handleOpenSombrillaReservationFromQuickView,
+      onOpenNewParkingReservation: handleOpenParkingReservationFromQuickView,
+      onViewDetails: handleViewReservationDetails,
+      onAddPayment: handleAddPaymentForReservationGroup
     };
 
     return (
@@ -2530,25 +2553,14 @@ function App() {
             />
           )}
 
-          <div className="w-full max-w-4xl rounded-2xl bg-white/95 border border-cyan-100 shadow-2xl p-5 sm:p-7 text-slate-900">
+          <div className="w-full rounded-2xl bg-white/95 border border-cyan-100 shadow-2xl p-5 sm:p-7 text-slate-900">
             {activeSection !== 'pileta' && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-                <div>
-                  {activeSection !== 'clientes' && activeSection !== 'reservas' && (
-                    <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-700 mb-1">
-                      {sectionTitleMap[activeSection] || 'Panel'}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2 justify-end">
-                  <button
-                    onClick={handleLogout}
-                    className="inline-flex md:hidden items-center justify-center rounded-full border border-slate-600 px-4 py-2 text-[11px] font-medium text-slate-100 hover:bg-slate-800 hover:border-slate-500 transition"
-                  >
-                    Cerrar sesión
-                  </button>
-                </div>
+              <div className="mb-6">
+                {activeSection !== 'clientes' && activeSection !== 'reservas' && (
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
+                    {sectionTitleMap[activeSection] || 'Panel'}
+                  </p>
+                )}
               </div>
             )}
 
@@ -2562,35 +2574,7 @@ function App() {
               />
             )}
 
-            {activeSection === 'vista-diaria' && (
-              <DailyViewSection
-                establishment={establishment}
-                carpasReservations={carpasReservations}
-                sombrillasReservations={sombrillasReservations}
-                parkingReservations={parkingReservations}
-                carpasDayOffset={carpasDayOffset}
-                sombrillasDayOffset={sombrillasDayOffset}
-                parkingDayOffset={parkingDayOffset}
-                quickViewLookaheadDays={QUICK_VIEW_LOOKAHEAD_DAYS}
-                reservationGroups={reservationGroups}
-                onViewReservationDetails={handleViewReservationDetails}
-                onOpenNewCarpaReservation={handleOpenCarpaReservationFromQuickView}
-                onOpenNewSombrillaReservation={handleOpenSombrillaReservationFromQuickView}
-                onOpenNewParkingReservation={handleOpenParkingReservationFromQuickView}
-                onFilterStatusChange={(value) => setReservationFilterStatus(value)}
-                onFilterFromChange={(value) => setReservationFilterFrom(value)}
-                onFilterToChange={(value) => setReservationFilterTo(value)}
-                onClearFilters={() => {
-                  // Volver al filtro por defecto: sombrillas activas hoy
-                  setReservationFilterService('sombrilla');
-                  setReservationFilterStatus('active');
-                  setReservationFilterFrom('');
-                  setReservationFilterTo('');
-                }}
-                onViewDetails={handleViewReservationDetails}
-                onAddPayment={handleAddPaymentForReservationGroup}
-              />
-            )}
+            {activeSection === 'vista-diaria' && <DailyViewSection {...propsVistaRapida} />}
 
             {activeSection === 'reservas' && (
               <ReservasSection
@@ -2606,7 +2590,7 @@ function App() {
                 onFilterToChange={(value) => setReservationFilterTo(value)}
                 onClearFilters={() => {
                   setReservationFilterService('');
-                  setReservationFilterStatus('active');
+                  setReservationFilterStatus('');
                   setReservationFilterFrom('');
                   setReservationFilterTo('');
                 }}

@@ -25,7 +25,6 @@ function useAuth(options = {}) {
       // Limpiar localStorage antiguo
       localStorage.removeItem('authToken');
       localStorage.removeItem('authEmail');
-      console.log('Migrado de localStorage a sessionStorage. Por favor, vuelve a iniciar sesión.');
     }
 
     const token = sessionStorage.getItem('authToken');

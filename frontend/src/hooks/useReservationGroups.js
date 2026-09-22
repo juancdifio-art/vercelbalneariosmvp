@@ -60,16 +60,6 @@ function useReservationGroups(authToken) {
         const data = await response.json();
         const groups = Array.isArray(data.reservationGroups) ? data.reservationGroups : [];
 
-        console.log('[useReservationGroups] Fetched groups:', {
-          total: groups.length,
-          byService: {
-            carpa: groups.filter(g => g.serviceType === 'carpa').length,
-            sombrilla: groups.filter(g => g.serviceType === 'sombrilla').length,
-            parking: groups.filter(g => g.serviceType === 'parking').length,
-            pileta: groups.filter(g => g.serviceType === 'pileta').length
-          },
-          filters: { service, status, from, to }
-        });
 
         // OPTIMIZACIÓN: No cargar pagos aquí (eliminado N+1 problem)
         // El backend ya devuelve paidAmount (suma total de pagos)

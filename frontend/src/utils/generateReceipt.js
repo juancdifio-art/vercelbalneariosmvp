@@ -1,6 +1,5 @@
 import { jsPDF } from 'jspdf';
-import { format } from 'date-fns';
-
+import { format } from '../lib/dates';
 export function generateReceipt(reservation, establishment) {
   const doc = new jsPDF();
   

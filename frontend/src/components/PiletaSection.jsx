@@ -1,6 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { format } from 'date-fns';
-
+import { format } from '../lib/dates';
 function PiletaSection({
   establishment,
   reservationGroups,

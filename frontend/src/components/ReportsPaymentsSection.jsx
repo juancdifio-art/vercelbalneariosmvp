@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { format } from 'date-fns';
+import { format } from '../lib/dates';
 import { getApiBaseUrl } from '../apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
