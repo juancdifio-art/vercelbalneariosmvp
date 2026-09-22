@@ -8,7 +8,6 @@ import {
   CalendarDays,
   Users,
   BarChart3,
-  Store,
   User,
   LogOut,
   LayoutDashboard,
@@ -99,7 +98,6 @@ const POR_SECCION = {
   pileta: conTrazo(Waves),
   clientes: conTrazo(Users),
   reportes: conTrazo(BarChart3),
-  'config-establecimiento': conTrazo(Store),
   'panel-usuario': conTrazo(User)
 };
 

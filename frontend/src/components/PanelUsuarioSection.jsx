@@ -208,6 +208,7 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
                   Email nuevo
                   <input
                     type="email"
+                    autoComplete="email"
                     value={nuevoEmail}
                     onChange={(e) => setNuevoEmail(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
@@ -217,6 +218,7 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
                   Tu contraseña
                   <input
                     type="password"
+                    autoComplete="current-password"
                     value={emailPassword}
                     onChange={(e) => setEmailPassword(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
@@ -254,6 +256,7 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
                   Contraseña actual
                   <input
                     type="password"
+                    autoComplete="current-password"
                     value={passwordActual}
                     onChange={(e) => setPasswordActual(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"
@@ -263,6 +266,7 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
                   Contraseña nueva
                   <input
                     type="password"
+                    autoComplete="new-password"
                     value={passwordNueva}
                     onChange={(e) => setPasswordNueva(e.target.value)}
                     className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2"

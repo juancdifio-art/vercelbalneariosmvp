@@ -17,6 +17,7 @@ import SombrillaReservationModal from './components/SombrillaReservationModal';
 import PoolPassModal from './components/PoolPassModal';
 import ReservationEditModal from './components/ReservationEditModal';
 import EstablishmentConfigForm from './components/EstablishmentConfigForm';
+import PanelUsuarioSection from './components/PanelUsuarioSection';
 import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
 import DashboardSection from './components/DashboardSection';
@@ -96,6 +97,7 @@ function App() {
     setIsAuthenticated,
     authToken,
     userEmail,
+    setUserEmail,
     email,
     setEmail,
     password,
@@ -2383,7 +2385,6 @@ function App() {
 
     navItems.push({ id: 'clientes', label: 'Clientes', group: 'admin' });
     navItems.push({ id: 'reportes', label: 'Reportes', group: 'admin' });
-    navItems.push({ id: 'config-establecimiento', label: 'Establecimiento', group: 'admin' });
     navItems.push({ id: 'panel-usuario', label: 'Panel de usuario', group: 'admin' });
 
     const sectionTitleMap = {
@@ -2395,7 +2396,35 @@ function App() {
       carpas: 'Capacidades y reservas',
       sombrillas: 'Capacidades y reservas',
       estacionamiento: 'Capacidades y reservas',
-      pileta: 'Pileta'
+      pileta: 'Pileta',
+      'panel-usuario': 'Panel de usuario'
+    };
+
+    // Las 25 props del formulario de establecimiento viajan agrupadas para no
+    // sumar 25 lineas de cableado en un archivo que ya tiene 2781.
+    const propsEstablecimiento = {
+      estName,
+      setEstName,
+      estHasParking,
+      setEstHasParking,
+      estParkingCapacity,
+      setEstParkingCapacity,
+      estHasCarpas,
+      setEstHasCarpas,
+      estCarpasCapacity,
+      setEstCarpasCapacity,
+      estHasSombrillas,
+      setEstHasSombrillas,
+      estSombrillasCapacity,
+      setEstSombrillasCapacity,
+      estHasPileta,
+      setEstHasPileta,
+      estPoolMaxOccupancy,
+      setEstPoolMaxOccupancy,
+      onSubmit: handleSaveEstablishment,
+      estSaving,
+      error,
+      success
     };
 
     // Props de la vista rapida: la grilla de ocupacion por dia.
@@ -2637,38 +2666,18 @@ function App() {
               />
             )}
 
-            {activeSection === 'config-establecimiento' && (
-              <div className="rounded-xl bg-sky-50 border border-cyan-100 px-4 py-4 text-sm">
-                <p className="text-slate-900 font-medium mb-2">Configurar establecimiento</p>
-                <p className="text-[11px] text-slate-600 mb-4">
-                  Actualizá el nombre y los servicios del establecimiento. Los cambios impactan en todas las secciones.
-                </p>
-                <EstablishmentConfigForm
-                  variant="light"
-                  estName={estName}
-                  setEstName={setEstName}
-                  estHasParking={estHasParking}
-                  setEstHasParking={setEstHasParking}
-                  estParkingCapacity={estParkingCapacity}
-                  setEstParkingCapacity={setEstParkingCapacity}
-                  estHasCarpas={estHasCarpas}
-                  setEstHasCarpas={setEstHasCarpas}
-                  estCarpasCapacity={estCarpasCapacity}
-                  setEstCarpasCapacity={setEstCarpasCapacity}
-                  estHasSombrillas={estHasSombrillas}
-                  setEstHasSombrillas={setEstHasSombrillas}
-                  estSombrillasCapacity={estSombrillasCapacity}
-                  setEstSombrillasCapacity={setEstSombrillasCapacity}
-                  estHasPileta={estHasPileta}
-                  setEstHasPileta={setEstHasPileta}
-                  estPoolMaxOccupancy={estPoolMaxOccupancy}
-                  setEstPoolMaxOccupancy={setEstPoolMaxOccupancy}
-                  onSubmit={handleSaveEstablishment}
-                  estSaving={estSaving}
-                  error={error}
-                  success={success}
-                />
-              </div>
+            {activeSection === 'panel-usuario' && (
+              <PanelUsuarioSection
+                authToken={authToken}
+                userEmail={userEmail}
+                onEmailChanged={(nuevo) => {
+                  // La sesion sigue valida: el email del token no se usa para
+                  // autorizar. Solo hay que refrescar lo que se muestra.
+                  setUserEmail(nuevo);
+                  sessionStorage.setItem('authEmail', nuevo);
+                }}
+                establecimiento={propsEstablecimiento}
+              />
             )}
 
             {activeSection === 'sombrillas' && (

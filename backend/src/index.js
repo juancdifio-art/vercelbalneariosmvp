@@ -142,6 +142,120 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Los tres endpoints de perfil existen tambien en api/index.js, que es el
+// router serverless que corre en Vercel. El repo mantiene las dos
+// implementaciones en paralelo: esta para desarrollo local, aquella para
+// produccion. Un cambio aca tiene que replicarse alla.
+app.get('/api/auth/me', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, email, role, created_at FROM users WHERE id = $1',
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+
+    const row = result.rows[0];
+    res.json({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      createdAt: row.created_at
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.post('/api/auth/password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'missing_fields' });
+    }
+
+    if (String(newPassword).length < 8) {
+      return res.status(400).json({ error: 'password_too_short' });
+    }
+
+    const result = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+
+    const matches = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+
+    if (!matches) {
+      return res.status(401).json({ error: 'invalid_password' });
+    }
+
+    const nextHash = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [nextHash, req.user.id]);
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.patch('/api/auth/email', authenticateToken, async (req, res) => {
+  try {
+    const { newEmail, currentPassword } = req.body;
+
+    if (!newEmail || !currentPassword) {
+      return res.status(400).json({ error: 'missing_fields' });
+    }
+
+    const normalized = String(newEmail).trim().toLowerCase();
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+      return res.status(400).json({ error: 'invalid_email' });
+    }
+
+    const userResult = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'user_not_found' });
+    }
+
+    const matches = await bcrypt.compare(currentPassword, userResult.rows[0].password_hash);
+
+    // Se verifica la clave antes de consultar la unicidad para no filtrar que
+    // emails existen a alguien que se encontro la sesion abierta.
+    if (!matches) {
+      return res.status(401).json({ error: 'invalid_password' });
+    }
+
+    const taken = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND id <> $2',
+      [normalized, req.user.id]
+    );
+
+    if (taken.rows.length > 0) {
+      return res.status(409).json({ error: 'email_taken' });
+    }
+
+    const updated = await pool.query(
+      'UPDATE users SET email = $1 WHERE id = $2 RETURNING id, email, role, created_at',
+      [normalized, req.user.id]
+    );
+
+    const row = updated.rows[0];
+    res.json({
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      createdAt: row.created_at
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
 app.get('/api/establishment/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
