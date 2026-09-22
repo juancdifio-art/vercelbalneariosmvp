@@ -307,6 +307,85 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/auth/email =============
+    if (first === 'auth' && second === 'email') {
+      if (method !== 'PATCH') {
+        res.statusCode = 405;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'method_not_allowed' }));
+      }
+
+      const auth = authenticateToken(req, res);
+      if (!auth) return;
+
+      try {
+        const { newEmail, currentPassword } = await parseJsonBody(req);
+
+        if (!newEmail || !currentPassword) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'missing_fields' }));
+        }
+
+        const normalized = String(newEmail).trim().toLowerCase();
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'invalid_email' }));
+        }
+
+        const userResult = await db.query('SELECT password_hash FROM users WHERE id = $1', [auth.id]);
+
+        if (userResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'user_not_found' }));
+        }
+
+        const matches = await bcrypt.compare(currentPassword, userResult.rows[0].password_hash);
+
+        // Se verifica la clave antes de consultar la unicidad para no filtrar
+        // que emails existen a alguien que se encontro la sesion abierta.
+        if (!matches) {
+          res.statusCode = 401;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'invalid_password' }));
+        }
+
+        const taken = await db.query(
+          'SELECT id FROM users WHERE email = $1 AND id <> $2',
+          [normalized, auth.id]
+        );
+
+        if (taken.rows.length > 0) {
+          res.statusCode = 409;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'email_taken' }));
+        }
+
+        const updated = await db.query(
+          'UPDATE users SET email = $1 WHERE id = $2 RETURNING id, email, role, created_at',
+          [normalized, auth.id]
+        );
+
+        const row = updated.rows[0];
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          id: row.id,
+          email: row.email,
+          role: row.role,
+          createdAt: row.created_at
+        }));
+      } catch (error) {
+        console.error('Error in /api/auth/email:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // ============= /api/auth/login =============
     if (first === 'auth' && second === 'login') {
       if (method !== 'POST') {

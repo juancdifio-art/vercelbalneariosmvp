@@ -110,3 +110,75 @@ describe('POST /api/auth/password', () => {
     expect(await bcrypt.compare('unaClaveLarga', params[0])).toBe(true);
   });
 });
+
+describe('PATCH /api/auth/email', () => {
+  it('rechaza un formato de email invalido', async () => {
+    const res = await request(handler)
+      .patch('/?route=auth/email')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ newEmail: 'no-es-un-mail', currentPassword: 'admin123' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('invalid_email');
+  });
+
+  it('rechaza si la contrasena actual no coincide', async () => {
+    const hash = await bcrypt.hash('admin123', 10);
+    queryMock.mockResolvedValueOnce({ rows: [{ password_hash: hash }] });
+
+    const res = await request(handler)
+      .patch('/?route=auth/email')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ newEmail: 'nuevo@balneario.com', currentPassword: 'equivocada' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('invalid_password');
+  });
+
+  it('rechaza un email que ya pertenece a otro usuario', async () => {
+    const hash = await bcrypt.hash('admin123', 10);
+    queryMock.mockResolvedValueOnce({ rows: [{ password_hash: hash }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 9 }] });
+
+    const res = await request(handler)
+      .patch('/?route=auth/email')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ newEmail: 'ocupado@balneario.com', currentPassword: 'admin123' });
+
+    expect(res.status).toBe(409);
+    expect(res.body.error).toBe('email_taken');
+  });
+
+  it('normaliza el email y lo guarda', async () => {
+    const hash = await bcrypt.hash('admin123', 10);
+    queryMock.mockResolvedValueOnce({ rows: [{ password_hash: hash }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: 2, email: 'nuevo@balneario.com', role: 'admin', created_at: '2025-11-23T10:00:00.000Z' }]
+    });
+
+    const res = await request(handler)
+      .patch('/?route=auth/email')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ newEmail: '  NUEVO@Balneario.com  ', currentPassword: 'admin123' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.email).toBe('nuevo@balneario.com');
+
+    // Segunda llamada = el chequeo de unicidad, con el mail ya normalizado.
+    expect(queryMock.mock.calls[1][1][0]).toBe('nuevo@balneario.com');
+  });
+
+  it('chequea la contrasena antes que la unicidad del email', async () => {
+    const hash = await bcrypt.hash('admin123', 10);
+    queryMock.mockResolvedValueOnce({ rows: [{ password_hash: hash }] });
+
+    await request(handler)
+      .patch('/?route=auth/email')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ newEmail: 'ocupado@balneario.com', currentPassword: 'equivocada' });
+
+    // Solo la consulta del hash: nunca se pregunto si el email existe.
+    expect(queryMock).toHaveBeenCalledTimes(1);
+  });
+});
