@@ -1,0 +1,884 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plano del Balneario Zeus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --arena:      #F3E4C3;
+    --arena-2:    #E7D2A2;
+    --papel:      #FBF6EA;
+    --unidad:     #FFFDF7;
+    --borde:      #C6A45F;
+    --borde-soft: #DFC894;
+    --tinta:      #382F21;
+    --tinta-soft: #7A6A4C;
+    --badge:      #2F8E96;
+    --mar:        #79C3D6;
+    --mar-soft:   #CDE9F0;
+    --acento:     #BC4F3B;
+    --terraza:    #8A6A2F;
+    --terr-soft:  #EFDDB4;
+    --frontal:    #2F8E96;
+    --front-soft: #CFE9EC;
+    --sombrilla:  #5B7F94;
+    --somb-soft:  #DDE8EE;
+    --warn:       #9C5B14;
+    --warn-soft:  #F7E7C9;
+    --ok:         #3B7442;
+
+    --f-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --f-mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --arena:      #241E14;
+      --arena-2:    #2F2718;
+      --papel:      #1A160E;
+      --unidad:     #332B1C;
+      --borde:      #7E683A;
+      --borde-soft: #4A3E24;
+      --tinta:      #F1E6CE;
+      --tinta-soft: #A8977A;
+      --badge:      #48B3BB;
+      --mar:        #2C6B7C;
+      --mar-soft:   #1B3B44;
+      --acento:     #DE7259;
+      --terraza:    #CFA657;
+      --terr-soft:  #3E3117;
+      --frontal:    #48B3BB;
+      --front-soft: #1D3F44;
+      --sombrilla:  #93B3C6;
+      --somb-soft:  #253742;
+      --warn:       #D89A4C;
+      --warn-soft:  #38290F;
+      --ok:         #78AE80;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--tinta);
+    font-family: var(--f-sans);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1180px;
+    margin-inline: auto;
+    padding-inline: 20px;
+    padding-block: 32px 56px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  h1 {
+    font-size: clamp(1.6rem, 1.2rem + 2vw, 2.3rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  .lede { margin: 0; max-width: 66ch; color: var(--tinta-soft); }
+
+  .stamp {
+    display: inline-flex;
+    font-family: var(--f-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--acento);
+    border: 1px solid var(--acento);
+    border-radius: 2px;
+    padding: 4px 9px;
+    margin-bottom: 12px;
+  }
+
+  .barra {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 10px;
+    border: 1px solid var(--borde-soft);
+    border-radius: 3px;
+    background: var(--papel);
+    padding: 11px 14px;
+  }
+
+  button.tool {
+    font: inherit;
+    font-size: 0.83rem;
+    color: var(--tinta);
+    background: var(--arena);
+    border: 1px solid var(--borde);
+    border-radius: 3px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background .12s;
+  }
+  button.tool:hover:not(:disabled) { background: var(--arena-2); }
+  button.tool:disabled { opacity: .45; cursor: default; }
+  button.tool:focus-visible, select:focus-visible { outline: 2px solid var(--badge); outline-offset: 1px; }
+  button.tool.peligro { color: var(--acento); border-color: var(--acento); }
+  button.tool.fuerte { background: var(--badge); border-color: var(--badge); color: #fff; }
+  button.tool.fuerte:hover { filter: brightness(1.08); }
+
+  select {
+    font: inherit;
+    font-size: 0.83rem;
+    color: var(--tinta);
+    background: var(--arena);
+    border: 1px solid var(--borde);
+    border-radius: 3px;
+    padding: 6px 9px;
+  }
+
+  .sep { flex: 1 1 auto; }
+
+  .estado {
+    font-family: var(--f-mono);
+    font-size: 0.72rem;
+    color: var(--tinta-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .estado[data-tono="ok"] { color: var(--ok); }
+  .estado[data-tono="warn"] { color: var(--warn); }
+
+  .seleccion { font-size: 0.83rem; color: var(--tinta-soft); display: flex; align-items: center; gap: 8px; }
+  .seleccion b { font-family: var(--f-mono); color: var(--tinta); font-variant-numeric: tabular-nums; }
+
+  /* ---------- conteos ---------- */
+
+  .conteos { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+
+  .conteo {
+    border: 1px solid var(--borde-soft);
+    border-left-width: 4px;
+    border-radius: 3px;
+    background: var(--papel);
+    padding: 11px 14px;
+  }
+  .conteo.carpas { border-left-color: var(--borde); }
+  .conteo.sombrillas { border-left-color: var(--sombrilla); }
+
+  .conteo h2 {
+    margin: 0 0 2px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+  }
+  .conteo h2 b {
+    font-family: var(--f-mono);
+    font-size: 1.25rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .conteo p { margin: 0; font-size: 0.78rem; color: var(--tinta-soft); }
+  .conteo p[data-tono="warn"] { color: var(--warn); }
+  .conteo p[data-tono="ok"] { color: var(--ok); }
+
+  /* ---------- plano ---------- */
+
+  .planowrap { overflow-x: auto; border: 1px solid var(--borde); border-radius: 3px; }
+
+  .plano { display: inline-block; min-width: 100%; background: var(--arena); }
+
+  .mar, .entrada {
+    font-family: var(--f-mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    text-align: center;
+    padding: 7px 6px;
+  }
+  .mar { background: var(--mar-soft); border-bottom: 2px solid var(--mar); color: var(--badge); }
+  .entrada { background: var(--arena-2); border-top: 2px solid var(--borde); color: var(--tinta-soft); }
+
+  .lienzo { position: relative; margin: 14px; touch-action: none; }
+
+  .lienzo::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      repeating-linear-gradient(90deg, var(--borde-soft) 0 1px, transparent 1px var(--cw)),
+      repeating-linear-gradient(180deg, var(--borde-soft) 0 1px, transparent 1px var(--ch));
+    opacity: .34;
+    pointer-events: none;
+  }
+
+  .u {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--unidad);
+    border: 1px solid var(--borde);
+    border-radius: 2px;
+    font-family: var(--f-mono);
+    font-size: 0.74rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    color: var(--tinta);
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+    overflow: hidden;
+  }
+
+  .u[data-tipo="terraza"]  { background: var(--terr-soft);  border-color: var(--terraza); }
+  .u[data-tipo="frontal"]  { background: var(--front-soft); border-color: var(--frontal); border-top-width: 3px; }
+  .u[data-tipo="sombrilla"]{
+    background: var(--somb-soft);
+    border-color: var(--sombrilla);
+    border-radius: 50%;
+    font-size: 0.58rem;
+    letter-spacing: -0.03em;
+  }
+
+  .u.sel { outline: 2px solid var(--badge); outline-offset: 1px; z-index: 3; }
+  .u.arrastrando { cursor: grabbing; z-index: 5; box-shadow: 0 4px 10px rgb(0 0 0 / .28); }
+  .u.choque { border-color: var(--acento); background: var(--warn-soft); }
+  .u.nueva { animation: aparecer 1.1s ease-out; z-index: 4; }
+
+  @keyframes aparecer {
+    0%   { transform: scale(1.9); background: var(--badge); color: #fff; }
+    60%  { transform: scale(1);   background: var(--badge); color: #fff; }
+    100% { transform: scale(1); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .u.nueva { animation: none; outline: 2px solid var(--badge); }
+    * { transition: none !important; }
+  }
+
+  .refs { display: flex; flex-wrap: wrap; gap: 9px 22px; align-items: center; font-size: 0.82rem; color: var(--tinta-soft); }
+  .refs span { display: inline-flex; align-items: center; gap: 7px; }
+  .sw { width: 14px; height: 12px; border: 1px solid; display: inline-block; border-radius: 2px; }
+  .sw.carpa { background: var(--unidad); border-color: var(--borde); }
+  .sw.terraza { background: var(--terr-soft); border-color: var(--terraza); }
+  .sw.frontal { background: var(--front-soft); border-color: var(--frontal); }
+  .sw.sombrilla { background: var(--somb-soft); border-color: var(--sombrilla); border-radius: 50%; width: 13px; height: 13px; }
+
+  .notas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 22px;
+    border-top: 1px solid var(--borde-soft);
+    padding-top: 22px;
+  }
+  .notas h3 { margin: 0 0 8px; font-size: 0.92rem; font-weight: 600; }
+  .notas p, .notas li { margin: 0 0 8px; font-size: 0.86rem; color: var(--tinta-soft); }
+  .notas ul { margin: 0; padding-left: 17px; }
+  .notas .q { color: var(--tinta); font-weight: 500; margin-bottom: 3px; }
+  .notas kbd {
+    font-family: var(--f-mono);
+    font-size: 0.78em;
+    background: var(--arena);
+    border: 1px solid var(--borde-soft);
+    border-bottom-width: 2px;
+    border-radius: 3px;
+    padding: 1px 5px;
+    color: var(--tinta);
+  }
+
+  @media (max-width: 620px) { .wrap { padding-block: 24px 38px; gap: 16px; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="stamp">Editable · arrastrá las unidades</div>
+    <h1>Plano del Balneario Zeus</h1>
+    <p class="lede">
+      La planta relevada: la banda de sombrillas contra el agua — 36 de ancho por 6 de
+      fondo — y detrás las doce filas de carpas. Arrastrá para mover, agregá o quitá lo
+      que falte, y acomodala hasta que sea la de Zeus. Se guarda en este navegador.
+    </p>
+  </header>
+
+  <div class="conteos">
+    <div class="conteo carpas">
+      <h2>Carpas <b id="t-carpas">100</b></h2>
+      <p id="v-carpas">—</p>
+    </div>
+    <div class="conteo sombrillas">
+      <h2>Sombrillas <b id="t-sombrillas">216</b></h2>
+      <p id="v-sombrillas">—</p>
+    </div>
+  </div>
+
+  <div class="barra">
+    <button type="button" class="tool" id="add-carpa">+ Carpa</button>
+    <button type="button" class="tool" id="add-sombrilla">+ Sombrilla</button>
+
+    <span class="seleccion">
+      Seleccionada: <b id="sel-num">ninguna</b>
+      <select id="sel-tipo" disabled>
+        <option value="carpa">Carpa</option>
+        <option value="frontal">Carpa que mira al mar</option>
+        <option value="terraza">Carpa de terraza</option>
+        <option value="sombrilla">Sombrilla</option>
+      </select>
+      <button type="button" class="tool peligro" id="quitar" disabled>Quitar</button>
+    </span>
+
+    <button type="button" class="tool" id="renumerar">Renumerar por posición</button>
+    <button type="button" class="tool peligro" id="reset">Volver al relevamiento</button>
+
+    <span class="sep"></span>
+    <span class="estado" id="estado">—</span>
+  </div>
+
+  <div class="barra">
+    <button type="button" class="tool fuerte" id="descargar">⬇ Descargar planta (JSON)</button>
+    <button type="button" class="tool" id="cargar">⬆ Cargar planta</button>
+    <input type="file" id="archivo" accept="application/json,.json" hidden>
+    <span class="estado">Descargala y pasámela: con eso implemento el plano en la app.</span>
+  </div>
+
+  <div class="planowrap">
+    <div class="plano">
+      <div class="mar">Mar ▲</div>
+      <div class="lienzo" id="lienzo"></div>
+      <div class="entrada">Entrada · estructura · pileta</div>
+    </div>
+  </div>
+
+  <div class="refs">
+    <span><i class="sw sombrilla"></i> Sombrilla</span>
+    <span><i class="sw carpa"></i> Carpa</span>
+    <span><i class="sw frontal"></i> Punta de fila — mira al mar</span>
+    <span><i class="sw terraza"></i> Terraza elevada</span>
+  </div>
+
+  <div class="notas">
+    <div>
+      <h3>Cómo se edita</h3>
+      <ul>
+        <li><strong>Arrastrá</strong> a cualquier celda libre. Si la soltás sobre una ocupada, vuelve a su lugar.</li>
+        <li><strong>Clic</strong> para seleccionar: ahí le cambiás el tipo o la quitás.</li>
+        <li><strong>+ Carpa</strong> y <strong>+ Sombrilla</strong> agregan pegado a lo que tengas seleccionado, o al final de esa zona.</li>
+        <li><kbd>Supr</kbd> quita la seleccionada; las flechas la mueven de a una celda.</li>
+        <li><strong>Renumerar</strong> reasigna los números. Carpas y sombrillas se numeran por separado, como en el sistema.</li>
+      </ul>
+    </div>
+
+    <div>
+      <h3>Cómo me la pasás</h3>
+      <p>Se guarda sola en este navegador, así que podés cerrar y seguir después.</p>
+      <p>Cuando la planta sea la de Zeus, tocá <strong>Descargar planta</strong> y pasame el archivo. Ahí tengo cada unidad con su posición, su tipo y su número, y lo implemento en la Vista rápida exactamente así.</p>
+    </div>
+
+    <div>
+      <h3>Lo que asumí</h3>
+      <p class="q">Las 4 sombrillas que sobran quedan a la izquierda.</p>
+      <p>Las 12 filas de carpas arrancan pasada esa franja y llegan hasta el final del frente, repartidas parejo con un pasillo entre cada una.</p>
+      <p class="q">Las sombrillas se numeran de a filas, del agua hacia atrás.</p>
+      <p>La 1 a la 36 es la primera fila, la que toca el agua. Las carpas siguen el recorrido a pie, entrando por el frente y volviendo por la fila siguiente.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  var COLS = 40, ROWS = 26, CW = 36, CH = 30;
+  var CLAVE = 'balnearios.plano.zeus';
+  var SEMILLA = 3;
+
+  var CAP_CARPAS = 200, CAP_SOMBRILLAS = 250;
+
+  // Relevamiento sobre las fotos aereas.
+  var FILAS_CARPAS = [5, 6, 7, 8, 8, 5, 6, 7, 8, 9, 10, 11];
+  var TERRAZA = 10;
+  // Banda de sombrillas contra el agua: 36 a lo largo de la costa por 6 de
+  // fondo. Las carpas empiezan detras de esa banda.
+  var SOMB_ANCHO = 36, SOMB_FONDO = 6;
+
+  // Caminos dentro de la zona de sombrillas: a lo ancho quedan divididas en
+  // secciones (la primera de 4, el resto de 8) y a lo largo hay un pasillo
+  // cada dos filas.
+  var SECCION_PRIMERA = 4, SECCION = 8, FILAS_POR_BLOQUE = 2;
+
+  /** Columnas de la grilla para N sombrillas de ancho, dejando los caminos. */
+  function columnasConSecciones(n) {
+    var out = [], grid = 0, enSeccion = 0, limite = SECCION_PRIMERA;
+    for (var i = 0; i < n; i++) {
+      out.push(grid);
+      grid++; enSeccion++;
+      if (enSeccion === limite && i < n - 1) {
+        grid++;                 // camino entre secciones
+        enSeccion = 0;
+        limite = SECCION;
+      }
+    }
+    return out;
+  }
+
+  /** Filas de la grilla para N filas de sombrillas, con pasillo cada dos. */
+  function filasConPasillos(n) {
+    var out = [], grid = 0;
+    for (var i = 0; i < n; i++) {
+      out.push(grid);
+      grid++;
+      if ((i + 1) % FILAS_POR_BLOQUE === 0 && i < n - 1) grid++;
+    }
+    return out;
+  }
+  // Las carpas ocupan casi todo el frente: 12 filas con sus pasillos cubren
+  // el ancho de la banda menos las ultimas 4 sombrillas. Es cuestion de
+  // escala: la carpa es mas ancha que la sombrilla y entre fila y fila corre
+  // un pasillo.
+  // Las carpas arrancan pasada la primera seccion de sombrillas y su camino,
+  // y llegan hasta el final del frente.
+  var COLS_SOMB = columnasConSecciones(SOMB_ANCHO);
+  var FILAS_SOMB = filasConPasillos(SOMB_FONDO);
+  var CARPAS_DESDE = COLS_SOMB[SECCION_PRIMERA];
+  var CARPAS_HASTA = COLS_SOMB[COLS_SOMB.length - 1];
+  var ROW_CARPAS = FILAS_SOMB[FILAS_SOMB.length - 1] + 3;
+
+  /** Columna de cada fila de carpas, repartidas parejo sobre el frente. */
+  function columnaDeFila(i, total) {
+    if (total < 2) return CARPAS_DESDE;
+    return CARPAS_DESDE + Math.round(i * (CARPAS_HASTA - CARPAS_DESDE) / (total - 1));
+  }
+
+  var TIPOS_CARPA = ['carpa', 'frontal', 'terraza'];
+  var esCarpa = function (u) { return TIPOS_CARPA.indexOf(u.tipo) !== -1; };
+  var esSombrilla = function (u) { return u.tipo === 'sombrilla'; };
+
+  var el = function (id) { return document.getElementById(id); };
+  var lienzo = el('lienzo');
+
+  var unidades = [];
+  var seleccion = null;
+
+  // ---------- estado inicial ----------
+
+  function sembrar() {
+    var out = [];
+    var uid = 1;
+
+    // Sombrillas: la primera fila contra el agua, seis de fondo, con los
+    // caminos entre secciones y cada dos filas.
+    for (var f = 0; f < SOMB_FONDO; f++) {
+      for (var c = 0; c < SOMB_ANCHO; c++) {
+        out.push({ id: uid++, col: COLS_SOMB[c], row: FILAS_SOMB[f], tipo: 'sombrilla', num: 0 });
+      }
+    }
+
+    // Carpas: filas alineadas contra el mar, estirandose hacia la estructura.
+    // La punta de cada fila, la que da al agua, mira al mar.
+    FILAS_CARPAS.forEach(function (alto, i) {
+      var col = columnaDeFila(i, FILAS_CARPAS.length);
+      for (var k = 0; k < alto; k++) {
+        out.push({
+          id: uid++,
+          col: col,
+          row: ROW_CARPAS + k,
+          tipo: k === 0 ? 'frontal' : 'carpa',
+          num: 0
+        });
+      }
+    });
+
+    // Terraza elevada, contra la estructura.
+    for (var t = 0; t < TERRAZA; t++) {
+      out.push({
+        id: uid++,
+        col: CARPAS_HASTA - 4 + (t % 5),
+        row: ROWS - 2 + Math.floor(t / 5),
+        tipo: 'terraza',
+        num: 0
+      });
+    }
+
+    renumerar(out);
+    return out;
+  }
+
+  /**
+   * Numeracion por posicion. Carpas y sombrillas van por separado, porque en
+   * el sistema son servicios distintos y cada uno tiene su propio numero.
+   *
+   * Carpas: siguiendo el recorrido a pie, columna por columna, entrando por
+   * el agua en una fila y volviendo en la siguiente. La terraza va al final.
+   * Sombrillas: de a filas, del mar hacia atras, de izquierda a derecha.
+   */
+  function renumerar(lista) {
+    var campo = lista.filter(function (u) { return u.tipo === 'carpa' || u.tipo === 'frontal'; });
+    var porCol = {};
+    campo.forEach(function (u) { (porCol[u.col] = porCol[u.col] || []).push(u); });
+
+    var cols = Object.keys(porCol).map(Number).sort(function (a, b) { return a - b; });
+    var n = 1;
+    cols.forEach(function (c, i) {
+      var col = porCol[c];
+      col.sort(function (a, b) { return i % 2 === 0 ? a.row - b.row : b.row - a.row; });
+      col.forEach(function (u) { u.num = n++; });
+    });
+
+    lista.filter(function (u) { return u.tipo === 'terraza'; })
+      .sort(function (a, b) { return a.row - b.row || a.col - b.col; })
+      .forEach(function (u) { u.num = n++; });
+
+    var s = 1;
+    lista.filter(esSombrilla)
+      .sort(function (a, b) { return a.row - b.row || a.col - b.col; })
+      .forEach(function (u) { u.num = s++; });
+  }
+
+  function ocupada(col, row, exceptoId) {
+    return unidades.some(function (u) {
+      return u.col === col && u.row === row && u.id !== exceptoId;
+    });
+  }
+
+  // ---------- render ----------
+
+  lienzo.style.setProperty('--cw', CW + 'px');
+  lienzo.style.setProperty('--ch', CH + 'px');
+  lienzo.style.width = COLS * CW + 'px';
+  lienzo.style.height = ROWS * CH + 'px';
+
+  function veredicto(nodo, total, cap, palabra) {
+    if (total === cap) {
+      nodo.dataset.tono = 'ok';
+      nodo.textContent = 'coincide con las ' + cap + ' configuradas';
+      return;
+    }
+    nodo.dataset.tono = 'warn';
+    var d = total - cap;
+    nodo.textContent = (d > 0 ? 'sobran ' : 'faltan ') + Math.abs(d) +
+      ' respecto de las ' + cap + ' ' + palabra + ' configuradas en el sistema';
+  }
+
+  function render() {
+    lienzo.querySelectorAll('.u').forEach(function (n) { n.remove(); });
+
+    unidades.forEach(function (u) {
+      var d = document.createElement('div');
+      d.className = 'u' + (seleccion === u.id ? ' sel' : '');
+      d.dataset.id = u.id;
+      d.dataset.tipo = u.tipo;
+      var diametro = CH - 3;
+      var ancho = esSombrilla(u) ? diametro : CW - 3;
+      var alto = esSombrilla(u) ? diametro : CH - 3;
+      d.style.left = u.col * CW + (CW - ancho) / 2 + 'px';
+      d.style.top = u.row * CH + (CH - alto) / 2 + 'px';
+      d.style.width = ancho + 'px';
+      d.style.height = alto + 'px';
+      d.textContent = u.num;
+      d.title = (esSombrilla(u) ? 'Sombrilla ' : 'Carpa ') + u.num;
+      lienzo.appendChild(d);
+    });
+
+    var carpas = unidades.filter(esCarpa).length;
+    var sombrillas = unidades.filter(esSombrilla).length;
+    el('t-carpas').textContent = carpas;
+    el('t-sombrillas').textContent = sombrillas;
+    veredicto(el('v-carpas'), carpas, CAP_CARPAS, 'carpas');
+    veredicto(el('v-sombrillas'), sombrillas, CAP_SOMBRILLAS, 'sombrillas');
+
+    var sel = unidades.find(function (u) { return u.id === seleccion; });
+    el('sel-num').textContent = sel
+      ? (esSombrilla(sel) ? 'sombrilla ' : 'carpa ') + sel.num
+      : 'ninguna';
+    el('sel-tipo').disabled = !sel;
+    el('quitar').disabled = !sel;
+    if (sel) el('sel-tipo').value = sel.tipo;
+  }
+
+  // ---------- arrastre ----------
+
+  var drag = null;
+
+  lienzo.addEventListener('pointerdown', function (e) {
+    var nodo = e.target.closest('.u');
+    if (!nodo) { seleccion = null; render(); return; }
+
+    var id = +nodo.dataset.id;
+    var u = unidades.find(function (x) { return x.id === id; });
+    if (!u) return;
+
+    seleccion = id;
+    render();
+
+    var vivo = lienzo.querySelector('.u[data-id="' + id + '"]');
+    drag = { id: id, x0: e.clientX, y0: e.clientY, col0: u.col, row0: u.row, nodo: vivo, movio: false };
+    vivo.classList.add('arrastrando');
+    try { vivo.setPointerCapture(e.pointerId); } catch (_) { /* puntero sin captura */ }
+    e.preventDefault();
+  });
+
+  function celdaDestino(dx, dy) {
+    return {
+      col: Math.max(0, Math.min(COLS - 1, Math.round(drag.col0 + dx / CW))),
+      row: Math.max(0, Math.min(ROWS - 1, Math.round(drag.row0 + dy / CH)))
+    };
+  }
+
+  lienzo.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.movio = true;
+
+    drag.nodo.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    var destino = celdaDestino(dx, dy);
+    drag.nodo.classList.toggle('choque', ocupada(destino.col, destino.row, drag.id));
+  });
+
+  function soltar(e) {
+    if (!drag) return;
+    var destino = celdaDestino(e.clientX - drag.x0, e.clientY - drag.y0);
+
+    drag.nodo.style.transform = '';
+    drag.nodo.classList.remove('arrastrando', 'choque');
+
+    if (drag.movio && !ocupada(destino.col, destino.row, drag.id)) {
+      var u = unidades.find(function (x) { return x.id === drag.id; });
+      u.col = destino.col;
+      u.row = destino.row;
+      guardar();
+    }
+    drag = null;
+    render();
+  }
+
+  lienzo.addEventListener('pointerup', soltar);
+  lienzo.addEventListener('pointercancel', soltar);
+
+  // ---------- teclado ----------
+
+  document.addEventListener('keydown', function (e) {
+    if (seleccion === null) return;
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) return;
+
+    var u = unidades.find(function (x) { return x.id === seleccion; });
+    if (!u) return;
+
+    if (e.key === 'Delete' || e.key === 'Backspace') { quitar(); e.preventDefault(); return; }
+
+    var pasos = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    var p = pasos[e.key];
+    if (!p) return;
+
+    var col = Math.max(0, Math.min(COLS - 1, u.col + p[0]));
+    var row = Math.max(0, Math.min(ROWS - 1, u.row + p[1]));
+    if (!ocupada(col, row, u.id)) { u.col = col; u.row = row; guardar(); render(); }
+    e.preventDefault();
+  });
+
+  // ---------- acciones ----------
+
+  function quitar() {
+    unidades = unidades.filter(function (u) { return u.id !== seleccion; });
+    seleccion = null;
+    guardar();
+    render();
+  }
+
+  el('quitar').addEventListener('click', quitar);
+
+  /** Primera celda libre al final de una columna, hacia la estructura. */
+  function finDeColumna(col) {
+    var enCol = unidades.filter(function (u) { return u.col === col; });
+    var desde = enCol.length
+      ? Math.max.apply(null, enCol.map(function (u) { return u.row; })) + 1
+      : 0;
+    for (var r = desde; r < ROWS; r++) {
+      if (!ocupada(col, r, null)) return { col: col, row: r };
+    }
+    return null;
+  }
+
+  /** Celda libre mas cercana a un origen, buscando en anillos. */
+  function celdaLibreCerca(origen) {
+    for (var r = 1; r <= Math.max(COLS, ROWS); r++) {
+      for (var dc = -r; dc <= r; dc++) {
+        for (var dr = -r; dr <= r; dr++) {
+          if (Math.max(Math.abs(dc), Math.abs(dr)) !== r) continue;
+          var c = origen.col + dc, f = origen.row + dr;
+          if (c < 0 || c >= COLS || f < 0 || f >= ROWS) continue;
+          if (!ocupada(c, f, null)) return { col: c, row: f };
+        }
+      }
+    }
+    return null;
+  }
+
+  function agregar(tipo) {
+    var deLaZona = tipo === 'sombrilla' ? esSombrilla : esCarpa;
+    var sel = unidades.find(function (u) { return u.id === seleccion; });
+    var origen = (sel && deLaZona(sel)) ? sel : null;
+
+    if (!origen) {
+      // Sin nada util seleccionado: al final de esa zona.
+      origen = unidades.filter(function (u) { return deLaZona(u) && u.tipo !== 'terraza'; })
+        .sort(function (a, b) { return b.col - a.col || b.row - a.row; })[0];
+    }
+    if (!origen) origen = tipo === 'sombrilla'
+      ? { col: 0, row: 0 }
+      : { col: CARPAS_DESDE, row: ROW_CARPAS };
+
+    var destino = finDeColumna(origen.col) || celdaLibreCerca(origen);
+    if (!destino) { estado('No queda lugar en el plano', 'warn'); return; }
+
+    var id = unidades.reduce(function (m, u) { return Math.max(m, u.id); }, 0) + 1;
+    var num = unidades.filter(deLaZona)
+      .reduce(function (m, u) { return Math.max(m, u.num); }, 0) + 1;
+
+    unidades.push({ id: id, col: destino.col, row: destino.row, tipo: tipo, num: num });
+    seleccion = id;
+    guardar();
+    render();
+    destacar(id);
+  }
+
+  el('add-carpa').addEventListener('click', function () { agregar('carpa'); });
+  el('add-sombrilla').addEventListener('click', function () { agregar('sombrilla'); });
+
+  /** Trae la unidad a la vista y la marca un momento, para que se note. */
+  function destacar(id) {
+    var nodo = lienzo.querySelector('.u[data-id="' + id + '"]');
+    if (!nodo) return;
+    nodo.classList.add('nueva');
+    if (nodo.scrollIntoView) nodo.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    setTimeout(function () { nodo.classList.remove('nueva'); }, 1100);
+  }
+
+  el('sel-tipo').addEventListener('change', function () {
+    var u = unidades.find(function (x) { return x.id === seleccion; });
+    if (!u) return;
+    u.tipo = this.value;
+    guardar();
+    render();
+  });
+
+  el('renumerar').addEventListener('click', function () {
+    renumerar(unidades);
+    guardar();
+    render();
+  });
+
+  el('reset').addEventListener('click', function () {
+    if (!window.confirm('¿Volver a la planta relevada sobre las fotos? Se pierde lo que hayas acomodado.')) return;
+    unidades = sembrar();
+    seleccion = null;
+    guardar();
+    render();
+  });
+
+  // ---------- guardado local ----------
+
+  function estado(texto, tono) {
+    var n = el('estado');
+    n.textContent = texto;
+    if (tono) n.dataset.tono = tono; else delete n.dataset.tono;
+  }
+
+  function guardar() {
+    try {
+      localStorage.setItem(CLAVE, JSON.stringify({
+        unidades: unidades,
+        semilla: SEMILLA,
+        actualizado: new Date().toISOString()
+      }));
+      estado('Guardado', 'ok');
+    } catch (err) {
+      estado('No se pudo guardar en este navegador', 'warn');
+    }
+  }
+
+  function cargar() {
+    var crudo;
+    try { crudo = localStorage.getItem(CLAVE); } catch (err) { return null; }
+    if (!crudo) return null;
+    try {
+      var d = JSON.parse(crudo);
+      return (d && Array.isArray(d.unidades) && d.unidades.length) ? d : null;
+    } catch (err) { return null; }
+  }
+
+  // ---------- exportar / importar ----------
+
+  el('descargar').addEventListener('click', function () {
+    var datos = {
+      balneario: 'Zeus',
+      grilla: { cols: COLS, rows: ROWS },
+      semilla: SEMILLA,
+      exportado: new Date().toISOString(),
+      totales: {
+        carpas: unidades.filter(esCarpa).length,
+        sombrillas: unidades.filter(esSombrilla).length
+      },
+      unidades: unidades
+    };
+    var blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'plano-zeus.json';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    estado('Descargado', 'ok');
+  });
+
+  el('cargar').addEventListener('click', function () { el('archivo').click(); });
+
+  el('archivo').addEventListener('change', function () {
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var lector = new FileReader();
+    lector.onload = function () {
+      try {
+        var d = JSON.parse(lector.result);
+        if (!d || !Array.isArray(d.unidades) || !d.unidades.length) throw new Error('sin unidades');
+        unidades = d.unidades;
+        seleccion = null;
+        guardar();
+        render();
+        estado('Planta cargada del archivo', 'ok');
+      } catch (err) {
+        estado('El archivo no es una planta válida', 'warn');
+      }
+    };
+    lector.readAsText(f);
+    this.value = '';
+  });
+
+  // ---------- arranque ----------
+
+  var guardado = cargar();
+  if (guardado && guardado.semilla === SEMILLA) {
+    unidades = guardado.unidades;
+    estado('Guardado', 'ok');
+  } else {
+    // Sin nada guardado, o guardado de un relevamiento anterior.
+    unidades = sembrar();
+    estado(guardado ? 'Planta actualizada al relevamiento nuevo' : 'Planta del relevamiento', 'ok');
+    if (guardado) guardar();
+  }
+  render();
+})();
+</script>
+</body>
+</html>
