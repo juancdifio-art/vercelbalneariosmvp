@@ -1,12 +1,5 @@
 import React from 'react';
-
-/** Dias entre dos fechas yyyy-mm-dd, contando los dos extremos. */
-function diasInclusivos(desde, hasta) {
-  const [a1, m1, d1] = desde.split('-').map(Number);
-  const [a2, m2, d2] = hasta.split('-').map(Number);
-  // En UTC para que un cambio de horario no corra la cuenta un dia.
-  return Math.round((Date.UTC(a2, m2 - 1, d2) - Date.UTC(a1, m1 - 1, d1)) / 86400000) + 1;
-}
+import { diasInclusivos } from '../lib/reservas';
 
 /**
  * Nombre del cliente sobre la barra de una reserva, en las grillas de

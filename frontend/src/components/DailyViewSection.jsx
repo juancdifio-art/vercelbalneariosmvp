@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { addDays } from 'date-fns';
 import { format } from '../lib/dates';
 import { ServiceIcon } from './icons';
+import { diasOcupadaDesde } from '../lib/reservas';
 function DailyViewSection({
   establishment,
   carpasReservations,
@@ -306,12 +307,19 @@ function DailyViewSection({
                   const key = `${currentDateStr}-${numero}`;
                   const ocupada = Boolean(reservations[key]);
 
-                  const diasMismoEstado = computeSpanSameStatus(
-                    reservations,
-                    currentDay,
-                    numero,
-                    ocupada
-                  );
+                  // Ocupada: los dias salen de la fecha de fin real de la reserva.
+                  // El mapa dia por dia solo cubre los proximos 90 dias, y con el
+                  // una estadia de temporada marcaba "Ocupada 90 dias". Si por
+                  // algun motivo no se encuentra la reserva, se cae al mapa.
+                  // Libre: se sigue usando el mapa, porque ahi el tope es a
+                  // proposito ("sin reservas en los proximos 90 dias").
+                  const diasOcupada = ocupada
+                    ? diasOcupadaDesde(reservationGroups, serviceTypeForGroups, numero, currentDateStr)
+                    : 0;
+                  const diasMismoEstado =
+                    diasOcupada > 0
+                      ? diasOcupada
+                      : computeSpanSameStatus(reservations, currentDay, numero, ocupada);
 
                   const diasTexto = diasMismoEstado === 1 ? 'día' : 'días';
                   const libreSinReservas = !ocupada && diasMismoEstado >= quickViewLookaheadDays;
