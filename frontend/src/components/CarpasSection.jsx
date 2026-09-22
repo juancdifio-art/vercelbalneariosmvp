@@ -1,6 +1,6 @@
 import React from 'react';
-import { format, addDays, isSameDay } from 'date-fns';
-
+import { addDays, isSameDay } from 'date-fns';
+import { format, weekdayInitial } from '../lib/dates';
 function CarpasSection({
   establishment,
   carpasDayOffset,
@@ -40,8 +40,7 @@ function CarpasSection({
         Capacidad configurada: {establishment?.carpasCapacity ?? 'sin definir'} carpas.
       </p>
       <p className="text-[11px] text-slate-600 mb-3">
-        Vista conceptual de los próximos 30 días: filas = carpas, columnas = días. Más adelante vamos a colorear estos
-        bloques según reservas y ocupación.
+        Disponibilidad de los próximos 30 días: cada fila es una carpa, cada columna un día.
       </p>
 
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600 bg-sky-50 pb-2">
@@ -51,18 +50,18 @@ function CarpasSection({
             {format(addDays(new Date(), carpasDayOffset), 'dd/MM/yyyy')}
           </span>
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setCarpasDayOffset((prev) => prev - 10)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 text-[10px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 text-[11px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             ◀ 10 días
           </button>
           <button
             type="button"
             onClick={() => setCarpasDayOffset((prev) => prev + 10)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 text-[10px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 text-[11px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             10 días ▶
           </button>
@@ -108,7 +107,7 @@ function CarpasSection({
                       >
                         <div>{format(day, 'dd')}</div>
                         <div className="text-[9px] text-slate-500">
-                          {format(day, 'EEE')[0]}
+                          {weekdayInitial(day)}
                         </div>
                       </th>
                     );
@@ -119,7 +118,7 @@ function CarpasSection({
                 {Array.from({ length: totalCarpas }, (_, i) => i + 1).map((carpaNumero) => {
                   return (
                     <tr key={carpaNumero} className="border-t border-slate-200">
-                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-16">
+                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-16 whitespace-nowrap">
                         Carpa {carpaNumero}
                       </td>
                       {days.map((day, idx) => {
@@ -216,13 +215,6 @@ function CarpasSection({
                             }}
                             onClick={() => {
                               if (isReserved) {
-                                console.log('[CarpasSection] Click on occupied cell:', {
-                                  carpaNumero,
-                                  dateStr,
-                                  groupForClick,
-                                  totalGroups: reservationGroups.length,
-                                  carpaGroups: reservationGroups.filter(g => g.serviceType === 'carpa').length
-                                });
 
                                 const group =
                                   groupForClick ||
@@ -235,7 +227,6 @@ function CarpasSection({
                                       g.endDate >= dateStr
                                   );
 
-                                console.log('[CarpasSection] Found group:', group);
 
                                 if (group) {
                                   onViewReservationDetails(group);

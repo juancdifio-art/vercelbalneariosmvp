@@ -1,6 +1,6 @@
 import React from 'react';
-import { format, addDays, isSameDay } from 'date-fns';
-
+import { addDays, isSameDay } from 'date-fns';
+import { format, weekdayInitial } from '../lib/dates';
 function SombrillasSection({
   establishment,
   sombrillasDayOffset,
@@ -40,8 +40,7 @@ function SombrillasSection({
         Capacidad configurada: {establishment?.sombrillasCapacity ?? 'sin definir'} sombrillas.
       </p>
       <p className="text-[11px] text-slate-600 mb-3">
-        Vista conceptual de los próximos 30 días: filas = sombrillas, columnas = días. Más adelante vamos a colorear estos
-        bloques según reservas y ocupación.
+        Disponibilidad de los próximos 30 días: cada fila es una sombrilla, cada columna un día.
       </p>
 
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600 bg-sky-50 pb-2">
@@ -51,18 +50,18 @@ function SombrillasSection({
             {format(addDays(new Date(), sombrillasDayOffset), 'dd/MM/yyyy')}
           </span>
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setSombrillasDayOffset((prev) => prev - 10)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 text-[10px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 text-[11px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             ◀ 10 días
           </button>
           <button
             type="button"
             onClick={() => setSombrillasDayOffset((prev) => prev + 10)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 text-[10px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 text-[11px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             10 días ▶
           </button>
@@ -91,7 +90,10 @@ function SombrillasSection({
             <table className="w-full table-fixed text-[10px]">
               <thead>
                 <tr>
-                  <th className="bg-cyan-50 px-1 py-1 text-left font-semibold text-cyan-900 border-b border-slate-400 w-16 sticky top-0 z-10">
+                  {/* Con table-fixed el ancho lo define esta celda, no las del
+                      cuerpo. Necesita entrar "Sombrilla 218" en una sola linea:
+                      si wrapea, esa fila queda mas alta y desalinea la grilla. */}
+                  <th className="bg-cyan-50 px-1 py-1 text-left font-semibold text-cyan-900 border-b border-slate-400 w-24 sticky top-0 z-10">
                     Sombrilla
                   </th>
                   {days.map((day, idx) => {
@@ -108,7 +110,7 @@ function SombrillasSection({
                       >
                         <div>{format(day, 'dd')}</div>
                         <div className="text-[9px] text-slate-500">
-                          {format(day, 'EEE')[0]}
+                          {weekdayInitial(day)}
                         </div>
                       </th>
                     );
@@ -119,7 +121,7 @@ function SombrillasSection({
                 {Array.from({ length: totalSombrillas }, (_, i) => i + 1).map((sombrillaNumero) => {
                   return (
                     <tr key={sombrillaNumero} className="border-t border-slate-200">
-                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-16">
+                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-20 whitespace-nowrap">
                         Sombrilla {sombrillaNumero}
                       </td>
                       {days.map((day, idx) => {

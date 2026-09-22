@@ -1,6 +1,6 @@
 import React from 'react';
-import { format, addDays, isSameDay } from 'date-fns';
-
+import { addDays, isSameDay } from 'date-fns';
+import { format, weekdayInitial } from '../lib/dates';
 function EstacionamientoSection({
   establishment,
   parkingDayOffset,
@@ -40,7 +40,7 @@ function EstacionamientoSection({
         Plazas disponibles configuradas: {establishment?.parkingCapacity ?? 'sin definir'}.
       </p>
       <p className="text-[11px] text-slate-600 mb-3">
-        Vista conceptual de los próximos 30 días: filas = plazas, columnas = días.
+        Disponibilidad de los próximos 30 días: cada fila es una plaza, cada columna un día.
       </p>
 
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600 bg-sky-50 pb-2">
@@ -50,18 +50,18 @@ function EstacionamientoSection({
             {format(addDays(new Date(), parkingDayOffset), 'dd/MM/yyyy')}
           </span>
         </span>
-        <div className="flex gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             onClick={() => setParkingDayOffset((prev) => prev - 10)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 text-[10px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 text-[11px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             ◀ 10 días
           </button>
           <button
             type="button"
             onClick={() => setParkingDayOffset((prev) => prev + 10)}
-            className="inline-flex items-center rounded-full border border-cyan-400 px-2 py-0.5 text-[10px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
+            className="inline-flex items-center whitespace-nowrap rounded-full border border-cyan-400 px-3 py-1.5 text-[11px] bg-white hover:bg-cyan-50 hover:border-cyan-500"
           >
             10 días ▶
           </button>
@@ -107,7 +107,7 @@ function EstacionamientoSection({
                       >
                         <div>{format(day, 'dd')}</div>
                         <div className="text-[9px] text-slate-500">
-                          {format(day, 'EEE')[0]}
+                          {weekdayInitial(day)}
                         </div>
                       </th>
                     );
@@ -118,7 +118,7 @@ function EstacionamientoSection({
                 {Array.from({ length: totalPlazas }, (_, i) => i + 1).map((plazaNumero) => {
                   return (
                     <tr key={plazaNumero} className="border-t border-slate-200">
-                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-16">
+                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-16 whitespace-nowrap">
                         Plaza {plazaNumero}
                       </td>
                       {days.map((day, idx) => {
@@ -215,13 +215,6 @@ function EstacionamientoSection({
                             }}
                             onClick={() => {
                               if (isReserved) {
-                                console.log('[EstacionamientoSection] Click on occupied cell:', {
-                                  plazaNumero,
-                                  dateStr,
-                                  groupForClick,
-                                  totalGroups: reservationGroups.length,
-                                  parkingGroups: reservationGroups.filter(g => g.serviceType === 'parking').length
-                                });
 
                                 const group =
                                   groupForClick ||
@@ -234,7 +227,6 @@ function EstacionamientoSection({
                                       g.endDate >= dateStr
                                   );
 
-                                console.log('[EstacionamientoSection] Found group:', group);
 
                                 if (group) {
                                   onViewReservationDetails(group);
