@@ -1,6 +1,6 @@
 # Panel de usuario — Perfil y Establecimiento — Plan de implementación
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Convertir el item de menú `panel-usuario` —hoy vacío— en una pantalla con dos solapas: Perfil (cambiar mail, cambiar contraseña, ver nivel de acceso) y Establecimiento.
 
@@ -57,7 +57,7 @@ Monta la infraestructura de tests del backend (hoy inexistente) y la estrena con
 - Consumes: nada.
 - Produces: `GET /api/auth/me` → `200 { id, email, role, createdAt }`. El helper de test `tokenPara(id)` y el mock `queryMock`, que las Tareas 2 y 3 reusan.
 
-- [ ] **Step 1: Escribir la migración**
+- [x] **Step 1: Escribir la migración**
 
 Crear `backend/migrate-user-role.sql`:
 
@@ -79,7 +79,7 @@ BEGIN
 END $$;
 ```
 
-- [ ] **Step 2: Reflejarlo en el schema base**
+- [x] **Step 2: Reflejarlo en el schema base**
 
 En `backend/schema.sql`, en el `CREATE TABLE IF NOT EXISTS users`, agregar la columna después de `password_hash`:
 
@@ -87,13 +87,13 @@ En `backend/schema.sql`, en el `CREATE TABLE IF NOT EXISTS users`, agregar la co
   role VARCHAR(20) NOT NULL DEFAULT 'admin',
 ```
 
-- [ ] **Step 3: Instalar las dependencias de test**
+- [x] **Step 3: Instalar las dependencias de test**
 
 ```bash
 cd api && npm install --save-dev vitest supertest
 ```
 
-- [ ] **Step 4: Agregar el script de test**
+- [x] **Step 4: Agregar el script de test**
 
 En `api/package.json`, agregar la clave `scripts` (hoy el archivo no la tiene):
 
@@ -104,7 +104,7 @@ En `api/package.json`, agregar la clave `scripts` (hoy el archivo no la tiene):
   },
 ```
 
-- [ ] **Step 5: Crear la config de vitest**
+- [x] **Step 5: Crear la config de vitest**
 
 Crear `api/vitest.config.mjs` (la extensión .mjs evita el warning de ESM en un paquete CommonJS):
 
@@ -119,7 +119,7 @@ export default defineConfig({
 });
 ```
 
-- [ ] **Step 6: Escribir el test que falla**
+- [x] **Step 6: Escribir el test que falla**
 
 Crear `api/index.test.js`. El mock es de `pg`, no de `lib/db`, porque `api/index.js` arma su propio pool.
 
@@ -211,12 +211,12 @@ describe('GET /api/auth/me', () => {
 });
 ```
 
-- [ ] **Step 7: Correr el test y verificar que falla**
+- [x] **Step 7: Correr el test y verificar que falla**
 
 Run: `cd api && npm test`
 Expected: **los 3 fallan con `404 not_found`**. Sin el bloque de ruta, `auth/me` no matchea ningún `if` y cae al 404 del final del router — incluso los dos casos que esperan 401, porque el chequeo de token todavía no llega a ejecutarse.
 
-- [ ] **Step 8: Implementar el endpoint**
+- [x] **Step 8: Implementar el endpoint**
 
 En `api/index.js`, insertar este bloque **antes** del comentario `// ============= /api/auth/login =============`:
 
@@ -262,12 +262,12 @@ En `api/index.js`, insertar este bloque **antes** del comentario `// ===========
     }
 ```
 
-- [ ] **Step 9: Correr los tests y verificar que pasan**
+- [x] **Step 9: Correr los tests y verificar que pasan**
 
 Run: `cd api && npm test`
 Expected: 3 tests en verde.
 
-- [ ] **Step 10: Aplicar la migración en la base local**
+- [x] **Step 10: Aplicar la migración en la base local**
 
 ```bash
 psql -U balneariosmvp_user -d balnearios_mvp -f backend/migrate-user-role.sql
@@ -275,7 +275,7 @@ psql -U balneariosmvp_user -d balnearios_mvp -f backend/migrate-user-role.sql
 
 Verificar: `psql -U balneariosmvp_user -d balnearios_mvp -c "SELECT id, email, role FROM users;"` debe mostrar `admin` en la columna `role`.
 
-- [ ] **Step 11: Commit**
+- [x] **Step 11: Commit**
 
 ```bash
 git add backend/migrate-user-role.sql backend/schema.sql api/vitest.config.mjs api/test/pg-mock.js api/index.test.js api/package.json api/package-lock.json api/index.js
@@ -294,7 +294,7 @@ git commit -m "feat: agregar columna role y endpoint GET /api/auth/me con harnes
 - Consumes: `tokenPara(id)` y `queryMock` de la Tarea 1.
 - Produces: `POST /api/auth/password` con body `{ currentPassword, newPassword }` → `200 { success: true }`.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 Agregar al final de `api/index.test.js`. Requiere importar bcrypt arriba del archivo, junto a los otros imports:
 
@@ -361,12 +361,12 @@ describe('POST /api/auth/password', () => {
 });
 ```
 
-- [ ] **Step 2: Correr y verificar que fallan**
+- [x] **Step 2: Correr y verificar que fallan**
 
 Run: `cd api && npm test`
 Expected: los 4 tests nuevos fallan con `404 not_found`.
 
-- [ ] **Step 3: Implementar el endpoint**
+- [x] **Step 3: Implementar el endpoint**
 
 En `api/index.js`, insertar después del bloque `/api/auth/me`:
 
@@ -428,12 +428,12 @@ En `api/index.js`, insertar después del bloque `/api/auth/me`:
     }
 ```
 
-- [ ] **Step 4: Correr y verificar que pasan**
+- [x] **Step 4: Correr y verificar que pasan**
 
 Run: `cd api && npm test`
 Expected: 7 tests en verde.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add api/index.js api/index.test.js
@@ -452,7 +452,7 @@ git commit -m "feat: endpoint POST /api/auth/password con verificacion de clave 
 - Consumes: `tokenPara(id)` y `queryMock` de la Tarea 1.
 - Produces: `PATCH /api/auth/email` con body `{ newEmail, currentPassword }` → `200 { id, email, role, createdAt }`.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 Agregar al final de `api/index.test.js`:
 
@@ -530,12 +530,12 @@ describe('PATCH /api/auth/email', () => {
 });
 ```
 
-- [ ] **Step 2: Correr y verificar que fallan**
+- [x] **Step 2: Correr y verificar que fallan**
 
 Run: `cd api && npm test`
 Expected: los 5 tests nuevos fallan con `404 not_found`.
 
-- [ ] **Step 3: Implementar el endpoint**
+- [x] **Step 3: Implementar el endpoint**
 
 En `api/index.js`, insertar después del bloque `/api/auth/password`:
 
@@ -620,12 +620,12 @@ En `api/index.js`, insertar después del bloque `/api/auth/password`:
     }
 ```
 
-- [ ] **Step 4: Correr y verificar que pasan**
+- [x] **Step 4: Correr y verificar que pasan**
 
 Run: `cd api && npm test`
 Expected: 12 tests en verde.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add api/index.js api/index.test.js
@@ -644,7 +644,7 @@ git commit -m "feat: endpoint PATCH /api/auth/email con normalizacion y chequeo 
 - Consumes: los tres endpoints de las Tareas 1–3. `EstablishmentConfigForm` (existente, 25 props, **firma sin cambios**).
 - Produces: `PanelUsuarioSection` con props `{ authToken, userEmail, onEmailChanged, establecimiento }`. `onEmailChanged` es `(nuevoEmail: string) => void`. `establecimiento` es el objeto con las 25 props del formulario.
 
-- [ ] **Step 1: Escribir el test que falla**
+- [x] **Step 1: Escribir el test que falla**
 
 Crear `frontend/src/components/PanelUsuarioSection.test.jsx`:
 
@@ -755,12 +755,12 @@ describe('PanelUsuarioSection', () => {
 });
 ```
 
-- [ ] **Step 2: Correr y verificar que falla**
+- [x] **Step 2: Correr y verificar que falla**
 
 Run: `cd frontend && npx vitest run src/components/PanelUsuarioSection.test.jsx`
 Expected: FAIL — el módulo `./PanelUsuarioSection` no existe.
 
-- [ ] **Step 3: Implementar el componente**
+- [x] **Step 3: Implementar el componente**
 
 Crear `frontend/src/components/PanelUsuarioSection.jsx`:
 
@@ -1071,17 +1071,17 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
 export default PanelUsuarioSection;
 ```
 
-- [ ] **Step 4: Correr y verificar que pasan**
+- [x] **Step 4: Correr y verificar que pasan**
 
 Run: `cd frontend && npx vitest run src/components/PanelUsuarioSection.test.jsx`
 Expected: 5 tests en verde.
 
-- [ ] **Step 5: Correr toda la suite del frontend**
+- [x] **Step 5: Correr toda la suite del frontend**
 
 Run: `cd frontend && npm test`
 Expected: 18 tests en verde (13 previos + 5 nuevos).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add frontend/src/components/PanelUsuarioSection.jsx frontend/src/components/PanelUsuarioSection.test.jsx
@@ -1099,7 +1099,7 @@ git commit -m "feat: componente PanelUsuarioSection con solapas Perfil y Estable
 - Consumes: `PanelUsuarioSection` de la Tarea 4.
 - Produces: nada que consuman tareas posteriores.
 
-- [ ] **Step 1: Importar el componente**
+- [x] **Step 1: Importar el componente**
 
 En `frontend/src/App.jsx`, junto a los otros imports de componentes:
 
@@ -1107,7 +1107,7 @@ En `frontend/src/App.jsx`, junto a los otros imports de componentes:
 import PanelUsuarioSection from './components/PanelUsuarioSection';
 ```
 
-- [ ] **Step 2: Sacar Establecimiento del menú**
+- [x] **Step 2: Sacar Establecimiento del menú**
 
 Borrar esta línea del bloque de `navItems.push(...)`:
 
@@ -1115,7 +1115,7 @@ Borrar esta línea del bloque de `navItems.push(...)`:
 navItems.push({ id: 'config-establecimiento', label: 'Establecimiento', group: 'admin' });
 ```
 
-- [ ] **Step 3: Actualizar el mapa de títulos**
+- [x] **Step 3: Actualizar el mapa de títulos**
 
 En `sectionTitleMap`, borrar la entrada `'config-establecimiento'` y agregar la de `panel-usuario` (hoy no existe):
 
@@ -1123,7 +1123,7 @@ En `sectionTitleMap`, borrar la entrada `'config-establecimiento'` y agregar la 
       'panel-usuario': 'Panel de usuario',
 ```
 
-- [ ] **Step 4: Armar el objeto de establecimiento**
+- [x] **Step 4: Armar el objeto de establecimiento**
 
 Cerca de donde se arma `propsVistaRapida`, agregar:
 
@@ -1156,7 +1156,7 @@ Cerca de donde se arma `propsVistaRapida`, agregar:
     };
 ```
 
-- [ ] **Step 5: Reemplazar el render**
+- [x] **Step 5: Reemplazar el render**
 
 Borrar todo el bloque `{activeSection === 'config-establecimiento' && ( ... )}` y agregar:
 
@@ -1176,17 +1176,17 @@ Borrar todo el bloque `{activeSection === 'config-establecimiento' && ( ... )}` 
             )}
 ```
 
-- [ ] **Step 6: Verificar que no quedan referencias**
+- [x] **Step 6: Verificar que no quedan referencias**
 
 Run: `cd "E:/Balnearios 2026" && grep -rn "config-establecimiento" frontend/src/`
 Expected: sin resultados.
 
-- [ ] **Step 7: Correr la suite del frontend**
+- [x] **Step 7: Correr la suite del frontend**
 
 Run: `cd frontend && npm test`
 Expected: 18 tests en verde.
 
-- [ ] **Step 8: Verificar en el navegador**
+- [x] **Step 8: Verificar en el navegador**
 
 Con backend en 9000 y frontend en 9001, entrar con `admin@balneario.com` / `admin123` y comprobar:
 
@@ -1198,7 +1198,7 @@ Con backend en 9000 y frontend en 9001, entrar con `admin@balneario.com` / `admi
 6. **Cambiar el email de verdad** → el sidebar y el perfil muestran el nuevo, **y la sesión sigue viva** (navegar a Reservas debe seguir cargando datos, sin 401).
 7. Volver a dejar el email en `admin@balneario.com`.
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 git add frontend/src/App.jsx
@@ -1209,18 +1209,18 @@ git commit -m "feat: cablear Panel de usuario y mover Establecimiento adentro"
 
 ## Cierre
 
-- [ ] **Correr todo junto**
+- [x] **Correr todo junto**
 
 ```bash
 cd api && npm test && cd ../frontend && npm test && npm run build
 ```
 Expected: 12 tests de API, 18 de frontend, build sin errores.
 
-- [ ] **Aplicar la migración en producción**
+- [x] **Aplicar la migración en producción**
 
 `backend/migrate-user-role.sql` contra la base de Supabase de `vercelbalneariosmvp1`. Es idempotente: se puede correr dos veces sin romper.
 
-- [ ] **Revisión de seguridad**
+- [x] **Revisión de seguridad**
 
 El CLAUDE.md del equipo exige llamar a `@security` antes de mergear cualquier feature que toque autenticación. Esta califica. Pasarle el diff de `api/index.js`.
 
