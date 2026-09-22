@@ -159,19 +159,20 @@ export function generateReceipt(reservation, establishment) {
   doc.text(`${fecha(reservation.startDate)} - ${fecha(reservation.endDate)}`, rightMargin, yPos, { align: 'right' });
   yPos += 5;
 
-  if (isPoolPass) {
-    // El backend local devuelve poolAdultsCount y el de produccion adultsCount:
-    // son dos implementaciones de la API que divergieron. Se aceptan los dos.
-    const adults = Number.parseInt(String(reservation.poolAdultsCount ?? reservation.adultsCount ?? '0'), 10) || 0;
-    const children = Number.parseInt(String(reservation.poolChildrenCount ?? reservation.childrenCount ?? '0'), 10) || 0;
+  // La cantidad de personas vale para los cuatro servicios, no solo para el
+  // pase de pileta. Si la reserva no la tiene cargada, la linea no sale.
+  const adults = Number.parseInt(String(reservation.adultsCount ?? '0'), 10) || 0;
+  const children = Number.parseInt(String(reservation.childrenCount ?? '0'), 10) || 0;
 
+  if (adults + children > 0) {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...grayText);
     doc.text('Personas:', leftMargin, yPos);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...primaryColor);
-    doc.text(`Adultos: ${adults}  ·  Niños: ${children}`, rightMargin, yPos, { align: 'right' });
+    const etiquetaMenores = isPoolPass ? 'Niños' : 'Menores';
+    doc.text(`Adultos: ${adults}  ·  ${etiquetaMenores}: ${children}`, rightMargin, yPos, { align: 'right' });
     yPos += 4;
   }
   

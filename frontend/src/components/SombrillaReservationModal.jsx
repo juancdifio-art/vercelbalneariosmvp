@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
 import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
+import PersonasFields from './PersonasFields';
 
 // Función para formatear montos con separadores de miles (formato argentino)
 const formatCurrency = (value) => {
@@ -54,6 +55,8 @@ function SombrillaReservationModal({
     clientId,
     customerName,
     customerPhone,
+    adultsCount,
+    childrenCount,
     dailyPrice,
     includeParking,
     parkingSpotNumber,
@@ -346,6 +349,15 @@ function SombrillaReservationModal({
               </div>
             )}
           </div>
+
+          {!isReserved && (
+            <PersonasFields
+              adultsCount={adultsCount}
+              childrenCount={childrenCount}
+              onChangeForm={onChangeForm}
+              idPrefijo="sombrilla"
+            />
+          )}
 
           {!isReserved && error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -674,6 +686,8 @@ function SombrillaReservationModal({
                     clientId,
                     customerName,
                     customerPhone,
+                    adultsCount,
+                    childrenCount,
                     dailyPrice,
                     includeParking,
                     parkingSpotNumber: plazaAsignada,

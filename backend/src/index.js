@@ -943,8 +943,8 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.notes,
         rg.status,
         rg.client_id,
-        rg.pool_adults_count,
-        rg.pool_children_count,
+        rg.adults_count,
+        rg.children_count,
         rg.pool_adult_price_per_day,
         rg.pool_child_price_per_day,
         c.document_number AS client_document_number,
@@ -1035,8 +1035,8 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.notes,
         rg.status,
         rg.client_id,
-        rg.pool_adults_count,
-        rg.pool_children_count,
+        rg.adults_count,
+        rg.children_count,
         rg.pool_adult_price_per_day,
         rg.pool_child_price_per_day,
         c.document_number
@@ -1062,8 +1062,8 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         notes: row.notes,
         status: row.status,
         clientId: row.client_id,
-        poolAdultsCount: row.pool_adults_count,
-        poolChildrenCount: row.pool_children_count,
+        adultsCount: row.adults_count,
+        childrenCount: row.children_count,
         poolAdultPricePerDay: row.pool_adult_price_per_day,
         poolChildPricePerDay: row.pool_child_price_per_day,
         clientDocumentNumber: row.client_document_number || null,
@@ -1090,8 +1090,8 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       totalPrice,
       notes,
       clientId,
-      poolAdultsCount,
-      poolChildrenCount,
+      adultsCount,
+      childrenCount,
       poolAdultPricePerDay,
       poolChildPricePerDay
     } = req.body;
@@ -1170,28 +1170,30 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         ? Number.parseFloat(totalPrice)
         : null;
 
-    let poolAdultsCountParsed = 0;
-    let poolChildrenCountParsed = 0;
     let poolAdultPricePerDayParsed = null;
     let poolChildPricePerDayParsed = null;
 
+    // La cantidad de personas vale para los cuatro servicios, no solo pileta:
+    // antes esto vivia dentro del if (isPool) y una carpa se guardaba siempre
+    // con cero personas. Los precios por persona, en cambio, son solo de
+    // pileta y se siguen calculando adentro del bloque.
+    let adultsCountParsed =
+      adultsCount !== undefined && adultsCount !== null && adultsCount !== ''
+        ? Number.parseInt(adultsCount, 10)
+        : 0;
+    if (Number.isNaN(adultsCountParsed) || adultsCountParsed < 0) {
+      adultsCountParsed = 0;
+    }
+
+    let childrenCountParsed =
+      childrenCount !== undefined && childrenCount !== null && childrenCount !== ''
+        ? Number.parseInt(childrenCount, 10)
+        : 0;
+    if (Number.isNaN(childrenCountParsed) || childrenCountParsed < 0) {
+      childrenCountParsed = 0;
+    }
+
     if (isPool) {
-      poolAdultsCountParsed =
-        poolAdultsCount !== undefined && poolAdultsCount !== null && poolAdultsCount !== ''
-          ? Number.parseInt(poolAdultsCount, 10)
-          : 0;
-      if (Number.isNaN(poolAdultsCountParsed) || poolAdultsCountParsed < 0) {
-        poolAdultsCountParsed = 0;
-      }
-
-      poolChildrenCountParsed =
-        poolChildrenCount !== undefined && poolChildrenCount !== null && poolChildrenCount !== ''
-          ? Number.parseInt(poolChildrenCount, 10)
-          : 0;
-      if (Number.isNaN(poolChildrenCountParsed) || poolChildrenCountParsed < 0) {
-        poolChildrenCountParsed = 0;
-      }
-
       poolAdultPricePerDayParsed =
         poolAdultPricePerDay !== undefined && poolAdultPricePerDay !== null && poolAdultPricePerDay !== ''
           ? Number.parseFloat(poolAdultPricePerDay)
@@ -1217,8 +1219,8 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       }
 
       const computedDaily =
-        poolAdultsCountParsed * poolAdultPricePerDayParsed +
-        poolChildrenCountParsed * poolChildPricePerDayParsed;
+        adultsCountParsed * poolAdultPricePerDayParsed +
+        childrenCountParsed * poolChildPricePerDayParsed;
       const computedTotal = computedDaily * daysCount;
 
       dailyPriceParsed = Number.isNaN(computedDaily) ? null : computedDaily;
@@ -1250,13 +1252,13 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         daily_price,
         total_price,
         notes,
-        pool_adults_count,
-        pool_children_count,
+        adults_count,
+        children_count,
         pool_adult_price_per_day,
         pool_child_price_per_day,
         client_id
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day`,
+      RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day`,
       [
         establishmentId,
         serviceType,
@@ -1268,8 +1270,8 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         Number.isNaN(dailyPriceParsed) ? null : dailyPriceParsed,
         Number.isNaN(totalPriceParsed) ? null : totalPriceParsed,
         notes || null,
-        poolAdultsCountParsed,
-        poolChildrenCountParsed,
+        adultsCountParsed,
+        childrenCountParsed,
         poolAdultPricePerDayParsed,
         poolChildPricePerDayParsed,
         clientIdParsed
@@ -1299,8 +1301,8 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         notes: groupRow.notes,
         status: groupRow.status,
         clientId: groupRow.client_id,
-        poolAdultsCount: groupRow.pool_adults_count,
-        poolChildrenCount: groupRow.pool_children_count,
+        adultsCount: groupRow.adults_count,
+        childrenCount: groupRow.children_count,
         poolAdultPricePerDay: groupRow.pool_adult_price_per_day,
         poolChildPricePerDay: groupRow.pool_child_price_per_day,
         paidAmount: 0
@@ -1329,8 +1331,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
       notes,
       status,
       clientId,
-      poolAdultsCount,
-      poolChildrenCount,
+      adultsCount,
+      childrenCount,
       poolAdultPricePerDay,
       poolChildPricePerDay,
       resourceNumber,
@@ -1356,7 +1358,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     const establishmentId = estResult.rows[0].id;
 
     const existingResult = await pool.query(
-      'SELECT id, establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+      'SELECT id, establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
       [groupId, establishmentId]
     );
 
@@ -1383,15 +1385,15 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     const nextNotes = notes !== undefined ? notes : current.notes;
     const nextStatus = status !== undefined && status !== null ? status : current.status;
 
-    const nextPoolAdultsCount =
-      poolAdultsCount !== undefined && poolAdultsCount !== null && poolAdultsCount !== ''
-        ? Number.parseInt(poolAdultsCount, 10)
-        : current.pool_adults_count;
+    const nextAdultsCount =
+      adultsCount !== undefined && adultsCount !== null && adultsCount !== ''
+        ? Number.parseInt(adultsCount, 10)
+        : current.adults_count;
 
-    const nextPoolChildrenCount =
-      poolChildrenCount !== undefined && poolChildrenCount !== null && poolChildrenCount !== ''
-        ? Number.parseInt(poolChildrenCount, 10)
-        : current.pool_children_count;
+    const nextChildrenCount =
+      childrenCount !== undefined && childrenCount !== null && childrenCount !== ''
+        ? Number.parseInt(childrenCount, 10)
+        : current.children_count;
 
     const nextPoolAdultPricePerDay =
       poolAdultPricePerDay !== undefined
@@ -1487,7 +1489,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     }
 
     const updateResult = await pool.query(
-      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, pool_adults_count = $8, pool_children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, updated_at = NOW() WHERE id = $15 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, pool_adults_count, pool_children_count, pool_adult_price_per_day, pool_child_price_per_day',
+      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, adults_count = $8, children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, updated_at = NOW() WHERE id = $15 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day',
       [
         nextCustomerName || null,
         nextCustomerPhone || null,
@@ -1496,8 +1498,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         nextNotes || null,
         nextStatus,
         nextClientId,
-        nextPoolAdultsCount,
-        nextPoolChildrenCount,
+        nextAdultsCount,
+        nextChildrenCount,
         nextPoolAdultPricePerDay,
         nextPoolChildPricePerDay,
         nextResourceNumber,
@@ -1529,8 +1531,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         notes: updatedRow.notes,
         status: updatedRow.status,
         clientId: updatedRow.client_id,
-        poolAdultsCount: updatedRow.pool_adults_count,
-        poolChildrenCount: updatedRow.pool_children_count,
+        adultsCount: updatedRow.adults_count,
+        childrenCount: updatedRow.children_count,
         poolAdultPricePerDay: updatedRow.pool_adult_price_per_day,
         poolChildPricePerDay: updatedRow.pool_child_price_per_day
       }
@@ -1758,6 +1760,210 @@ app.post('/api/reservation-groups/:id/payments', authenticateToken, async (req, 
     });
   } catch (error) {
     console.error('Error creating reservation payment', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// ===== Personas que ocupan la reserva =====
+// Solo el nombre es obligatorio: un dato a medias sirve mas que ninguno.
+
+// Una fila de reservation_guests como la devuelve la API.
+const mapGuest = (row) => ({
+  id: row.id,
+  fullName: row.full_name,
+  documentNumber: row.document_number,
+  age: row.age,
+  birthDate: row.birth_date instanceof Date
+    ? row.birth_date.toISOString().slice(0, 10)
+    : row.birth_date,
+  createdAt: row.created_at
+});
+
+// La edad se escribe a mano en el mostrador: un texto vacio no es cero.
+const parseGuestAge = (age) => {
+  if (age === undefined || age === null || age === '') return null;
+  const parsed = Number.parseInt(age, 10);
+  if (Number.isNaN(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+// Devuelve el establecimiento del usuario y valida que la reserva sea suya.
+const resolveGuestScope = async (userId, groupId) => {
+  const estResult = await pool.query(
+    'SELECT id FROM establishments WHERE user_id = $1',
+    [userId]
+  );
+
+  if (estResult.rows.length === 0) return null;
+
+  const establishmentId = estResult.rows[0].id;
+
+  const groupResult = await pool.query(
+    'SELECT id FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+    [groupId, establishmentId]
+  );
+
+  if (groupResult.rows.length === 0) return null;
+
+  return establishmentId;
+};
+
+app.get('/api/reservation-groups/:id/guests', authenticateToken, async (req, res) => {
+  try {
+    const groupId = Number.parseInt(req.params.id, 10);
+
+    if (!groupId || Number.isNaN(groupId) || groupId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const establishmentId = await resolveGuestScope(req.user.id, groupId);
+
+    if (!establishmentId) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const result = await pool.query(
+      'SELECT id, full_name, document_number, age, birth_date, created_at FROM reservation_guests WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY id ASC',
+      [establishmentId, groupId]
+    );
+
+    return res.json({ guests: result.rows.map(mapGuest) });
+  } catch (error) {
+    console.error('Error fetching reservation guests', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.post('/api/reservation-groups/:id/guests', authenticateToken, async (req, res) => {
+  try {
+    const groupId = Number.parseInt(req.params.id, 10);
+
+    if (!groupId || Number.isNaN(groupId) || groupId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const establishmentId = await resolveGuestScope(req.user.id, groupId);
+
+    if (!establishmentId) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const { fullName, documentNumber, age, birthDate } = req.body || {};
+
+    if (!fullName || String(fullName).trim() === '') {
+      return res.status(400).json({ error: 'missing_fields' });
+    }
+
+    const result = await pool.query(
+      'INSERT INTO reservation_guests (establishment_id, reservation_group_id, full_name, document_number, age, birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, document_number, age, birth_date, created_at',
+      [
+        establishmentId,
+        groupId,
+        String(fullName).trim(),
+        documentNumber || null,
+        parseGuestAge(age),
+        birthDate || null
+      ]
+    );
+
+    return res.status(201).json({ guest: mapGuest(result.rows[0]) });
+  } catch (error) {
+    console.error('Error creating reservation guest', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.patch('/api/reservation-guests/:guestId', authenticateToken, async (req, res) => {
+  try {
+    const guestId = Number.parseInt(req.params.guestId, 10);
+
+    if (!guestId || Number.isNaN(guestId) || guestId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const estResult = await pool.query(
+      'SELECT id FROM establishments WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const establishmentId = estResult.rows[0].id;
+
+    const actual = await pool.query(
+      'SELECT id, full_name, document_number, age, birth_date FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+      [guestId, establishmentId]
+    );
+
+    if (actual.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const previo = actual.rows[0];
+    const { fullName, documentNumber, age, birthDate } = req.body || {};
+
+    // Lo que no viene en el body queda como estaba.
+    const nombre =
+      fullName !== undefined && String(fullName).trim() !== ''
+        ? String(fullName).trim()
+        : previo.full_name;
+
+    const result = await pool.query(
+      'UPDATE reservation_guests SET full_name = $1, document_number = $2, age = $3, birth_date = $4, updated_at = NOW() WHERE id = $5 RETURNING id, full_name, document_number, age, birth_date, created_at',
+      [
+        nombre,
+        documentNumber !== undefined ? documentNumber || null : previo.document_number,
+        age !== undefined ? parseGuestAge(age) : previo.age,
+        birthDate !== undefined ? birthDate || null : previo.birth_date,
+        guestId
+      ]
+    );
+
+    return res.json({ guest: mapGuest(result.rows[0]) });
+  } catch (error) {
+    console.error('Error updating reservation guest', error);
+    res.status(500).json({ error: 'server_error' });
+  }
+});
+
+app.delete('/api/reservation-guests/:guestId', authenticateToken, async (req, res) => {
+  try {
+    const guestId = Number.parseInt(req.params.guestId, 10);
+
+    if (!guestId || Number.isNaN(guestId) || guestId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+
+    const estResult = await pool.query(
+      'SELECT id FROM establishments WHERE user_id = $1',
+      [req.user.id]
+    );
+
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    const establishmentId = estResult.rows[0].id;
+
+    const existe = await pool.query(
+      'SELECT id FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+      [guestId, establishmentId]
+    );
+
+    if (existe.rows.length === 0) {
+      return res.status(404).json({ error: 'not_found' });
+    }
+
+    await pool.query('DELETE FROM reservation_guests WHERE id = $1 AND establishment_id = $2', [
+      guestId,
+      establishmentId
+    ]);
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting reservation guest', error);
     res.status(500).json({ error: 'server_error' });
   }
 });
@@ -1996,8 +2202,8 @@ app.get('/api/reports/occupancy', authenticateToken, async (req, res) => {
         resource_number,
         start_date,
         end_date,
-        pool_adults_count,
-        pool_children_count
+        adults_count,
+        children_count
       FROM reservation_groups
       WHERE establishment_id = $1
         AND status = 'active'
@@ -2066,7 +2272,7 @@ app.get('/api/reports/occupancy', authenticateToken, async (req, res) => {
       }
 
       const unitsForPool =
-        Number(row.pool_adults_count || 0) + Number(row.pool_children_count || 0);
+        Number(row.adults_count || 0) + Number(row.children_count || 0);
       const increment = serviceType === 'pileta'
         ? (Number.isFinite(unitsForPool) && unitsForPool > 0 ? unitsForPool : 0)
         : 1;

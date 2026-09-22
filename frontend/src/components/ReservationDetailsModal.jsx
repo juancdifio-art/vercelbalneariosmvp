@@ -5,6 +5,7 @@ import { getApiBaseUrl } from '../apiConfig';
 import { formatPesos } from '../lib/money';
 import { otrasReservasVigentes, saldoDe, hoyISO } from '../lib/reservas';
 import { ServiceIcon, COLOR_SERVICIO } from './icons';
+import PersonasReserva from './PersonasReserva';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -42,8 +43,6 @@ function ReservationDetailsModal({
     notes,
     status,
     linkedParkingResourceNumber,
-    poolAdultsCount,
-    poolChildrenCount,
     adultsCount,
     childrenCount
   } = reservation;
@@ -263,13 +262,13 @@ function ReservationDetailsModal({
                   </p>
                 </div>
               </div>
-              {serviceType === 'pileta' && (
+              {Number(adultsCount ?? 0) + Number(childrenCount ?? 0) > 0 && (
                 <div className="flex items-start gap-2">
                   <span className="text-base">👨‍👩‍👧‍👦</span>
                   <div className="flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium">Composición pileta</p>
+                    <p className="text-[10px] text-slate-500 font-medium">Personas</p>
                     <p className="text-xs font-semibold text-slate-900">
-                      Adultos: {Number(poolAdultsCount ?? adultsCount ?? 0)} · Niños: {Number(poolChildrenCount ?? childrenCount ?? 0)}
+                      Adultos: {Number(adultsCount ?? 0)} · {serviceType === 'pileta' ? 'Niños' : 'Menores'}: {Number(childrenCount ?? 0)}
                     </p>
                   </div>
                 </div>
@@ -392,6 +391,12 @@ function ReservationDetailsModal({
               </div>
             );
           })()}
+
+          <PersonasReserva
+            reservationGroupId={id}
+            adultsCount={adultsCount}
+            childrenCount={childrenCount}
+          />
 
           {/* Payments section */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">

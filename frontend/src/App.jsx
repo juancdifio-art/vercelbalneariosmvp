@@ -680,6 +680,8 @@ function App() {
     const {
       customerName,
       customerPhone,
+      adultsCount,
+      childrenCount,
       dailyPrice,
       clientId,
       includeParking,
@@ -720,7 +722,9 @@ function App() {
               : '',
           totalPrice: totalPrice !== null ? String(totalPrice) : '',
           notes: '',
-          clientId: clientId ?? ''
+          clientId: clientId ?? '',
+          adultsCount: String(adultsCount ?? ''),
+          childrenCount: String(childrenCount ?? '')
         })
       });
 
@@ -829,6 +833,8 @@ function App() {
           await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
             customerName,
             customerPhone,
+            adultsCount,
+            childrenCount,
             dailyPrice: parkingDailyPrice ?? '',
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
@@ -955,12 +961,8 @@ function App() {
           totalPrice: totalPrice > 0 ? String(totalPrice) : '',
           notes: '',
           clientId: clientId ?? '',
-          // Compatibilidad: backend serverless usa adultsCount/childrenCount,
-          // backend Express usa poolAdultsCount/poolChildrenCount
           adultsCount: String(adults),
           childrenCount: String(children),
-          poolAdultsCount: String(adults),
-          poolChildrenCount: String(children),
           poolAdultPricePerDay: poolAdultPricePerDay ? String(poolAdultPricePerDay) : '',
           poolChildPricePerDay: poolChildPricePerDay ? String(poolChildPricePerDay) : ''
         })
@@ -1080,6 +1082,8 @@ function App() {
     const {
       customerName,
       customerPhone,
+      adultsCount,
+      childrenCount,
       dailyPrice,
       clientId,
       includeParking,
@@ -1120,7 +1124,9 @@ function App() {
               : '',
           totalPrice: totalPrice !== null ? String(totalPrice) : '',
           notes: '',
-          clientId: clientId ?? ''
+          clientId: clientId ?? '',
+          adultsCount: String(adultsCount ?? ''),
+          childrenCount: String(childrenCount ?? '')
         })
       });
 
@@ -1228,6 +1234,8 @@ function App() {
           await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
             customerName,
             customerPhone,
+            adultsCount,
+            childrenCount,
             dailyPrice: parkingDailyPrice ?? '',
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
@@ -1291,6 +1299,8 @@ function App() {
     const {
       customerName,
       customerPhone,
+      adultsCount,
+      childrenCount,
       dailyPrice,
       clientId,
       initialPaymentAmount,
@@ -1326,7 +1336,9 @@ function App() {
               : '',
           totalPrice: totalPrice !== null ? String(totalPrice) : '',
           notes: '',
-          clientId: clientId ?? ''
+          clientId: clientId ?? '',
+          adultsCount: String(adultsCount ?? ''),
+          childrenCount: String(childrenCount ?? '')
         })
       });
 
@@ -1447,6 +1459,8 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
       dailyPrice: '',
       includeParking: false,
       parkingSpotNumber: '',
@@ -1476,6 +1490,8 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
       dailyPrice: '',
       includeParking: false,
       parkingSpotNumber: '',
@@ -1505,6 +1521,8 @@ function App() {
       clientId: null,
       customerName: '',
       customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
       dailyPrice: '',
       initialPaymentAmount: '',
       initialPaymentMethod: ''
@@ -1773,15 +1791,8 @@ function App() {
       }
     }
 
-    const mappedPoolAdultsCount =
-      group.poolAdultsCount ?? group.adultsCount ?? 0;
-    const mappedPoolChildrenCount =
-      group.poolChildrenCount ?? group.childrenCount ?? 0;
-
     setReservationDetailsModal({
       ...group,
-      poolAdultsCount: mappedPoolAdultsCount,
-      poolChildrenCount: mappedPoolChildrenCount,
       linkedParkingResourceNumber,
       linkedParkingData,
       payments: [],
@@ -2060,8 +2071,8 @@ function App() {
       tempPoolChildrenCount,
       tempPoolAdultPricePerDay,
       tempPoolChildPricePerDay,
-      poolAdultsCount,
-      poolChildrenCount,
+      adultsCount,
+      childrenCount,
       poolAdultPricePerDay,
       poolChildPricePerDay
     } = reservationEditModal;
@@ -2086,13 +2097,13 @@ function App() {
 
       // Agregar campos de pileta solo si el servicio es pileta
       if (serviceType === 'pileta') {
-        const finalPoolAdultsCount = tempPoolAdultsCount !== undefined ? tempPoolAdultsCount : (poolAdultsCount ?? 0);
-        const finalPoolChildrenCount = tempPoolChildrenCount !== undefined ? tempPoolChildrenCount : (poolChildrenCount ?? 0);
+        const finalPoolAdultsCount = tempPoolAdultsCount !== undefined ? tempPoolAdultsCount : (adultsCount ?? 0);
+        const finalPoolChildrenCount = tempPoolChildrenCount !== undefined ? tempPoolChildrenCount : (childrenCount ?? 0);
         const finalPoolAdultPricePerDay = tempPoolAdultPricePerDay !== undefined ? tempPoolAdultPricePerDay : (poolAdultPricePerDay ?? 0);
         const finalPoolChildPricePerDay = tempPoolChildPricePerDay !== undefined ? tempPoolChildPricePerDay : (poolChildPricePerDay ?? 0);
 
-        updateBody.poolAdultsCount = finalPoolAdultsCount;
-        updateBody.poolChildrenCount = finalPoolChildrenCount;
+        updateBody.adultsCount = finalPoolAdultsCount;
+        updateBody.childrenCount = finalPoolChildrenCount;
         updateBody.poolAdultPricePerDay = finalPoolAdultPricePerDay;
         updateBody.poolChildPricePerDay = finalPoolChildPricePerDay;
 

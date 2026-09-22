@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
 import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
+import PersonasFields from './PersonasFields';
 
 function ParkingReservationModal({
   form,
@@ -26,6 +27,8 @@ function ParkingReservationModal({
     clientId,
     customerName,
     customerPhone,
+    adultsCount,
+    childrenCount,
     dailyPrice,
     initialPaymentAmount,
     initialPaymentMethod
@@ -288,6 +291,15 @@ function ParkingReservationModal({
             )}
           </div>
 
+          {!isReserved && (
+            <PersonasFields
+              adultsCount={adultsCount}
+              childrenCount={childrenCount}
+              onChangeForm={onChangeForm}
+              idPrefijo="parking"
+            />
+          )}
+
           {!isReserved && error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               <p className="text-xs text-red-700 flex items-center gap-2">
@@ -437,6 +449,8 @@ function ParkingReservationModal({
                     clientId,
                     customerName,
                     customerPhone,
+                    adultsCount,
+                    childrenCount,
                     dailyPrice,
                     initialPaymentAmount,
                     initialPaymentMethod
