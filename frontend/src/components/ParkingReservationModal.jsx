@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
+import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
 
 function ParkingReservationModal({
   form,
@@ -33,28 +34,17 @@ function ParkingReservationModal({
   // Calcular plazas disponibles para el rango de fechas seleccionado
   const totalPlazas = Number.parseInt(establishment?.parkingCapacity ?? '0', 10);
 
-  const getAvailablePlazas = () => {
-    if (!startDate || !endDate || !totalPlazas) return [];
+  // Disponibilidad real de todo el periodo, pedida al servidor. Antes se
+  // miraba la lista de reservas de la app, que en esta seccion trae solo los
+  // 30 dias de la grilla: en una estadia larga, una plaza tomada despues del
+  // dia 30 aparecia libre. Y la plaza ya elegida se daba siempre por libre.
+  const desdeDisponibilidad = startDate || (day ? format(day, 'yyyy-MM-dd') : '');
+  const ocupacion = useUnidadesOcupadas('parking', desdeDisponibilidad, endDate || '', !isReserved);
+  const hayRango = Boolean(endDate);
 
-    const available = [];
-    for (let i = 1; i <= totalPlazas; i++) {
-      // Verificar si la plaza está ocupada en el rango de fechas
-      const isOccupied = reservationGroups?.some((g) => {
-        if (g.serviceType !== 'parking') return false;
-        if (g.resourceNumber !== i) return false;
-        if (g.status !== 'active') return false;
-        // Verificar solapamiento de fechas
-        return g.startDate <= endDate && g.endDate >= startDate;
-      });
-
-      if (!isOccupied || i === plazaNumero) {
-        available.push(i);
-      }
-    }
-    return available;
-  };
-
-  const availablePlazas = getAvailablePlazas();
+  const availablePlazas = hayRango && totalPlazas
+    ? Array.from({ length: totalPlazas }, (_, i) => i + 1).filter((n) => !ocupacion.ocupadas.has(n))
+    : [];
 
   const startStr = startDate || format(day, 'yyyy-MM-dd');
   const endStr = endDate || '';
@@ -86,6 +76,11 @@ function ParkingReservationModal({
   const paymentMissingMethod = paymentAmountNum > 0 && !initialPaymentMethod;
 
   const hasPaymentError = paymentExceedsTotal || paymentMissingMethod;
+
+  // La plaza elegida que choca con otra reserva en algun dia del periodo no
+  // se guarda.
+  const conflictoPlaza = !isReserved && hayRango && ocupacion.ocupadas.has(Number(plazaNumero));
+  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -143,7 +138,8 @@ function ParkingReservationModal({
                     }}
                   >
                     {Array.from({ length: totalPlazas }, (_, i) => i + 1).map((num) => {
-                      const isAvailable = availablePlazas.includes(num);
+                      // Sin fecha de salida todavia no hay nada que chequear.
+                      const isAvailable = !hayRango || !ocupacion.ocupadas.has(num);
                       const isCurrent = num === plazaNumero;
                       return (
                         <option
@@ -151,7 +147,7 @@ function ParkingReservationModal({
                           value={num}
                           disabled={!isAvailable && !isCurrent}
                         >
-                          Plaza {num}{!isAvailable && !isCurrent ? ' (ocupada)' : ''}
+                          Plaza {num}{!isAvailable ? ' (ocupada)' : ''}
                         </option>
                       );
                     })}
@@ -406,6 +402,18 @@ function ParkingReservationModal({
             </div>
           )}
 
+          {/* Disponibilidad */}
+          {conflictoPlaza && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ La plaza {plazaNumero} está ocupada en alguno de esos días. Elegí otra o cambiá las fechas.
+            </div>
+          )}
+          {ocupacion.fallo && (
+            <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg border border-amber-200 mb-4">
+              No se pudo verificar la disponibilidad. Al guardar, el sistema igual controla que no se superponga con otra reserva.
+            </div>
+          )}
+
           {/* Mensaje de error de pago */}
           {paymentMissingMethod && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
@@ -417,8 +425,8 @@ function ParkingReservationModal({
             {!isReserved && (
               <button
                 type="button"
-                disabled={hasPaymentError}
-                className={`inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${hasPaymentError
+                disabled={bloqueaGuardar}
+                className={`inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${bloqueaGuardar
                   ? 'bg-slate-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
                   }`}

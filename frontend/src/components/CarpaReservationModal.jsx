@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
+import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
 
 // Función para formatear montos con separadores de miles (formato argentino)
 const formatCurrency = (value) => {
@@ -75,16 +76,12 @@ function CarpaReservationModal({
   const startStr = startDate || format(day, 'yyyy-MM-dd');
   const endStr = endDate || '';
 
-  // Función para verificar si una unidad está ocupada en un rango de fechas
-  const isUnitOccupied = (serviceType, unitNumber, start, end) => {
-    if (!start || !end) return false;
-    return reservationGroups?.some((g) => {
-      if (g.serviceType !== serviceType) return false;
-      if (Number(g.resourceNumber) !== unitNumber) return false;
-      if (g.status !== 'active') return false;
-      return g.startDate <= end && g.endDate >= start;
-    }) || false;
-  };
+  // Disponibilidad real de todo el periodo, pedida al servidor. Antes se
+  // miraba la lista de reservas de la app, que en esta seccion trae solo carpas
+  // y solo los 30 dias de la grilla: ninguna plaza figuraba ocupada y, en una
+  // estadia larga, una carpa tomada despues del dia 30 aparecia libre.
+  const principal = useUnidadesOcupadas('carpa', startStr, endStr, !isReserved);
+  const estacionamiento = useUnidadesOcupadas('parking', startStr, endStr, !isReserved && Boolean(includeParking));
 
   const startDateObj = parseLocalDateFromInput(startStr);
   const endDateObj = parseLocalDateFromInput(endStr);
@@ -140,6 +137,16 @@ function CarpaReservationModal({
   const parkingPaymentMissingMethod = includeParking && parkingPaymentAmountNum > 0 && !parkingInitialPaymentMethod;
 
   const hasPaymentError = paymentExceedsTotal || (includeParking && parkingPaymentExceedsTotal) || paymentMissingMethod || parkingPaymentMissingMethod;
+
+  // Una unidad ya elegida que choca con otra reserva en algun dia del periodo
+  // no se guarda: antes, con estacionamiento, App la cambiaba por otra plaza
+  // sin avisar.
+  const conflictoPrincipal = !isReserved && principal.ocupadas.has(Number(carpaNumero));
+  const conflictoEstacionamiento = Boolean(
+    !isReserved && includeParking && parkingSpotNumber && estacionamiento.ocupadas.has(Number(parkingSpotNumber))
+  );
+  const verificandoDisponibilidad = principal.verificando || Boolean(includeParking && estacionamiento.verificando);
+  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -197,12 +204,12 @@ function CarpaReservationModal({
                     }}
                   >
                     {Array.from({ length: totalCarpas }, (_, i) => i + 1).map((num) => {
-                      const isOccupied = isUnitOccupied('carpa', num, startStr, endStr);
+                      const isOccupied = principal.ocupadas.has(num);
                       return (
                         <option
                           key={num}
                           value={num}
-                          disabled={isOccupied}
+                          disabled={isOccupied && num !== carpaNumero}
                         >
                           Carpa {num}{isOccupied ? ' (ocupada)' : ''}
                         </option>
@@ -493,12 +500,12 @@ function CarpaReservationModal({
                     >
                       <option value="">Seleccionar plaza...</option>
                       {parkingUnits.map((num) => {
-                        const isOccupied = isUnitOccupied('parking', num, startStr, endStr);
+                        const isOccupied = estacionamiento.ocupadas.has(num);
                         return (
                           <option
                             key={num}
                             value={num}
-                            disabled={isOccupied}
+                            disabled={isOccupied && num !== Number(parkingSpotNumber)}
                           >
                             Plaza {num}{isOccupied ? ' (ocupada)' : ''}
                           </option>
@@ -616,6 +623,23 @@ function CarpaReservationModal({
             </div>
           )}
 
+          {/* Disponibilidad */}
+          {conflictoPrincipal && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ La carpa {carpaNumero} está ocupada en alguno de esos días. Elegí otra o cambiá las fechas.
+            </div>
+          )}
+          {conflictoEstacionamiento && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ La plaza {parkingSpotNumber} está ocupada en alguno de esos días. Elegí otra.
+            </div>
+          )}
+          {(principal.fallo || estacionamiento.fallo) && (
+            <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg border border-amber-200 mb-4">
+              No se pudo verificar la disponibilidad. Al guardar, el sistema igual controla que no se superponga con otra reserva.
+            </div>
+          )}
+
           {/* Mensajes de error de pago */}
           {paymentMissingMethod && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
@@ -632,12 +656,18 @@ function CarpaReservationModal({
             {!isReserved && (
               <button
                 type="button"
-                disabled={hasPaymentError}
-                className={`inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${hasPaymentError
+                disabled={bloqueaGuardar}
+                className={`inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${bloqueaGuardar
                   ? 'bg-slate-400 cursor-not-allowed'
                   : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
                   }`}
                 onClick={async () => {
+                  // Sin plaza elegida se asigna la primera libre en todo el
+                  // periodo. App la buscaba mirando solo los proximos 90 dias.
+                  const plazaAsignada =
+                    includeParking && !parkingSpotNumber
+                      ? parkingUnits.find((n) => !estacionamiento.ocupadas.has(n)) ?? null
+                      : parkingSpotNumber;
                   const ok = await onSaveRange(carpaNumero, startStr, endStr, {
                     // Sin esto la reserva se guardaba sin vincular al cliente elegido
                     // en el buscador: quedaba solo el nombre como texto.
@@ -646,7 +676,7 @@ function CarpaReservationModal({
                     customerPhone,
                     dailyPrice,
                     includeParking,
-                    parkingSpotNumber,
+                    parkingSpotNumber: plazaAsignada,
                     parkingDailyPrice,
                     initialPaymentAmount,
                     initialPaymentMethod,

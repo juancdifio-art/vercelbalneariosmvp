@@ -1,6 +1,6 @@
 import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CarpaReservationModal from './CarpaReservationModal';
 import SombrillaReservationModal from './SombrillaReservationModal';
@@ -18,6 +18,17 @@ function parseLocal(value) {
 }
 
 const CLIENTE = { id: 305, fullName: 'Valentina Rios', phone: '2262-445512' };
+
+// Los modales consultan la disponibilidad al servidor: sin reservas, todo libre.
+beforeEach(() => {
+  global.fetch = vi.fn(() =>
+    Promise.resolve({ ok: true, json: () => Promise.resolve({ reservationGroups: [] }) })
+  );
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const MODALES = [
   { nombre: 'carpa', Modal: CarpaReservationModal, clave: 'carpaNumero' },
@@ -58,7 +69,10 @@ describe.each(MODALES)('modal de $nombre', ({ Modal, clave }) => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /Guardar reserva/ }));
+    // Guardar queda deshabilitado mientras se verifica la disponibilidad.
+    const guardar = screen.getByRole('button', { name: /Guardar reserva/ });
+    await waitFor(() => expect(guardar).toBeEnabled());
+    await user.click(guardar);
 
     expect(onSaveRange).toHaveBeenCalledTimes(1);
     const extra = onSaveRange.mock.calls[0][3];

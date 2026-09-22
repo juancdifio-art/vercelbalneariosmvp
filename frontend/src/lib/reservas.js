@@ -144,3 +144,20 @@ export function deudasPorCliente(reservas, hoy) {
   }
   return porCliente;
 }
+
+/**
+ * Unidades de un servicio ocupadas en algun dia del periodo [desde, hasta].
+ * Alcanza con que se superpongan un solo dia: una plaza tomada el ultimo dia
+ * de la estadia no se puede ofrecer.
+ */
+export function unidadesOcupadas(reservas, serviceType, desde, hasta) {
+  const ocupadas = new Set();
+  if (!desde || !hasta) return ocupadas;
+  const [a, b] = desde <= hasta ? [desde, hasta] : [hasta, desde];
+  for (const g of reservas || []) {
+    if (g.serviceType !== serviceType) continue;
+    if (g.status === 'cancelled') continue;
+    if (g.startDate <= b && g.endDate >= a) ocupadas.add(Number(g.resourceNumber));
+  }
+  return ocupadas;
+}

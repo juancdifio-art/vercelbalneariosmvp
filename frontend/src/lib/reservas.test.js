@@ -7,7 +7,8 @@ import {
   estadoDeCuenta,
   diasOcupadaDesde,
   deudasPorCliente,
-  hoyISO
+  hoyISO,
+  unidadesOcupadas
 } from './reservas';
 
 const HOY = '2026-09-22';
@@ -192,5 +193,46 @@ describe('deudasPorCliente', () => {
     );
     expect(deudas.get(5).monto).toBe(100000);
     expect(deudas.get(9).monto).toBe(20000);
+  });
+});
+
+describe('unidadesOcupadas', () => {
+  const p = (resourceNumber, startDate, endDate, status = 'active', serviceType = 'parking') => ({
+    serviceType, resourceNumber, startDate, endDate, status
+  });
+
+  it('marca la plaza aunque se superponga un solo dia', () => {
+    // La reserva nueva va del 22/09 al 10/04; la plaza 3 se ocupa solo el 10/04.
+    const ocupadas = unidadesOcupadas([p(3, '2027-04-10', '2027-04-20')], 'parking', '2026-09-22', '2027-04-10');
+    expect(ocupadas.has(3)).toBe(true);
+  });
+
+  it('una estadia larga de otro cliente ocupa la plaza en todo el periodo', () => {
+    const ocupadas = unidadesOcupadas([p(1, '2026-09-22', '2027-03-28')], 'parking', '2026-12-01', '2026-12-05');
+    expect(ocupadas.has(1)).toBe(true);
+  });
+
+  it('no marca las que terminan antes o empiezan despues', () => {
+    const ocupadas = unidadesOcupadas(
+      [p(1, '2026-09-01', '2026-09-21'), p(2, '2026-10-01', '2026-10-10')],
+      'parking', '2026-09-22', '2026-09-30'
+    );
+    expect(ocupadas.size).toBe(0);
+  });
+
+  it('ignora canceladas y otros servicios', () => {
+    const ocupadas = unidadesOcupadas(
+      [p(1, '2026-09-22', '2026-09-30', 'cancelled'), p(2, '2026-09-22', '2026-09-30', 'active', 'carpa')],
+      'parking', '2026-09-22', '2026-09-30'
+    );
+    expect(ocupadas.size).toBe(0);
+  });
+
+  it('acepta las fechas al reves', () => {
+    expect(unidadesOcupadas([p(1, '2026-09-25', '2026-09-26')], 'parking', '2026-09-30', '2026-09-22').has(1)).toBe(true);
+  });
+
+  it('sin las dos fechas no hay nada que chequear', () => {
+    expect(unidadesOcupadas([p(1, '2026-09-25', '2026-09-26')], 'parking', '2026-09-22', '').size).toBe(0);
   });
 });
