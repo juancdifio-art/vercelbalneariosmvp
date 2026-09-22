@@ -947,8 +947,11 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.pool_children_count,
         rg.pool_adult_price_per_day,
         rg.pool_child_price_per_day,
+        c.document_number AS client_document_number,
         COALESCE(SUM(rp.amount), 0) AS paid_amount
       FROM reservation_groups rg
+      LEFT JOIN clients c
+        ON c.id = rg.client_id
       LEFT JOIN reservation_payments rp
         ON rp.establishment_id = rg.establishment_id
        AND rp.reservation_group_id = rg.id
@@ -1035,7 +1038,8 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.pool_adults_count,
         rg.pool_children_count,
         rg.pool_adult_price_per_day,
-        rg.pool_child_price_per_day
+        rg.pool_child_price_per_day,
+        c.document_number
       ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
     const result = await pool.query(query, params);
@@ -1062,6 +1066,7 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         poolChildrenCount: row.pool_children_count,
         poolAdultPricePerDay: row.pool_adult_price_per_day,
         poolChildPricePerDay: row.pool_child_price_per_day,
+        clientDocumentNumber: row.client_document_number || null,
         paidAmount: Number(row.paid_amount || 0)
       }))
     });

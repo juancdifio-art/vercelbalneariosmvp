@@ -845,8 +845,11 @@ module.exports = async (req, res) => {
             rg.client_id,
             rg.adults_count,
             rg.children_count,
+            c.document_number AS client_document_number,
             COALESCE(SUM(rp.amount), 0) AS paid_amount
           FROM reservation_groups rg
+          LEFT JOIN clients c
+            ON c.id = rg.client_id
           LEFT JOIN reservation_payments rp
             ON rp.establishment_id = rg.establishment_id
            AND rp.reservation_group_id = rg.id
@@ -936,7 +939,8 @@ module.exports = async (req, res) => {
             rg.status,
             rg.client_id,
             rg.adults_count,
-            rg.children_count
+            rg.children_count,
+            c.document_number
           ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
         const result = await db.query(query, params);
@@ -962,6 +966,7 @@ module.exports = async (req, res) => {
             status: row.status,
             clientId: row.client_id,
             adultsCount: row.adults_count || 0,
+            clientDocumentNumber: row.client_document_number || null,
             childrenCount: row.children_count || 0,
             paidAmount: Number(row.paid_amount || 0)
           }))

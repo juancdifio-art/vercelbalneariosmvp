@@ -51,3 +51,6 @@ coverage/
 
 # Artefactos de Playwright MCP (capturas y snapshots de sesiones de prueba)
 .playwright-mcp/
+
+# Comprobantes generados en pruebas locales
+comprobantes/

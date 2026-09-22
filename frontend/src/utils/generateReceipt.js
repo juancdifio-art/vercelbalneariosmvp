@@ -1,5 +1,18 @@
 import { jsPDF } from 'jspdf';
 import { format } from '../lib/dates';
+/** Formato argentino: $126.000,00. El resto de la app ya lo usa. */
+function pesos(valor) {
+  const n = Number.parseFloat(valor) || 0;
+  return '$' + n.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Las fechas llegan como yyyy-mm-dd desde la API y se muestran dd/MM/yyyy. */
+function fecha(iso) {
+  if (!iso) return '-';
+  const [a, m, d] = String(iso).slice(0, 10).split('-');
+  return d && m && a ? `${d}/${m}/${a}` : String(iso);
+}
+
 export function generateReceipt(reservation, establishment) {
   const doc = new jsPDF();
   
@@ -32,9 +45,14 @@ export function generateReceipt(reservation, establishment) {
   doc.text(receiptTitle, centerX, yPos, { align: 'center' });
   yPos += 3;
   
-  doc.setFontSize(8);
-  doc.text('Recibo de Pago', centerX, yPos, { align: 'center' });
-  yPos += 5;
+  // El subtitulo solo tiene sentido en el pase de pileta, donde el titulo de
+  // arriba dice otra cosa. En un recibo normal era la misma linea repetida.
+  if (isPoolPass) {
+    doc.setFontSize(8);
+    doc.text('Recibo de Pago', centerX, yPos, { align: 'center' });
+    yPos += 2;
+  }
+  yPos += 3;
   
   // Número de reserva
   doc.setFontSize(8);
@@ -72,7 +90,7 @@ export function generateReceipt(reservation, establishment) {
   doc.text('DNI:', leftMargin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...primaryColor);
-  doc.text('-', rightMargin, yPos, { align: 'right' });
+  doc.text(reservation.clientDocumentNumber || '-', rightMargin, yPos, { align: 'right' });
   yPos += 4;
   
   // Teléfono
@@ -129,7 +147,7 @@ export function generateReceipt(reservation, establishment) {
   doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primaryColor);
-  doc.text(`${reservation.startDate} - ${reservation.endDate}`, rightMargin, yPos, { align: 'right' });
+  doc.text(`${fecha(reservation.startDate)} - ${fecha(reservation.endDate)}`, rightMargin, yPos, { align: 'right' });
   yPos += 5;
 
   if (isPoolPass) {
@@ -153,7 +171,7 @@ export function generateReceipt(reservation, establishment) {
   doc.text('Total Reserva:', leftMargin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...primaryColor);
-  doc.text(`$${totalPrice.toFixed(2)}`, rightMargin, yPos, { align: 'right' });
+  doc.text(pesos(totalPrice), rightMargin, yPos, { align: 'right' });
   yPos += 4;
   
   // Estacionamiento asociado (si existe y no es una reserva de parking)
@@ -214,7 +232,7 @@ export function generateReceipt(reservation, establishment) {
     doc.text('Fecha de Pago:', leftMargin, yPos);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...primaryColor);
-    doc.text(lastPayment.paymentDate, rightMargin, yPos, { align: 'right' });
+    doc.text(fecha(lastPayment.paymentDate), rightMargin, yPos, { align: 'right' });
     yPos += 4;
     
     // Método de Pago
@@ -249,7 +267,7 @@ export function generateReceipt(reservation, establishment) {
   const paidAmount = parseFloat(reservation.paidAmount || 0);
   doc.text('MONTO PAGADO:', leftMargin + 5, yPos + 7);
   doc.setFontSize(12);
-  doc.text(`$${paidAmount.toFixed(2)}`, rightMargin - 5, yPos + 7, { align: 'right' });
+  doc.text(pesos(paidAmount), rightMargin - 5, yPos + 7, { align: 'right' });
   yPos += 14;
   
   // Línea separadora
@@ -271,7 +289,7 @@ export function generateReceipt(reservation, establishment) {
   doc.text('Total a Pagar:', leftMargin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...primaryColor);
-  doc.text(`$${totalPrice.toFixed(2)}`, rightMargin, yPos, { align: 'right' });
+  doc.text(pesos(totalPrice), rightMargin, yPos, { align: 'right' });
   yPos += 5;
   
   // Historial de Pagos
@@ -294,9 +312,9 @@ export function generateReceipt(reservation, establishment) {
       doc.setFontSize(7);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(...primaryColor);
-      doc.text(`${index + 1}. ${payment.paymentDate} - ${methodLabel}`, leftMargin + 4, yPos + 2);
+      doc.text(`${index + 1}. ${fecha(payment.paymentDate)} - ${methodLabel}`, leftMargin + 4, yPos + 2);
       doc.setFont('helvetica', 'bold');
-      doc.text(`$${parseFloat(payment.amount).toFixed(2)}`, rightMargin - 4, yPos + 2, { align: 'right' });
+      doc.text(pesos(payment.amount), rightMargin - 4, yPos + 2, { align: 'right' });
       yPos += 8;
     });
   }
@@ -311,7 +329,7 @@ export function generateReceipt(reservation, establishment) {
   doc.text('Total Pagado:', leftMargin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...primaryColor);
-  doc.text(`$${paidAmount.toFixed(2)}`, rightMargin, yPos, { align: 'right' });
+  doc.text(pesos(paidAmount), rightMargin, yPos, { align: 'right' });
   yPos += 4;
   
   // Saldo Pendiente
@@ -320,7 +338,7 @@ export function generateReceipt(reservation, establishment) {
   doc.text('Saldo Pendiente:', leftMargin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...primaryColor);
-  doc.text(`$${balance.toFixed(2)}`, rightMargin, yPos, { align: 'right' });
+  doc.text(pesos(balance), rightMargin, yPos, { align: 'right' });
   yPos += 6;
   
   // Estado final (botón verde o amarillo)
@@ -337,7 +355,7 @@ export function generateReceipt(reservation, establishment) {
     doc.setFontSize(9);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
-    doc.text(`SALDO: $${balance.toFixed(2)}`, centerX, yPos + 6, { align: 'center' });
+    doc.text(`SALDO: ${pesos(balance)}`, centerX, yPos + 6, { align: 'center' });
   }
   yPos += 12;
   
