@@ -845,6 +845,8 @@ module.exports = async (req, res) => {
             rg.client_id,
             rg.adults_count,
             rg.children_count,
+            rg.pool_adult_price_per_day,
+            rg.pool_child_price_per_day,
             c.document_number AS client_document_number,
             COALESCE(SUM(rp.amount), 0) AS paid_amount
           FROM reservation_groups rg
@@ -940,6 +942,8 @@ module.exports = async (req, res) => {
             rg.client_id,
             rg.adults_count,
             rg.children_count,
+            rg.pool_adult_price_per_day,
+            rg.pool_child_price_per_day,
             c.document_number
           ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
@@ -968,6 +972,8 @@ module.exports = async (req, res) => {
             adultsCount: row.adults_count || 0,
             clientDocumentNumber: row.client_document_number || null,
             childrenCount: row.children_count || 0,
+            poolAdultPricePerDay: row.pool_adult_price_per_day,
+            poolChildPricePerDay: row.pool_child_price_per_day,
             paidAmount: Number(row.paid_amount || 0)
           }))
         }));
@@ -986,7 +992,7 @@ module.exports = async (req, res) => {
 
       try {
         const body = await parseJsonBody(req);
-        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId, adultsCount, childrenCount } = body;
+        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId, adultsCount, childrenCount, poolAdultPricePerDay, poolChildPricePerDay } = body;
 
         // Validate required fields
         if (!serviceType || !resourceNumber || !startDate || !endDate || !customerName) {
@@ -1043,8 +1049,8 @@ module.exports = async (req, res) => {
 
         // Insert reservation group
         const insertResult = await db.query(
-          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
-          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0]
+          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
+          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0, poolAdultPricePerDay || null, poolChildPricePerDay || null]
         );
 
         const row = insertResult.rows[0];
@@ -1067,6 +1073,8 @@ module.exports = async (req, res) => {
             clientId: row.client_id,
             adultsCount: row.adults_count || 0,
             childrenCount: row.children_count || 0,
+            poolAdultPricePerDay: row.pool_adult_price_per_day,
+            poolChildPricePerDay: row.pool_child_price_per_day,
             paidAmount: 0,
             createdAt: row.created_at
           }
@@ -1135,7 +1143,7 @@ module.exports = async (req, res) => {
         }
 
         // Update other fields
-        const { customerName, customerPhone, dailyPrice, totalPrice, notes, adultsCount, childrenCount, resourceNumber, startDate, endDate } = body;
+        const { customerName, customerPhone, dailyPrice, totalPrice, notes, adultsCount, childrenCount, poolAdultPricePerDay, poolChildPricePerDay, resourceNumber, startDate, endDate } = body;
 
         // Calcular las fechas finales (nuevas o actuales)
         const finalStartDate = startDate !== undefined ? startDate : current.start_date;
@@ -1176,7 +1184,7 @@ module.exports = async (req, res) => {
         }
 
         const updateResult = await db.query(
-          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10 WHERE id = $11 RETURNING *`,
+          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10, pool_adult_price_per_day = $11, pool_child_price_per_day = $12 WHERE id = $13 RETURNING *`,
           [
             customerName !== undefined ? customerName : current.customer_name,
             customerPhone !== undefined ? customerPhone : current.customer_phone,
@@ -1188,6 +1196,8 @@ module.exports = async (req, res) => {
             finalResourceNumber,
             finalStartDate,
             finalEndDate,
+            poolAdultPricePerDay !== undefined ? poolAdultPricePerDay : current.pool_adult_price_per_day,
+            poolChildPricePerDay !== undefined ? poolChildPricePerDay : current.pool_child_price_per_day,
             reservationGroupId
           ]
         );
@@ -1210,7 +1220,9 @@ module.exports = async (req, res) => {
             status: row.status,
             clientId: row.client_id,
             adultsCount: row.adults_count || 0,
-            childrenCount: row.children_count || 0
+            childrenCount: row.children_count || 0,
+            poolAdultPricePerDay: row.pool_adult_price_per_day,
+            poolChildPricePerDay: row.pool_child_price_per_day
           }
         }));
       } catch (error) {

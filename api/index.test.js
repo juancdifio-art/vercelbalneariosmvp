@@ -182,3 +182,58 @@ describe('PATCH /api/auth/email', () => {
     expect(queryMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('precios de pileta en /api/reservation-groups', () => {
+  it('guarda los precios por adulto y por nino al crear un pase', async () => {
+    // En pileta no se chequea solapamiento: despues del establecimiento va el INSERT.
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] }); // establecimiento
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 99, service_type: 'pileta', adults_count: 2, children_count: 1, pool_adult_price_per_day: '6000.00', pool_child_price_per_day: '3500.00' }] });
+
+    const res = await request(handler)
+      .post('/?route=reservation-groups')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({
+        serviceType: 'pileta', resourceNumber: 1,
+        startDate: '2026-09-22', endDate: '2026-09-22',
+        customerName: 'Prueba', adultsCount: 2, childrenCount: 1,
+        poolAdultPricePerDay: 6000, poolChildPricePerDay: 3500
+      });
+
+    expect(res.status).toBe(201);
+    const insert = queryMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO reservation_groups'));
+    expect(String(insert[0])).toContain('pool_adult_price_per_day');
+    expect(insert[1]).toContain(6000);
+    expect(insert[1]).toContain(3500);
+  });
+
+  it('los devuelve al leer la reserva', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({
+      rows: [{ id: 99, service_type: 'pileta', resource_number: 1, start_date: '2026-09-22', end_date: '2026-09-22', adults_count: 2, children_count: 1, pool_adult_price_per_day: '6000.00', pool_child_price_per_day: '3500.00', paid_amount: 0 }]
+    });
+
+    const res = await request(handler)
+      .get('/?route=reservation-groups')
+      .set('Authorization', `Bearer ${tokenPara(2)}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.reservationGroups[0].poolAdultPricePerDay).toBe('6000.00');
+    expect(res.body.reservationGroups[0].poolChildPricePerDay).toBe('3500.00');
+  });
+
+  it('los actualiza al editar el pase', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 99, adults_count: 2, children_count: 1, pool_adult_price_per_day: '6000.00', pool_child_price_per_day: '3500.00' }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 99, service_type: 'pileta', adults_count: 3, children_count: 1, pool_adult_price_per_day: '7000.00', pool_child_price_per_day: '3500.00' }] });
+
+    const res = await request(handler)
+      .patch('/?route=reservation-groups/99')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ adultsCount: 3, poolAdultPricePerDay: 7000 });
+
+    expect(res.status).toBe(200);
+    const update = queryMock.mock.calls.find((c) => String(c[0]).includes('UPDATE reservation_groups'));
+    expect(String(update[0])).toContain('pool_adult_price_per_day');
+    expect(res.body.reservationGroup.poolAdultPricePerDay).toBe('7000.00');
+  });
+});
