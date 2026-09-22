@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { isToday, parseISO, differenceInCalendarDays, isTomorrow } from 'date-fns';
 import { format } from '../lib/dates';
+import { formatPesos } from '../lib/money';
 import { getApiBaseUrl } from '../apiConfig';
 import {
   ServiceIcon,
@@ -216,7 +217,7 @@ function DashboardSection({
               <IngresosIcon className="h-6 w-6 text-emerald-600" />
               <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wide">Ingresos</span>
             </div>
-            <p className="text-3xl font-bold text-emerald-900">${todayIncome.toFixed(0)}</p>
+            <p className="text-3xl font-bold text-emerald-900">{formatPesos(todayIncome, 0)}</p>
             <p className="text-xs text-emerald-700 mt-1">Pagos de hoy</p>
           </div>
 
@@ -399,7 +400,7 @@ function DashboardSection({
                       </div>
                       {group.totalPrice && (
                         <span className="text-sm font-bold text-emerald-700">
-                          ${parseFloat(group.totalPrice).toFixed(0)}
+                          {formatPesos(group.totalPrice, 0)}
                         </span>
                       )}
                     </div>
@@ -459,7 +460,7 @@ function DashboardSection({
                         </div>
                       </div>
                       <span className="text-sm font-bold text-emerald-700">
-                        ${parseFloat(payment.amount).toFixed(0)}
+                        {formatPesos(payment.amount, 0)}
                       </span>
                     </div>
                   </button>
@@ -556,7 +557,7 @@ function DashboardSection({
                       </div>
                       {group.totalPrice && (
                         <span className="text-sm font-bold text-slate-700">
-                          ${parseFloat(group.totalPrice).toFixed(0)}
+                          {formatPesos(group.totalPrice, 0)}
                         </span>
                       )}
                     </div>
