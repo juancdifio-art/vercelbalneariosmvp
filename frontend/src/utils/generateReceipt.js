@@ -160,10 +160,9 @@ export function generateReceipt(reservation, establishment) {
   yPos += 5;
 
   if (isPoolPass) {
-    // El backend local devuelve poolAdultsCount y el de produccion adultsCount:
     // son dos implementaciones de la API que divergieron. Se aceptan los dos.
-    const adults = Number.parseInt(String(reservation.poolAdultsCount ?? reservation.adultsCount ?? '0'), 10) || 0;
-    const children = Number.parseInt(String(reservation.poolChildrenCount ?? reservation.childrenCount ?? '0'), 10) || 0;
+    const adults = Number.parseInt(String(reservation.adultsCount ?? '0'), 10) || 0;
+    const children = Number.parseInt(String(reservation.childrenCount ?? '0'), 10) || 0;
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');

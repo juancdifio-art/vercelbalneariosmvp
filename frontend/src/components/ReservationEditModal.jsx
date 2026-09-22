@@ -349,7 +349,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                   <input
                     type="number"
                     min="0"
-                    value={modal.tempPoolAdultsCount ?? modal.poolAdultsCount ?? ''}
+                    value={modal.tempPoolAdultsCount ?? modal.adultsCount ?? ''}
                     onChange={(e) =>
                       setModal((prev) =>
                         prev
@@ -368,7 +368,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                   <input
                     type="number"
                     min="0"
-                    value={modal.tempPoolChildrenCount ?? modal.poolChildrenCount ?? ''}
+                    value={modal.tempPoolChildrenCount ?? modal.childrenCount ?? ''}
                     onChange={(e) =>
                       setModal((prev) =>
                         prev
@@ -427,8 +427,8 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
               </div>
               {/* Total calculado para pileta */}
               {(() => {
-                const adults = Number.parseInt(String(modal.tempPoolAdultsCount ?? modal.poolAdultsCount ?? '0'), 10) || 0;
-                const children = Number.parseInt(String(modal.tempPoolChildrenCount ?? modal.poolChildrenCount ?? '0'), 10) || 0;
+                const adults = Number.parseInt(String(modal.tempPoolAdultsCount ?? modal.adultsCount ?? '0'), 10) || 0;
+                const children = Number.parseInt(String(modal.tempPoolChildrenCount ?? modal.childrenCount ?? '0'), 10) || 0;
                 const adultPrice = Number.parseFloat(String(modal.tempPoolAdultPricePerDay ?? modal.poolAdultPricePerDay ?? '0')) || 0;
                 const childPrice = Number.parseFloat(String(modal.tempPoolChildPricePerDay ?? modal.poolChildPricePerDay ?? '0')) || 0;
 

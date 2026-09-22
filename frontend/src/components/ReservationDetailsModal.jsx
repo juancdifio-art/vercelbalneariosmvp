@@ -42,8 +42,6 @@ function ReservationDetailsModal({
     notes,
     status,
     linkedParkingResourceNumber,
-    poolAdultsCount,
-    poolChildrenCount,
     adultsCount,
     childrenCount
   } = reservation;
@@ -269,7 +267,7 @@ function ReservationDetailsModal({
                   <div className="flex-1">
                     <p className="text-[10px] text-slate-500 font-medium">Composición pileta</p>
                     <p className="text-xs font-semibold text-slate-900">
-                      Adultos: {Number(poolAdultsCount ?? adultsCount ?? 0)} · Niños: {Number(poolChildrenCount ?? childrenCount ?? 0)}
+                      Adultos: {Number(adultsCount ?? 0)} · Niños: {Number(childrenCount ?? 0)}
                     </p>
                   </div>
                 </div>
