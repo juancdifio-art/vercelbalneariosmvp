@@ -4,6 +4,7 @@ import { format } from '../lib/dates';
 import { getApiBaseUrl } from '../apiConfig';
 import {
   ServiceIcon,
+  COLOR_SERVICIO,
   ResumenIcon,
   ActivasHoyIcon,
   IngresosIcon,
@@ -163,9 +164,11 @@ function DashboardSection({
   }, [reservationGroups, checkInsFilter]);
 
   // El tamano viene del que la llama porque el mismo icono aparece chico en el
-  // chip del filtro y grande en las filas de los listados.
+  // chip del filtro y grande en las filas de los listados. El color, en cambio,
+  // lo pone el servicio: en un listado mezclado es lo que deja distinguir una
+  // reserva de carpa de una de pileta sin leer la etiqueta.
   const getServiceIcon = (type, className = 'h-5 w-5') => (
-    <ServiceIcon serviceId={type} className={className} />
+    <ServiceIcon serviceId={type} className={`${className} ${COLOR_SERVICIO[type] || 'text-slate-500'}`} />
   );
 
   const getServiceLabel = (type) => {
@@ -260,7 +263,7 @@ function DashboardSection({
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <ServiceIcon serviceId="carpas" className="h-6 w-6 text-orange-500" />
+                  <ServiceIcon serviceId="carpas" className={`h-6 w-6 ${COLOR_SERVICIO.carpas}`} />
                   <span className="text-sm font-bold text-slate-800">Carpas</span>
                 </div>
                 <span className="text-xs font-semibold text-slate-600">
@@ -291,7 +294,7 @@ function DashboardSection({
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <ServiceIcon serviceId="sombrillas" className="h-6 w-6 text-purple-500" />
+                  <ServiceIcon serviceId="sombrillas" className={`h-6 w-6 ${COLOR_SERVICIO.sombrillas}`} />
                   <span className="text-sm font-bold text-slate-800">Sombrillas</span>
                 </div>
                 <span className="text-xs font-semibold text-slate-600">
@@ -322,7 +325,7 @@ function DashboardSection({
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <ServiceIcon serviceId="parking" className="h-6 w-6 text-sky-500" />
+                  <ServiceIcon serviceId="parking" className={`h-6 w-6 ${COLOR_SERVICIO.parking}`} />
                   <span className="text-sm font-bold text-slate-800">Estacionamiento</span>
                 </div>
                 <span className="text-xs font-semibold text-slate-600">
@@ -381,7 +384,7 @@ function DashboardSection({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                        {getServiceIcon(group.serviceType, 'h-6 w-6 text-slate-500 shrink-0')}
+                        {getServiceIcon(group.serviceType, 'h-6 w-6 shrink-0')}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-slate-900">
                             {getServiceLabel(group.serviceType)} {group.resourceNumber}
@@ -434,7 +437,7 @@ function DashboardSection({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                        {getServiceIcon(payment.serviceType, 'h-6 w-6 text-slate-500 shrink-0')}
+                        {getServiceIcon(payment.serviceType, 'h-6 w-6 shrink-0')}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-slate-900">
                             {getServiceLabel(payment.serviceType)} {payment.resourceNumber}
@@ -530,7 +533,7 @@ function DashboardSection({
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                        {getServiceIcon(group.serviceType, 'h-6 w-6 text-slate-500 shrink-0')}
+                        {getServiceIcon(group.serviceType, 'h-6 w-6 shrink-0')}
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-semibold text-slate-900">
                             {getServiceLabel(group.serviceType)} {group.resourceNumber}

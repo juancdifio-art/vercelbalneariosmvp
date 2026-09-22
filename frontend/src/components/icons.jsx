@@ -117,6 +117,22 @@ export const PagosIcon = conTrazo(Banknote);
 export const CheckInsIcon = conTrazo(CalendarClock);
 export const CerrarIcon = conTrazo(X);
 
+/**
+ * Color de cada servicio. Unica fuente: si el naranja de carpas se define en
+ * cada pantalla por separado, tarde o temprano una queda distinta.
+ *
+ * Los cuatro se eligieron bien separados en el circulo cromatico para que en
+ * una lista mezclada se distingan de un vistazo, sin leer la etiqueta.
+ */
+export const COLOR_SERVICIO = {
+  carpas: 'text-orange-500',
+  carpa: 'text-orange-500',
+  sombrillas: 'text-purple-500',
+  sombrilla: 'text-purple-500',
+  parking: 'text-sky-500',
+  pileta: 'text-teal-500'
+};
+
 /** Icono de un servicio en la vista rapida. serviceId: carpas | sombrillas | parking */
 export function ServiceIcon({ serviceId, className = '' }) {
   const Icon = POR_SERVICIO[serviceId];
