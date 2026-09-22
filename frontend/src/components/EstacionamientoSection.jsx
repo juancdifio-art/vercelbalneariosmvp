@@ -1,6 +1,7 @@
 import React from 'react';
 import { addDays, isSameDay } from 'date-fns';
 import { format, weekdayInitial } from '../lib/dates';
+import ReservaEtiqueta from './ReservaEtiqueta';
 function EstacionamientoSection({
   establishment,
   parkingDayOffset,
@@ -148,7 +149,7 @@ function EstacionamientoSection({
                         }
 
                         let cellClasses =
-                          'h-5 border-l border-slate-300 transition-colors cursor-pointer ';
+                          'relative h-5 border-l border-slate-300 transition-colors cursor-pointer ';
 
                         if (isReserved) {
                           const paletteSize = CARPA_RESERVATION_COLORS.length || 1;
@@ -253,7 +254,14 @@ function EstacionamientoSection({
                                 dailyPrice: ''
                               });
                             }}
-                          />
+                          >
+                            <ReservaEtiqueta
+                              group={groupForCell}
+                              dateStr={dateStr}
+                              esPrimeraColumna={idx === 0}
+                              ultimoDiaVentana={format(days[days.length - 1], 'yyyy-MM-dd')}
+                            />
+                          </td>
                         );
                       })}
                     </tr>
