@@ -639,6 +639,9 @@ function CarpaReservationModal({
                   }`}
                 onClick={async () => {
                   const ok = await onSaveRange(carpaNumero, startStr, endStr, {
+                    // Sin esto la reserva se guardaba sin vincular al cliente elegido
+                    // en el buscador: quedaba solo el nombre como texto.
+                    clientId,
                     customerName,
                     customerPhone,
                     dailyPrice,
