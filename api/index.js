@@ -251,6 +251,62 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/auth/password =============
+    if (first === 'auth' && second === 'password') {
+      if (method !== 'POST') {
+        res.statusCode = 405;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'method_not_allowed' }));
+      }
+
+      const auth = authenticateToken(req, res);
+      if (!auth) return;
+
+      try {
+        const { currentPassword, newPassword } = await parseJsonBody(req);
+
+        if (!currentPassword || !newPassword) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'missing_fields' }));
+        }
+
+        if (String(newPassword).length < 8) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'password_too_short' }));
+        }
+
+        const result = await db.query('SELECT password_hash FROM users WHERE id = $1', [auth.id]);
+
+        if (result.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'user_not_found' }));
+        }
+
+        const matches = await bcrypt.compare(currentPassword, result.rows[0].password_hash);
+
+        if (!matches) {
+          res.statusCode = 401;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'invalid_password' }));
+        }
+
+        const nextHash = await bcrypt.hash(newPassword, 12);
+        await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [nextHash, auth.id]);
+
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ success: true }));
+      } catch (error) {
+        console.error('Error in /api/auth/password:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // ============= /api/auth/login =============
     if (first === 'auth' && second === 'login') {
       if (method !== 'POST') {

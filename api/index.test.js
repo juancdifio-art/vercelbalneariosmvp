@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 import { queryMock } from './test/pg-mock.js';
 
 // El pool se reemplaza por alias en vitest.config.mjs (ver test/pg-mock.js).
@@ -52,5 +53,60 @@ describe('GET /api/auth/me', () => {
       role: 'admin',
       createdAt: '2025-11-23T10:00:00.000Z'
     });
+  });
+});
+
+describe('POST /api/auth/password', () => {
+  it('rechaza si falta algun campo', async () => {
+    const res = await request(handler)
+      .post('/?route=auth/password')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ currentPassword: 'admin123' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('missing_fields');
+  });
+
+  it('rechaza una contrasena nueva de menos de 8 caracteres', async () => {
+    const res = await request(handler)
+      .post('/?route=auth/password')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ currentPassword: 'admin123', newPassword: 'corta' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('password_too_short');
+  });
+
+  it('rechaza si la contrasena actual no coincide', async () => {
+    const hash = await bcrypt.hash('admin123', 10);
+    queryMock.mockResolvedValueOnce({ rows: [{ password_hash: hash }] });
+
+    const res = await request(handler)
+      .post('/?route=auth/password')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ currentPassword: 'equivocada', newPassword: 'unaClaveLarga' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe('invalid_password');
+  });
+
+  it('guarda el hash nuevo con rounds 12', async () => {
+    const hash = await bcrypt.hash('admin123', 10);
+    queryMock.mockResolvedValueOnce({ rows: [{ password_hash: hash }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+
+    const res = await request(handler)
+      .post('/?route=auth/password')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ currentPassword: 'admin123', newPassword: 'unaClaveLarga' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ success: true });
+
+    // Segunda llamada = el UPDATE. El hash viaja como primer parametro.
+    const [sql, params] = queryMock.mock.calls[1];
+    expect(sql).toContain('UPDATE users');
+    expect(params[0]).toMatch(/^\$2[aby]\$12\$/);
+    expect(await bcrypt.compare('unaClaveLarga', params[0])).toBe(true);
   });
 });
