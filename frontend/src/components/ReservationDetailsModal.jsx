@@ -5,6 +5,7 @@ import { getApiBaseUrl } from '../apiConfig';
 import { formatPesos } from '../lib/money';
 import { otrasReservasVigentes, saldoDe, hoyISO } from '../lib/reservas';
 import { ServiceIcon, COLOR_SERVICIO } from './icons';
+import PersonasReserva from './PersonasReserva';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -390,6 +391,12 @@ function ReservationDetailsModal({
               </div>
             );
           })()}
+
+          <PersonasReserva
+            reservationGroupId={id}
+            adultsCount={adultsCount}
+            childrenCount={childrenCount}
+          />
 
           {/* Payments section */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">
