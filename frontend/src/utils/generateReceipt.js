@@ -13,6 +13,15 @@ function fecha(iso) {
   return d && m && a ? `${d}/${m}/${a}` : String(iso);
 }
 
+/** Local devuelve `method` y produccion `paymentMethod`; se aceptan los dos. */
+function metodoDe(pago) {
+  const m = pago && (pago.method || pago.paymentMethod);
+  if (m === 'cash') return 'Efectivo';
+  if (m === 'transfer') return 'Transferencia';
+  if (m === 'card') return 'Tarjeta';
+  return 'Otro';
+}
+
 export function generateReceipt(reservation, establishment) {
   const doc = new jsPDF();
   
@@ -151,8 +160,10 @@ export function generateReceipt(reservation, establishment) {
   yPos += 5;
 
   if (isPoolPass) {
-    const adults = Number.parseInt(String(reservation.poolAdultsCount ?? '0'), 10) || 0;
-    const children = Number.parseInt(String(reservation.poolChildrenCount ?? '0'), 10) || 0;
+    // El backend local devuelve poolAdultsCount y el de produccion adultsCount:
+    // son dos implementaciones de la API que divergieron. Se aceptan los dos.
+    const adults = Number.parseInt(String(reservation.poolAdultsCount ?? reservation.adultsCount ?? '0'), 10) || 0;
+    const children = Number.parseInt(String(reservation.poolChildrenCount ?? reservation.childrenCount ?? '0'), 10) || 0;
 
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
@@ -236,9 +247,7 @@ export function generateReceipt(reservation, establishment) {
     yPos += 4;
     
     // Método de Pago
-    const methodLabel = lastPayment.method === 'cash' ? 'Efectivo' :
-                       lastPayment.method === 'transfer' ? 'Transferencia' :
-                       lastPayment.method === 'card' ? 'Tarjeta' : 'Otro';
+    const methodLabel = metodoDe(lastPayment);
     
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...grayText);
@@ -301,9 +310,7 @@ export function generateReceipt(reservation, establishment) {
     yPos += 4;
     
     reservation.payments.forEach((payment, index) => {
-      const methodLabel = payment.method === 'cash' ? 'Efectivo' :
-                         payment.method === 'transfer' ? 'Transferencia' :
-                         payment.method === 'card' ? 'Tarjeta' : 'Otro';
+      const methodLabel = metodoDe(payment);
       
       // Fondo amarillo claro para cada pago
       doc.setFillColor(255, 248, 220);
