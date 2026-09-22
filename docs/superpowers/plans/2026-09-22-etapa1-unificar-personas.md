@@ -49,7 +49,7 @@
 - Consumes: nada.
 - Produces: en las dos bases, `reservation_groups` con `adults_count`, `children_count`, `pool_adult_price_per_day` y `pool_child_price_per_day`.
 
-- [ ] **Step 1: Migración de la base local**
+- [x] **Step 1: Migración de la base local**
 
 Crear `backend/migrate-unificar-personas-local.sql`:
 
@@ -71,7 +71,7 @@ UPDATE reservation_groups
    AND children_count = 0;
 ```
 
-- [ ] **Step 2: Migración de producción**
+- [x] **Step 2: Migración de producción**
 
 Crear `backend/migrate-precios-pileta-prod.sql`:
 
@@ -84,7 +84,7 @@ ALTER TABLE reservation_groups
   ADD COLUMN IF NOT EXISTS pool_child_price_per_day NUMERIC(12, 2);
 ```
 
-- [ ] **Step 3: Reflejarlo en el schema base**
+- [x] **Step 3: Reflejarlo en el schema base**
 
 En `backend/schema.sql`, dentro del bloque `ALTER TABLE reservation_groups ADD COLUMN IF NOT EXISTS ...` que ya existe, agregar:
 
@@ -95,7 +95,7 @@ En `backend/schema.sql`, dentro del bloque `ALTER TABLE reservation_groups ADD C
   ADD COLUMN IF NOT EXISTS pool_child_price_per_day NUMERIC(12, 2),
 ```
 
-- [ ] **Step 4: Aplicar la migración local**
+- [x] **Step 4: Aplicar la migración local**
 
 ```bash
 cd backend && node -e "
@@ -113,11 +113,11 @@ const pool=new Pool({host:process.env.DB_HOST,port:Number(process.env.DB_PORT)||
 
 Expected: en cada fila de pileta, `adults_count` igual a `pool_adults_count`.
 
-- [ ] **Step 5: Verificar que es idempotente**
+- [x] **Step 5: Verificar que es idempotente**
 
 Correr el mismo comando del paso 4 otra vez. Expected: termina sin error y la tabla queda igual.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add backend/migrate-unificar-personas-local.sql backend/migrate-precios-pileta-prod.sql backend/schema.sql
@@ -138,7 +138,7 @@ Esto es lo único de la Etapa 1 que arregla algo visible: hoy, editar un pase de
 - Consumes: el helper `tokenPara(id)` y el mock `queryMock` que ya existen en `api/index.test.js`.
 - Produces: `POST` y `PATCH /api/reservation-groups` aceptan `poolAdultPricePerDay` y `poolChildPricePerDay`; `GET` los devuelve.
 
-- [ ] **Step 1: Escribir los tests que fallan**
+- [x] **Step 1: Escribir los tests que fallan**
 
 Agregar al final de `api/index.test.js`:
 
@@ -199,12 +199,12 @@ describe('precios de pileta en /api/reservation-groups', () => {
 });
 ```
 
-- [ ] **Step 2: Correr y verificar que fallan**
+- [x] **Step 2: Correr y verificar que fallan**
 
 Run: `cd api && npm test`
 Expected: los 3 fallan. El INSERT y el UPDATE no mencionan `pool_adult_price_per_day`, y el GET no devuelve esos campos.
 
-- [ ] **Step 3: Agregar las columnas a los dos SELECT**
+- [x] **Step 3: Agregar las columnas a los dos SELECT**
 
 En `api/index.js`, después de `rg.children_count,` (líneas 847 y 942), agregar en ambos:
 
@@ -220,7 +220,7 @@ Y en el `GROUP BY` del segundo (después de `rg.children_count,`):
             rg.pool_child_price_per_day,
 ```
 
-- [ ] **Step 4: Devolverlas en las tres respuestas**
+- [x] **Step 4: Devolverlas en las tres respuestas**
 
 En `api/index.js`, después de cada `childrenCount: row.children_count || 0,` (líneas 970, 1069 y 1213), agregar:
 
@@ -229,7 +229,7 @@ En `api/index.js`, después de cada `childrenCount: row.children_count || 0,` (l
             poolChildPricePerDay: row.pool_child_price_per_day,
 ```
 
-- [ ] **Step 5: Aceptarlas al crear**
+- [x] **Step 5: Aceptarlas al crear**
 
 En la línea 989, agregar los dos campos al destructuring:
 
@@ -244,7 +244,7 @@ Y en el INSERT (líneas 1046-1047), agregar las dos columnas al final de la list
           [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0, poolAdultPricePerDay || null, poolChildPricePerDay || null]
 ```
 
-- [ ] **Step 6: Aceptarlas al editar**
+- [x] **Step 6: Aceptarlas al editar**
 
 En la línea 1138, agregar los dos campos al destructuring:
 
@@ -269,12 +269,12 @@ Y en el array de parámetros, **después de `finalEndDate` y antes de `reservati
 
 El orden del array tiene que coincidir con el de los placeholders: si los precios quedan antes de `finalResourceNumber`, la reserva se guarda con los datos corridos y sin ningún error visible.
 
-- [ ] **Step 7: Correr y verificar que pasan**
+- [x] **Step 7: Correr y verificar que pasan**
 
 Run: `cd api && npm test`
 Expected: todos en verde, los 12 de antes más los 3 nuevos.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add api/index.js api/index.test.js
@@ -292,7 +292,7 @@ git commit -m "fix: produccion guarda los precios por adulto y por nino del pase
 - Consumes: las columnas creadas en la Task 1.
 - Produces: el backend local acepta `adultsCount` / `childrenCount` en `POST` y `PATCH` para cualquier servicio, y los devuelve con esos nombres en `GET`.
 
-- [ ] **Step 1: Cambiar los nombres de columna en las consultas**
+- [x] **Step 1: Cambiar los nombres de columna en las consultas**
 
 En `backend/src/index.js`, reemplazar en **todas** las consultas SQL:
 
@@ -303,7 +303,7 @@ Afecta: los dos `SELECT` de la lista (946-947, 1038-1039), el `INSERT` y su `RET
 
 Los precios `pool_adult_price_per_day` y `pool_child_price_per_day` **no se tocan**.
 
-- [ ] **Step 2: Cambiar los nombres en las respuestas**
+- [x] **Step 2: Cambiar los nombres en las respuestas**
 
 Reemplazar en las tres respuestas (1065-1066, 1302-1303, 1532-1533):
 
@@ -327,7 +327,7 @@ Y en el reporte de ocupación (línea 2069):
         Number(row.adults_count || 0) + Number(row.children_count || 0);
 ```
 
-- [ ] **Step 3: Aceptar los nombres nuevos en el body**
+- [x] **Step 3: Aceptar los nombres nuevos en el body**
 
 En los destructuring del `POST` (1093-1094) y del `PATCH` (1332-1333), reemplazar:
 
@@ -345,7 +345,7 @@ por:
 
 Y renombrar los usos: `poolAdultsCountParsed` → `adultsCountParsed`, `poolChildrenCountParsed` → `childrenCountParsed` (1173-1192, 1220-1221, 1271-1272), y en el `PATCH` las expresiones de 1387-1394, que pasan a comparar contra `current.adults_count` y `current.children_count`.
 
-- [ ] **Step 4: Parsear la cantidad para todos los servicios**
+- [x] **Step 4: Parsear la cantidad para todos los servicios**
 
 En el `POST`, el bloque que parsea las cantidades (líneas 1173-1192) hoy está dentro del `if (isPool)`. Sacarlo fuera, para que valga para carpa, sombrilla y estacionamiento:
 
@@ -372,7 +372,7 @@ En el `POST`, el bloque que parsea las cantidades (líneas 1173-1192) hoy está 
 
 El cálculo del total de la pileta (1220-1221) sigue dentro del `if (isPool)` y usa estas mismas variables.
 
-- [ ] **Step 5: Reiniciar el backend local**
+- [x] **Step 5: Reiniciar el backend local**
 
 ```bash
 cd backend && npm start
@@ -380,7 +380,7 @@ cd backend && npm start
 
 Expected: `API listening on port 9000`, sin errores.
 
-- [ ] **Step 6: Verificar el ida y vuelta contra la API local**
+- [x] **Step 6: Verificar el ida y vuelta contra la API local**
 
 ```bash
 cd "E:/Balnearios 2026" && node -e "
@@ -405,7 +405,7 @@ console.log('en la lista ->', JSON.stringify({adultsCount:g.adultsCount, childre
 
 Expected: `carpa -> 3 adultos, 2 menores`, `pileta -> 2 adultos, 1 menores, total 15500` y la lista devolviendo `{"adultsCount":3,"childrenCount":2}`.
 
-- [ ] **Step 7: Borrar las reservas de prueba**
+- [x] **Step 7: Borrar las reservas de prueba**
 
 ```bash
 cd backend && node -e "
@@ -415,7 +415,7 @@ const pool=new Pool({host:process.env.DB_HOST,port:5432,database:process.env.DB_
 "
 ```
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add backend/src/index.js
@@ -436,7 +436,7 @@ git commit -m "refactor: el backend local usa adults_count y children_count para
 - Consumes: los dos backends devolviendo `adultsCount` / `childrenCount` (Tasks 2 y 3).
 - Produces: nada que consuman tareas posteriores.
 
-- [ ] **Step 1: Mandar un solo nombre en el pase de pileta**
+- [x] **Step 1: Mandar un solo nombre en el pase de pileta**
 
 En `frontend/src/App.jsx`, en el payload del pase de pileta, borrar las líneas de compatibilidad y dejar solo:
 
@@ -449,7 +449,7 @@ En `frontend/src/App.jsx`, en el payload del pase de pileta, borrar las líneas 
 
 Borrar el comentario `// Compatibilidad: backend serverless usa adultsCount/childrenCount` y las claves `poolAdultsCount` y `poolChildrenCount`.
 
-- [ ] **Step 2: Sacar las lecturas con alternativa**
+- [x] **Step 2: Sacar las lecturas con alternativa**
 
 Reemplazar, en los cuatro archivos, las expresiones del tipo:
 
@@ -465,12 +465,12 @@ group.adultsCount ?? 0
 
 Lo mismo para `childrenCount`. En `generateReceipt.js` la expresión es `reservation.poolAdultsCount ?? reservation.adultsCount ?? '0'`, que pasa a `reservation.adultsCount ?? '0'`.
 
-- [ ] **Step 3: Correr los tests y el build**
+- [x] **Step 3: Correr los tests y el build**
 
 Run: `cd frontend && npm test && npm run build`
 Expected: 73 tests en verde y el build compila.
 
-- [ ] **Step 4: Verificar el pase de pileta en el navegador**
+- [x] **Step 4: Verificar el pase de pileta en el navegador**
 
 Con el backend local en 9000 y el frontend en 9001:
 
@@ -480,7 +480,7 @@ Con el backend local en 9000 y el frontend en 9001:
 4. Descargar el comprobante: tiene que decir `Adultos: 2 · Niños: 1`.
 5. Abrir un pase de pileta **de los que ya existían** y confirmar que sigue mostrando su composición: es lo que copió la migración.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add frontend/src/App.jsx frontend/src/components/PiletaSection.jsx frontend/src/components/ReservationDetailsModal.jsx frontend/src/utils/generateReceipt.js
