@@ -211,6 +211,46 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/auth/me =============
+    if (first === 'auth' && second === 'me') {
+      if (method !== 'GET') {
+        res.statusCode = 405;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'method_not_allowed' }));
+      }
+
+      const auth = authenticateToken(req, res);
+      if (!auth) return;
+
+      try {
+        const result = await db.query(
+          'SELECT id, email, role, created_at FROM users WHERE id = $1',
+          [auth.id]
+        );
+
+        if (result.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'user_not_found' }));
+        }
+
+        const row = result.rows[0];
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({
+          id: row.id,
+          email: row.email,
+          role: row.role,
+          createdAt: row.created_at
+        }));
+      } catch (error) {
+        console.error('Error in /api/auth/me:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
     // ============= /api/auth/login =============
     if (first === 'auth' && second === 'login') {
       if (method !== 'POST') {

@@ -29,7 +29,8 @@
 |---|---|
 | `backend/migrate-user-role.sql` | *Crear.* Migración de la columna `role`. |
 | `backend/schema.sql` | *Modificar.* Agregar `role` para instalaciones nuevas. |
-| `api/vitest.config.js` | *Crear.* Config de tests de API (entorno node). |
+| `api/vitest.config.mjs` | *Crear.* Config de tests de API (entorno node). Extensión .mjs porque api/ es CommonJS. |
+| `api/test/pg-mock.js` | *Crear.* Doble de `pg` sembrado en el require.cache. |
 | `api/index.test.js` | *Crear.* Tests de los tres endpoints. |
 | `api/package.json` | *Modificar.* Script `test` y devDependencies. |
 | `api/index.js` | *Modificar.* Tres bloques de ruta nuevos. |
@@ -46,7 +47,8 @@ Monta la infraestructura de tests del backend (hoy inexistente) y la estrena con
 **Files:**
 - Create: `backend/migrate-user-role.sql`
 - Modify: `backend/schema.sql`
-- Create: `api/vitest.config.js`
+- Create: `api/vitest.config.mjs`
+- Create: `api/test/pg-mock.js`
 - Create: `api/index.test.js`
 - Modify: `api/package.json`
 - Modify: `api/index.js` (insertar antes del bloque `/api/auth/login`, línea ~214)
@@ -104,7 +106,7 @@ En `api/package.json`, agregar la clave `scripts` (hoy el archivo no la tiene):
 
 - [ ] **Step 5: Crear la config de vitest**
 
-Crear `api/vitest.config.js`:
+Crear `api/vitest.config.mjs` (la extensión .mjs evita el warning de ESM en un paquete CommonJS):
 
 ```js
 import { defineConfig } from 'vitest/config';
@@ -121,25 +123,42 @@ export default defineConfig({
 
 Crear `api/index.test.js`. El mock es de `pg`, no de `lib/db`, porque `api/index.js` arma su propio pool.
 
+Primero el doble de `pg`, en `api/test/pg-mock.js`:
+
+```js
+import { createRequire } from 'node:module';
+import { vi } from 'vitest';
+
+export const queryMock = vi.fn();
+
+export class Pool {
+  query(...args) {
+    return queryMock(...args);
+  }
+  end() {
+    return Promise.resolve();
+  }
+}
+
+const require = createRequire(import.meta.url);
+const pgPath = require.resolve('pg');
+
+require.cache[pgPath] = {
+  id: pgPath, filename: pgPath, path: pgPath,
+  loaded: true, children: [], paths: [],
+  exports: { Pool }
+};
+```
+
+> **Por qué así y no con `vi.mock('pg')`.** Se probaron las dos alternativas obvias y ninguna funciona: `api/` no declara `"type": "module"`, así que `index.js` es CommonJS y su `require('pg')` lo resuelve el require **nativo de Node**, que no pasa por el grafo de módulos de vitest. Ni `vi.mock` ni un alias de Vite lo interceptan — el test llega al `pg` real e intenta resolver el host de `DATABASE_URL`. Sembrar el `require.cache` antes de que `index.js` se cargue sí lo intercepta. El orden funciona porque los `import` estáticos del test se evalúan antes del `await import('./index.js')`.
+
+Y el test en `api/index.test.js`:
+
 ```js
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
-
-// El pool se mockea a nivel de `pg` porque api/index.js crea el suyo con
-// `new Pool(...)` y no depende de lib/db.
-const { queryMock } = vi.hoisted(() => ({ queryMock: vi.fn() }));
-
-vi.mock('pg', () => ({
-  Pool: class {
-    query(...args) {
-      return queryMock(...args);
-    }
-    end() {
-      return Promise.resolve();
-    }
-  }
-}));
+import { queryMock } from './test/pg-mock.js';
 
 // index.js lee JWT_SECRET al cargarse, así que hay que fijarlo antes de importarlo.
 process.env.JWT_SECRET = 'test-secret';
@@ -259,7 +278,7 @@ Verificar: `psql -U balneariosmvp_user -d balnearios_mvp -c "SELECT id, email, r
 - [ ] **Step 11: Commit**
 
 ```bash
-git add backend/migrate-user-role.sql backend/schema.sql api/vitest.config.js api/index.test.js api/package.json api/package-lock.json api/index.js
+git add backend/migrate-user-role.sql backend/schema.sql api/vitest.config.mjs api/test/pg-mock.js api/index.test.js api/package.json api/package-lock.json api/index.js
 git commit -m "feat: agregar columna role y endpoint GET /api/auth/me con harness de tests"
 ```
 
