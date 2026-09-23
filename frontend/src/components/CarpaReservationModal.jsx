@@ -6,6 +6,8 @@ import PersonasFields from './PersonasFields';
 import { numerosDeUnidades } from '../lib/unidades';
 import { normalizarPatente } from '../lib/patente';
 import PatenteField from './PatenteField';
+import PrecioReserva from './PrecioReserva';
+import { PRECIO_VACIO, aNumero, faltaMotivoAjuste } from '../lib/tarifas';
 
 // Función para formatear montos con separadores de miles (formato argentino)
 const formatCurrency = (value) => {
@@ -60,16 +62,19 @@ function CarpaReservationModal({
     customerPhone,
     adultsCount,
     childrenCount,
-    dailyPrice,
     includeParking,
     parkingSpotNumber,
-    parkingDailyPrice,
     initialPaymentAmount,
     initialPaymentMethod,
     parkingInitialPaymentAmount,
     parkingInitialPaymentMethod,
     vehiclePlate
   } = form;
+
+  const precio = form.precio ?? PRECIO_VACIO;
+  const precioCochera = form.precioCochera ?? PRECIO_VACIO;
+  const cambiarPrecio = (campo) => (patch) =>
+    onChangeForm((prev) => (prev ? { ...prev, [campo]: { ...(prev[campo] ?? PRECIO_VACIO), ...patch } } : prev));
 
   const hasParking = establishment?.hasParking;
   const parkingCapacity = hasParking
@@ -102,27 +107,9 @@ function CarpaReservationModal({
     daysCount = Math.floor(diffMs / msPerDay) + 1;
   }
 
-  let totalPreview = null;
-  if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '' && daysCount > 0) {
-    const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-    if (!Number.isNaN(parsedDaily)) {
-      totalPreview = parsedDaily * daysCount;
-    }
-  }
-
-  let parkingTotalPreview = null;
-  if (
-    includeParking &&
-    parkingDailyPrice !== undefined &&
-    parkingDailyPrice !== null &&
-    parkingDailyPrice !== '' &&
-    daysCount > 0
-  ) {
-    const parsedDailyParking = Number.parseFloat(String(parkingDailyPrice).replace(',', '.'));
-    if (!Number.isNaN(parsedDailyParking)) {
-      parkingTotalPreview = parsedDailyParking * daysCount;
-    }
-  }
+  // El total sale del recuadro de precio: la tarifa, o lo que cargo el encargado.
+  const totalPreview = aNumero(precio.cobrado);
+  const parkingTotalPreview = includeParking ? aNumero(precioCochera.cobrado) : null;
 
   const combinedTotalPreview = (() => {
     const base = totalPreview !== null ? totalPreview : 0;
@@ -157,7 +144,8 @@ function CarpaReservationModal({
   const verificandoDisponibilidad = principal.verificando || Boolean(includeParking && estacionamiento.verificando);
   // Sin patente no hay estacionamiento: es un dato obligatorio.
   const faltaPatente = Boolean(includeParking) && !normalizarPatente(vehiclePlate);
-  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad || faltaPatente;
+  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad || faltaPatente ||
+    faltaMotivoAjuste(precio) || (Boolean(includeParking) && faltaMotivoAjuste(precioCochera));
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -385,34 +373,15 @@ function CarpaReservationModal({
                 <span>Precio y pago de carpa</span>
               </h3>
               <div className="space-y-3">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-slate-700">Valor por día (ARS)</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={formatInputValue(dailyPrice)}
-                    onChange={(e) => {
-                      const rawValue = parseInputValue(e.target.value);
-                      onChangeForm((prev) =>
-                        prev
-                          ? {
-                            ...prev,
-                            dailyPrice: rawValue
-                          }
-                          : prev
-                      );
-                    }}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    placeholder="0"
-                  />
-                </label>
-                {totalPreview !== null && daysCount > 0 && (
-                  <div className="bg-cyan-50 rounded-lg px-3 py-2 border border-cyan-200">
-                    <p className="text-xs font-semibold text-cyan-900">
-                      💵 Total carpa: ${formatCurrency(totalPreview)} ARS
-                    </p>
-                  </div>
-                )}
+                <PrecioReserva
+                  serviceType="carpa"
+                  resourceNumber={carpaNumero}
+                  desde={startStr}
+                  hasta={endStr}
+                  valor={precio}
+                  onChange={cambiarPrecio('precio')}
+                  titulo="Precio de la carpa"
+                />
                 <div className="border-t border-slate-200 pt-3 space-y-3">
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora por carpa (ARS)</span>
@@ -541,35 +510,15 @@ function CarpaReservationModal({
                       onChangeForm((prev) => (prev ? { ...prev, vehiclePlate: value } : prev))
                     }
                   />
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Valor por día estacionamiento (ARS)</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formatInputValue(parkingDailyPrice)}
-                      onChange={(e) => {
-                        const rawValue = parseInputValue(e.target.value);
-                        onChangeForm((prev) =>
-                          prev
-                            ? {
-                              ...prev,
-                              parkingDailyPrice: rawValue
-                            }
-                            : prev
-                        );
-                      }}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      placeholder="0"
-                    />
-                  </label>
-
-                  {parkingTotalPreview !== null && daysCount > 0 && (
-                    <div className="bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
-                      <p className="text-xs font-semibold text-blue-900">
-                        🅿️ Total estacionamiento: ${formatCurrency(parkingTotalPreview)} ARS
-                      </p>
-                    </div>
-                  )}
+                  <PrecioReserva
+                    serviceType="parking"
+                    resourceNumber={parkingSpotNumber}
+                    desde={startStr}
+                    hasta={endStr}
+                    valor={precioCochera}
+                    onChange={cambiarPrecio('precioCochera')}
+                    titulo="Precio del estacionamiento"
+                  />
 
                   <div className="border-t border-slate-200 pt-3 space-y-3">
                     <label className="flex flex-col gap-1">
@@ -709,10 +658,10 @@ function CarpaReservationModal({
                     customerPhone,
                     adultsCount,
                     childrenCount,
-                    dailyPrice,
+                    precio,
                     includeParking,
                     parkingSpotNumber: plazaAsignada,
-                    parkingDailyPrice,
+                    precioCochera,
                     initialPaymentAmount,
                     initialPaymentMethod,
                     parkingInitialPaymentAmount,

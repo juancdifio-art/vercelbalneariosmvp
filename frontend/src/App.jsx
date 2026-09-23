@@ -683,26 +683,17 @@ function App() {
       customerPhone,
       adultsCount,
       childrenCount,
-      dailyPrice,
+      precio,
       clientId,
       includeParking,
       parkingSpotNumber,
-      parkingDailyPrice,
+      precioCochera,
       initialPaymentAmount,
       initialPaymentMethod,
       parkingInitialPaymentAmount,
       parkingInitialPaymentMethod,
       vehiclePlate
     } = extra;
-
-    let totalPrice = null;
-
-    if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '') {
-      const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-      if (!Number.isNaN(parsedDaily) && daysCount > 0) {
-        totalPrice = parsedDaily * daysCount;
-      }
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
@@ -718,11 +709,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice:
-            dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-              ? String(dailyPrice)
-              : '',
-          totalPrice: totalPrice !== null ? String(totalPrice) : '',
+          totalPrice: precio?.cobrado ?? '',
+          motivoAjuste: precio?.motivo ?? '',
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
@@ -741,6 +729,8 @@ function App() {
       if (!response.ok) {
         if (data && data.error === 'no_availability') {
           setCarpaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
+        } else if (data && data.error === 'motivo_ajuste_required') {
+          setCarpaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
         } else {
           console.error('Error creating reservation group for carpas', data);
           setError('No se pudo crear la reserva.');
@@ -837,7 +827,7 @@ function App() {
             customerPhone,
             adultsCount,
             childrenCount,
-            dailyPrice: parkingDailyPrice ?? '',
+            precio: precioCochera,
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
             initialPaymentMethod: parkingInitialPaymentMethod,
@@ -1087,26 +1077,17 @@ function App() {
       customerPhone,
       adultsCount,
       childrenCount,
-      dailyPrice,
+      precio,
       clientId,
       includeParking,
       parkingSpotNumber,
-      parkingDailyPrice,
+      precioCochera,
       initialPaymentAmount,
       initialPaymentMethod,
       parkingInitialPaymentAmount,
       parkingInitialPaymentMethod,
       vehiclePlate
     } = extra;
-
-    let totalPrice = null;
-
-    if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '') {
-      const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-      if (!Number.isNaN(parsedDaily) && daysCount > 0) {
-        totalPrice = parsedDaily * daysCount;
-      }
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
@@ -1122,11 +1103,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice:
-            dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-              ? String(dailyPrice)
-              : '',
-          totalPrice: totalPrice !== null ? String(totalPrice) : '',
+          totalPrice: precio?.cobrado ?? '',
+          motivoAjuste: precio?.motivo ?? '',
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
@@ -1145,6 +1123,8 @@ function App() {
       if (!response.ok) {
         if (data && data.error === 'no_availability') {
           setSombrillaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
+        } else if (data && data.error === 'motivo_ajuste_required') {
+          setSombrillaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
         } else {
           console.error('Error creating reservation group for sombrillas', data);
           setError('No se pudo crear la reserva.');
@@ -1240,7 +1220,7 @@ function App() {
             customerPhone,
             adultsCount,
             childrenCount,
-            dailyPrice: parkingDailyPrice ?? '',
+            precio: precioCochera,
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
             initialPaymentMethod: parkingInitialPaymentMethod,
@@ -1306,21 +1286,12 @@ function App() {
       customerPhone,
       adultsCount,
       childrenCount,
-      dailyPrice,
+      precio,
       clientId,
       initialPaymentAmount,
       initialPaymentMethod,
       vehiclePlate
     } = extra;
-
-    let totalPrice = null;
-
-    if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '') {
-      const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-      if (!Number.isNaN(parsedDaily) && daysCount > 0) {
-        totalPrice = parsedDaily * daysCount;
-      }
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
@@ -1336,11 +1307,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice:
-            dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-              ? String(dailyPrice)
-              : '',
-          totalPrice: totalPrice !== null ? String(totalPrice) : '',
+          totalPrice: precio?.cobrado ?? '',
+          motivoAjuste: precio?.motivo ?? '',
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
@@ -1364,6 +1332,8 @@ function App() {
           const msg = 'Falta la patente del vehículo: es obligatoria para usar el estacionamiento.';
           setParkingReservationError(msg);
           setError(msg);
+        } else if (data && data.error === 'motivo_ajuste_required') {
+          setParkingReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
         } else {
           console.error('Error creating reservation group for parking', data);
           setError('No se pudo crear la reserva.');

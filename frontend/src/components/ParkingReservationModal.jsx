@@ -5,6 +5,8 @@ import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
 import PersonasFields from './PersonasFields';
 import PatenteField from './PatenteField';
 import { normalizarPatente } from '../lib/patente';
+import PrecioReserva from './PrecioReserva';
+import { PRECIO_VACIO, aNumero, faltaMotivoAjuste } from '../lib/tarifas';
 
 function ParkingReservationModal({
   form,
@@ -31,11 +33,14 @@ function ParkingReservationModal({
     customerPhone,
     adultsCount,
     childrenCount,
-    dailyPrice,
     initialPaymentAmount,
     initialPaymentMethod,
     vehiclePlate
   } = form;
+
+  const precio = form.precio ?? PRECIO_VACIO;
+  const cambiarPrecio = (campo) => (patch) =>
+    onChangeForm((prev) => (prev ? { ...prev, [campo]: { ...(prev[campo] ?? PRECIO_VACIO), ...patch } } : prev));
 
   // Calcular plazas disponibles para el rango de fechas seleccionado
   const totalPlazas = Number.parseInt(establishment?.parkingCapacity ?? '0', 10);
@@ -65,13 +70,8 @@ function ParkingReservationModal({
     daysCount = Math.floor(diffMs / msPerDay) + 1;
   }
 
-  let totalPreview = null;
-  if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '' && daysCount > 0) {
-    const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-    if (!Number.isNaN(parsedDaily)) {
-      totalPreview = parsedDaily * daysCount;
-    }
-  }
+  // El total sale del recuadro de precio: la tarifa, o lo que cargo el encargado.
+  const totalPreview = aNumero(precio.cobrado);
 
   // Validación de pago que no exceda el total
   const paymentExceedsTotal = initialPaymentAmount && totalPreview !== null &&
@@ -88,7 +88,7 @@ function ParkingReservationModal({
   const conflictoPlaza = !isReserved && hayRango && ocupacion.ocupadas.has(Number(plazaNumero));
   // Sin patente no hay estacionamiento: es un dato obligatorio.
   const faltaPatente = !normalizarPatente(vehiclePlate);
-  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando || faltaPatente;
+  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando || faltaPatente || faltaMotivoAjuste(precio);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -331,34 +331,15 @@ function ParkingReservationModal({
                 <span>Precio</span>
               </h3>
               <div className="space-y-3">
-                <label className="flex flex-col gap-1">
-                  <span className="text-[11px] font-semibold text-slate-700">Valor por día (ARS)</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={dailyPrice || ''}
-                    onChange={(e) => {
-                      const value = e.target.value.replace(/[^0-9]/g, '');
-                      onChangeForm((prev) =>
-                        prev
-                          ? {
-                            ...prev,
-                            dailyPrice: value
-                          }
-                          : prev
-                      );
-                    }}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                  />
-                </label>
-                {totalPreview !== null && daysCount > 0 && (
-                  <div className="bg-blue-50 rounded-lg px-3 py-2 border border-blue-200">
-                    <p className="text-xs font-semibold text-blue-900">
-                      🅿️ Total estacionamiento: ${totalPreview.toFixed(2)} ARS
-                    </p>
-                  </div>
-                )}
+                <PrecioReserva
+                  serviceType="parking"
+                  resourceNumber={plazaNumero}
+                  desde={startStr}
+                  hasta={endStr}
+                  valor={precio}
+                  onChange={cambiarPrecio('precio')}
+                  titulo="Precio del estacionamiento"
+                />
               </div>
             </div>
           )}
@@ -472,7 +453,7 @@ function ParkingReservationModal({
                     customerPhone,
                     adultsCount,
                     childrenCount,
-                    dailyPrice,
+                    precio,
                     initialPaymentAmount,
                     initialPaymentMethod,
                     vehiclePlate: normalizarPatente(vehiclePlate)
