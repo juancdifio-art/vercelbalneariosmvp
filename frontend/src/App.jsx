@@ -11,6 +11,7 @@ import SombrillasSection from './components/SombrillasSection';
 import EstacionamientoSection from './components/EstacionamientoSection';
 import PiletaSection from './components/PiletaSection';
 import ReportsPaymentsSection from './components/ReportsPaymentsSection';
+import TarifasSection from './components/tarifas/TarifasSection';
 import CarpaReservationModal from './components/CarpaReservationModal';
 import ParkingReservationModal from './components/ParkingReservationModal';
 import SombrillaReservationModal from './components/SombrillaReservationModal';
@@ -2409,6 +2410,7 @@ function App() {
 
     navItems.push({ id: 'clientes', label: 'Clientes', group: 'admin' });
     navItems.push({ id: 'reportes', label: 'Reportes', group: 'admin' });
+    navItems.push({ id: 'tarifas', label: 'Tarifas', group: 'admin' });
     navItems.push({ id: 'panel-usuario', label: 'Panel de usuario', group: 'admin' });
 
     const sectionTitleMap = {
@@ -2679,6 +2681,8 @@ function App() {
             {activeSection === 'reportes' && (
               <ReportsPaymentsSection authToken={authToken} />
             )}
+
+            {activeSection === 'tarifas' && <TarifasSection establishment={establishment} />}
 
             {activeSection === 'clientes' && (
               <ClientsSection
