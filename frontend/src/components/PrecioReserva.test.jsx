@@ -13,6 +13,10 @@ const INCOMPLETA = {
   dias: 2, total: 0, completo: false, diasSinTarifa: ['2026-03-14', '2026-03-15'],
   desglose: { clase: 'fecha', tramos: [], diasSinTarifa: ['2026-03-14', '2026-03-15'] }
 };
+const COMPLETA_DECIMAL = {
+  dias: 3, total: 9999.5, completo: true, diasSinTarifa: [],
+  desglose: { clase: 'fecha', tramos: [{ desde: '2026-01-10', hasta: '2026-01-12', periodoId: 1, periodo: 'Alta', dias: 3, precioDia: 3333.17, subtotal: 9999.5 }], diasSinTarifa: [] }
+};
 
 function responder(cotizacion) {
   global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: () => Promise.resolve({ cotizacion }) }));
@@ -82,5 +86,27 @@ describe('PrecioReserva', () => {
     render(<ConEstado cotizar={false} inicial={{ ...PRECIO_VACIO, precioTarifa: 30000, cobrado: '30000', desglose: COMPLETA.desglose }} />);
     expect(screen.getByText('3 días Alta × $10.000 = $30.000')).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('una tarifa con centavos precarga con coma decimal y guarda un valor plano', async () => {
+    responder(COMPLETA_DECIMAL);
+    render(<ConEstado />);
+    await waitFor(() => expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('9.999,5'));
+    expect(ultimo.cobrado).toBe('9999.5');
+
+    const total = screen.getByLabelText('Total cobrado (ARS)');
+    await userEvent.clear(total);
+    await userEvent.type(total, '25000');
+    expect(ultimo.cobrado).toBe('25000');
+  });
+
+  it('si la tarifa nueva queda incompleta al cambiar de fechas, vacia el total ajustado', async () => {
+    render(<ConEstado />);
+    const total = await screen.findByDisplayValue('30.000');
+    await userEvent.clear(total);
+    await userEvent.type(total, '25000');
+    responder(INCOMPLETA);
+    await userEvent.click(screen.getByText('alargar'));
+    await waitFor(() => expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue(''));
   });
 });

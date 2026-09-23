@@ -2,10 +2,29 @@ import React, { useEffect } from 'react';
 import useCotizacion from '../hooks/useCotizacion';
 import { lineasDesglose, diferenciaAjuste, faltaMotivoAjuste, formatearPesos } from '../lib/tarifas';
 
-// Miles con puntos mientras se escribe, igual que el resto de los montos del modal.
-const conPuntos = (valor) => {
-  const digitos = String(valor ?? '').replace(/\D/g, '');
-  return digitos ? Number(digitos).toLocaleString('es-AR') : '';
+// Miles con puntos y decimales con coma, formato es-AR (9999.5 -> "9.999,5").
+// El estado (`valor.cobrado`) siempre guarda un string numerico plano, sin
+// separadores ("9999.5"): el formato es solo para mostrar mientras se tipea.
+// Antes esto sacaba todo lo que no fuera digito, así que una tarifa con
+// centavos (el backend redondea a 2 decimales) se mostraba y re-guardaba mal
+// (9999.5 -> "99995" en vez de "9.999,5").
+const aTextoVisual = (valor) => {
+  const texto = String(valor ?? '');
+  if (!texto) return '';
+  const [enteroCrudo, decimales] = texto.split('.');
+  const entero = enteroCrudo.replace(/\D/g, '');
+  const enteroVisual = entero ? Number(entero).toLocaleString('es-AR') : '0';
+  return decimales !== undefined ? `${enteroVisual},${decimales}` : enteroVisual;
+};
+
+// Inversa de aTextoVisual: de lo que hay en el input (con puntos de miles y
+// coma decimal) a un string numerico plano para guardar en el estado.
+const aValorPlano = (texto) => {
+  let limpio = String(texto ?? '').replace(/\./g, '').replace(',', '.');
+  limpio = limpio.replace(/[^\d.]/g, '');
+  const i = limpio.indexOf('.');
+  if (i !== -1) limpio = `${limpio.slice(0, i + 1)}${limpio.slice(i + 1).replace(/\./g, '')}`;
+  return limpio;
 };
 
 const ddmm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -35,7 +54,10 @@ function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onCha
     if (!cotizacion) return;
     const precioTarifa = cotizacion.completo ? cotizacion.total : null;
     const patch = { precioTarifa, desglose: cotizacion.desglose };
-    if (valor.editadoEn !== clave) patch.cobrado = precioTarifa != null ? String(precioTarifa) : valor.cobrado ?? '';
+    // Si las fechas cambiaron (editadoEn !== clave), el cobrado anterior era
+    // para otra estadia: se reemplaza por el de la tarifa nueva, o se vacia
+    // si la tarifa nueva quedo incompleta (no queda un total viejo colgado).
+    if (valor.editadoEn !== clave) patch.cobrado = precioTarifa != null ? String(precioTarifa) : '';
     onChange(patch);
     // Solo reacciona a una cotizacion nueva, no a cada tecla del total.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,8 +95,8 @@ function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onCha
         <input
           type="text"
           inputMode="numeric"
-          value={conPuntos(valor.cobrado)}
-          onChange={(e) => onChange({ cobrado: e.target.value.replace(/\D/g, ''), editadoEn: clave || 'manual' })}
+          value={aTextoVisual(valor.cobrado)}
+          onChange={(e) => onChange({ cobrado: aValorPlano(e.target.value), editadoEn: clave || 'manual' })}
           placeholder="0"
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
         />
