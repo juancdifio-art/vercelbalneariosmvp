@@ -41,6 +41,22 @@ export function faltaMotivoAjuste(valor) {
   return diferenciaAjuste(valor) !== 0 && !String(valor.motivo ?? '').trim();
 }
 
+/**
+ * Arma el `tempPrecio` inicial al abrir la edición de una reserva ya guardada.
+ * `totalPrice` llega como string ("9999.50"); si se redondeaba a entero acá,
+ * una tarifa con centavos abría con un ajuste falso (motivo obligatorio) y
+ * guardar de nuevo recortaba el total.
+ */
+export function precioDesdeReserva(group) {
+  return {
+    precioTarifa: group.precioTarifa != null ? Number(group.precioTarifa) : null,
+    desglose: group.desglose ?? null,
+    cobrado: group.totalPrice != null && group.totalPrice !== '' ? String(Number(group.totalPrice)) : '',
+    motivo: group.motivoAjuste ?? '',
+    editadoEn: null
+  };
+}
+
 const DIAS_POR_MES = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 export function parseDiaMes(texto) {

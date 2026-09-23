@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   formatearPesos, aNumero, lineasDesglose, diferenciaAjuste, faltaMotivoAjuste,
-  parseDiaMes, formatearDiaMes, filaCoincide, colorSuave
+  parseDiaMes, formatearDiaMes, filaCoincide, colorSuave, precioDesdeReserva
 } from './tarifas';
 
 describe('lineasDesglose', () => {
@@ -34,6 +34,20 @@ describe('ajuste', () => {
     expect(faltaMotivoAjuste({ precioTarifa: 30000, cobrado: '25000', motivo: 'amigo' })).toBe(false);
     expect(faltaMotivoAjuste({ precioTarifa: 30000, cobrado: '30000', motivo: '' })).toBe(false);
     expect(faltaMotivoAjuste({ precioTarifa: null, cobrado: '1', motivo: '' })).toBe(false);
+  });
+});
+
+describe('precioDesdeReserva', () => {
+  it('conserva los centavos: no genera un ajuste falso', () => {
+    const resultado = precioDesdeReserva({ precioTarifa: '9999.50', totalPrice: '9999.50', desglose: null, motivoAjuste: '' });
+    expect(resultado.cobrado).toBe('9999.5');
+    expect(resultado.precioTarifa).toBe(9999.5);
+    expect(faltaMotivoAjuste(resultado)).toBe(false);
+  });
+  it('sin totales guardados, deja el precio vacio', () => {
+    const resultado = precioDesdeReserva({ precioTarifa: null, totalPrice: null, desglose: null, motivoAjuste: null });
+    expect(resultado.cobrado).toBe('');
+    expect(resultado.precioTarifa).toBeNull();
   });
 });
 

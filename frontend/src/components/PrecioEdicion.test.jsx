@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ReservationEditModal from './ReservationEditModal';
 import ReservationDetailsModal from './ReservationDetailsModal';
@@ -42,6 +42,26 @@ describe('precio al editar', () => {
     render(<EdicionConEstado />);
     await userEvent.clear(screen.getByLabelText(/Motivo del ajuste/));
     expect(screen.getByRole('button', { name: /Guardar cambios/ })).toBeDisabled();
+  });
+
+  it('muestra el aviso cuando el servidor exige el motivo del ajuste', () => {
+    const modal = {
+      ...GRUPO, tempCustomerName: 'Lucia', tempNotes: '',
+      tempPrecio: { ...PRECIO_VACIO, precioTarifa: 30000, desglose: DESGLOSE, cobrado: '25000', motivo: 'cliente de años' }
+    };
+    render(
+      <ReservationEditModal
+        modal={modal}
+        saving={false}
+        setModal={vi.fn()}
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+        establishment={{ carpasCapacity: 100 }}
+        reservationGroups={[]}
+        error="El total es distinto al de la tarifa: falta el motivo del ajuste."
+      />
+    );
+    expect(screen.getByText('El total es distinto al de la tarifa: falta el motivo del ajuste.')).toBeInTheDocument();
   });
 });
 

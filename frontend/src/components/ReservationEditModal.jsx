@@ -5,7 +5,7 @@ import PatenteField from './PatenteField';
 import PrecioReserva from './PrecioReserva';
 import { PRECIO_VACIO, faltaMotivoAjuste } from '../lib/tarifas';
 
-function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups }) {
+function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups, error }) {
   if (!modal) return null;
 
   const serviceIcon = modal.serviceType === 'carpa' ? '🏖️' : modal.serviceType === 'sombrilla' ? '☂️' : modal.serviceType === 'parking' ? '🚗' : '🏊';
@@ -411,6 +411,15 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent resize-none"
             />
           </div>
+
+          {error && (
+            <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p className="text-xs text-red-700 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </p>
+            </div>
+          )}
 
           {/* Botones */}
           <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200">

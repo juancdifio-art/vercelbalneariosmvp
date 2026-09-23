@@ -22,6 +22,7 @@ import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
 import { normalizarPatente } from './lib/patente';
+import { precioDesdeReserva } from './lib/tarifas';
 import DashboardSection from './components/DashboardSection';
 import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
@@ -184,6 +185,7 @@ function App() {
   const [reservationPaymentSaving, setReservationPaymentSaving] = useState(false);
   const [reservationEditModal, setReservationEditModal] = useState(null);
   const [reservationEditSaving, setReservationEditSaving] = useState(false);
+  const [reservationEditError, setReservationEditError] = useState('');
 
   const {
     clients,
@@ -1714,6 +1716,7 @@ function App() {
 
   const handleOpenReservationEditModal = (group) => {
     if (!group) return;
+    setReservationEditError('');
     setReservationEditModal({
       ...group,
       tempCustomerName: group.customerName || '',
@@ -1722,13 +1725,7 @@ function App() {
       tempTotalPrice: group.totalPrice ?? '',
       tempNotes: group.notes || '',
       tempVehiclePlate: group.vehiclePlate || '',
-      tempPrecio: {
-        precioTarifa: group.precioTarifa != null ? Number(group.precioTarifa) : null,
-        desglose: group.desglose ?? null,
-        cobrado: group.totalPrice != null ? String(Math.round(Number(group.totalPrice))) : '',
-        motivo: group.motivoAjuste ?? '',
-        editadoEn: null
-      },
+      tempPrecio: precioDesdeReserva(group),
     });
   };
 
@@ -2168,12 +2165,14 @@ function App() {
       if (!response.ok) {
         const data = await response.json().catch(() => null);
         if (data && data.error === 'motivo_ajuste_required') {
-          setError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+          setReservationEditError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
         } else {
           console.error('Error updating reservation group');
         }
         return;
       }
+
+      setReservationEditError('');
 
       // Si cambió el resourceNumber o las fechas, actualizar el mapa visual de reservas
       const datesChanged = startDateChanged || endDateChanged;
@@ -2537,8 +2536,12 @@ function App() {
               modal={reservationEditModal}
               setModal={setReservationEditModal}
               saving={reservationEditSaving}
+              error={reservationEditError}
               onSave={handleSaveReservationEdit}
-              onClose={() => setReservationEditModal(null)}
+              onClose={() => {
+                setReservationEditModal(null);
+                setReservationEditError('');
+              }}
               establishment={establishment}
               reservationGroups={reservationGroups}
             />
