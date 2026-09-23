@@ -7,6 +7,7 @@ import { otrasReservasVigentes, saldoDe, hoyISO } from '../lib/reservas';
 import { ServiceIcon, COLOR_SERVICIO } from './icons';
 import PersonasReserva from './PersonasReserva';
 import { formatearPatente } from '../lib/patente';
+import { lineasDesglose, formatearPesos } from '../lib/tarifas';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -47,7 +48,10 @@ function ReservationDetailsModal({
     linkedParkingData,
     vehiclePlate,
     adultsCount,
-    childrenCount
+    childrenCount,
+    precioTarifa,
+    desglose,
+    motivoAjuste
   } = reservation;
 
   // Estado para cargar pagos lazy (solo cuando se abre el modal)
@@ -317,7 +321,7 @@ function ReservationDetailsModal({
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">💰 Resumen financiero</h3>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-[11px] text-slate-600">Precio por día</span>
+                  <span className="text-[11px] text-slate-600">{desglose ? 'Promedio por día' : 'Precio por día'}</span>
                   <span className="text-sm font-bold text-slate-900">
                     {dailyPrice !== null && dailyPrice !== undefined ? formatPesos(dailyPrice, 0) : '—'}
                   </span>
@@ -328,6 +332,16 @@ function ReservationDetailsModal({
                     {totalPrice !== null && totalPrice !== undefined ? formatPesos(totalPrice, 0) : '—'}
                   </span>
                 </div>
+                {lineasDesglose(desglose).length > 0 && (
+                  <div className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-700 space-y-0.5">
+                    {lineasDesglose(desglose).map((linea) => <p key={linea}>{linea}</p>)}
+                  </div>
+                )}
+                {precioTarifa != null && motivoAjuste && (
+                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
+                    Tarifa {formatearPesos(precioTarifa)} · Cobrado {formatearPesos(totalPrice)} · Motivo: {motivoAjuste}
+                  </p>
+                )}
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-slate-600">Pagos realizados</span>
                   <span className="text-sm font-bold text-emerald-600">

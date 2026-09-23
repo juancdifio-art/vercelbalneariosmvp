@@ -1721,7 +1721,14 @@ function App() {
       tempDailyPrice: group.dailyPrice ?? '',
       tempTotalPrice: group.totalPrice ?? '',
       tempNotes: group.notes || '',
-      tempVehiclePlate: group.vehiclePlate || ''
+      tempVehiclePlate: group.vehiclePlate || '',
+      tempPrecio: {
+        precioTarifa: group.precioTarifa != null ? Number(group.precioTarifa) : null,
+        desglose: group.desglose ?? null,
+        cobrado: group.totalPrice != null ? String(Math.round(Number(group.totalPrice))) : '',
+        motivo: group.motivoAjuste ?? '',
+        editadoEn: null
+      },
     });
   };
 
@@ -2051,6 +2058,7 @@ function App() {
       tempStartDate,
       tempEndDate,
       dailyPrice,
+      tempPrecio,
       // Pool-specific fields
       tempPoolAdultsCount,
       tempPoolChildrenCount,
@@ -2083,6 +2091,13 @@ function App() {
       // En estacionamiento la patente es obligatoria; el modal no deja guardarla vacia.
       if (serviceType === 'parking') {
         updateBody.vehiclePlate = normalizarPatente(tempVehiclePlate);
+      }
+
+      // Carpa, sombrilla y estacionamiento: el servidor recalcula; se manda lo cobrado y el motivo.
+      if (serviceType !== 'pileta') {
+        delete updateBody.dailyPrice;
+        updateBody.totalPrice = tempPrecio?.cobrado ?? '';
+        updateBody.motivoAjuste = tempPrecio?.motivo ?? '';
       }
 
       // Agregar campos de pileta solo si el servicio es pileta
@@ -2151,7 +2166,12 @@ function App() {
       });
 
       if (!response.ok) {
-        console.error('Error updating reservation group');
+        const data = await response.json().catch(() => null);
+        if (data && data.error === 'motivo_ajuste_required') {
+          setError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else {
+          console.error('Error updating reservation group');
+        }
         return;
       }
 
