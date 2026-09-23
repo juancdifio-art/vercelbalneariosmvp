@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const reportPaymentsHandler = require('./_handlers/reports/payments');
 const reportOccupancyHandler = require('./_handlers/reports/occupancy');
+const tarifas = require('./_tarifas/servicio');
 
 // Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
 // Es obligatoria en toda reserva de estacionamiento.
@@ -1612,6 +1613,37 @@ module.exports = async (req, res) => {
         }
       } catch (error) {
         console.error('Error with reservation guest:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/tarifas/* =============
+    // Toda la logica vive en _tarifas/servicio.js, compartida con el backend local.
+    if (first === 'tarifas') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+        const body = method === 'POST' || method === 'PATCH' ? await parseJsonBody(req) : {};
+        const r = await tarifas.rutearTarifas(db.query, estResult.rows[0].id, {
+          method,
+          partes: segments.slice(2),
+          params: Object.fromEntries(url.searchParams),
+          body
+        });
+        res.statusCode = r.status;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify(r.body));
+      } catch (error) {
+        console.error('Error en tarifas:', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));
