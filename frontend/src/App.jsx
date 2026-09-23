@@ -2418,6 +2418,7 @@ function App() {
       'vista-diaria': 'Vista rápida',
       reservas: 'Reservas',
       reportes: 'Reportes',
+      tarifas: 'Tarifas',
       clientes: 'Clientes',
       carpas: 'Capacidades y reservas',
       sombrillas: 'Capacidades y reservas',

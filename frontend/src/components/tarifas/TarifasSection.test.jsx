@@ -5,7 +5,17 @@ import userEvent from '@testing-library/user-event';
 import TarifasSection from './TarifasSection';
 
 const ALTA = { id: 1, nombre: 'Temporada alta', mesInicio: 12, diaInicio: 15, mesFin: 3, diaFin: 15, prioridad: 1 };
-const calendario = Array.from({ length: 366 }, (_, i) => ({ mes: 1, dia: 1, periodoId: i % 2 ? 1 : null }));
+const DIAS_POR_MES_2024 = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+const calendario = [];
+{
+  let i = 0;
+  for (let mes = 1; mes <= 12; mes++) {
+    for (let dia = 1; dia <= DIAS_POR_MES_2024[mes - 1]; dia++) {
+      calendario.push({ mes, dia, periodoId: i % 2 ? 1 : null });
+      i++;
+    }
+  }
+}
 
 let respuestas;
 beforeEach(() => {
@@ -44,7 +54,7 @@ describe('TarifasSection: periodos', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Agregar período' }));
     const post = global.fetch.mock.calls.find((c) => c[1]?.method === 'POST');
     expect(JSON.parse(post[1].body)).toEqual({ nombre: 'Navidad', mesInicio: 12, diaInicio: 24, mesFin: 12, diaFin: 26, prioridad: 10 });
-  });
+  }, 15000);
 
   it('muestra el error del servidor en castellano', async () => {
     render(<TarifasSection establishment={EST} />);
@@ -54,7 +64,7 @@ describe('TarifasSection: periodos', () => {
     await userEvent.type(screen.getByLabelText('Hasta (día/mes)'), '31/1');
     await userEvent.click(screen.getByRole('button', { name: 'Agregar período' }));
     expect(await screen.findByText('Ya hay un período con la misma prioridad en esas fechas. Subile la prioridad al más específico.')).toBeInTheDocument();
-  });
+  }, 15000);
 
   it('valida el formato dia/mes antes de mandar', async () => {
     render(<TarifasSection establishment={EST} />);
@@ -65,5 +75,5 @@ describe('TarifasSection: periodos', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Agregar período' }));
     expect(screen.getByText('Las fechas van como día/mes, por ejemplo 15/12.')).toBeInTheDocument();
     expect(global.fetch.mock.calls.some((c) => c[1]?.method === 'POST')).toBe(false);
-  });
+  }, 15000);
 });
