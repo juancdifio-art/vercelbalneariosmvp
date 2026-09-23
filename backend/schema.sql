@@ -77,7 +77,10 @@ ALTER TABLE reservation_groups
   ADD COLUMN IF NOT EXISTS adults_count INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS children_count INTEGER NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS pool_adult_price_per_day NUMERIC(12, 2),
-  ADD COLUMN IF NOT EXISTS pool_child_price_per_day NUMERIC(12, 2);
+  ADD COLUMN IF NOT EXISTS pool_child_price_per_day NUMERIC(12, 2),
+  -- Patente del vehiculo: obligatoria en las reservas de estacionamiento
+  -- (la API la exige). Se guarda en mayusculas y sin espacios: AB123CD.
+  ADD COLUMN IF NOT EXISTS vehicle_plate VARCHAR(20);
 
 -- Las personas que ocupan una reserva. Solo full_name es obligatorio.
 -- age y birth_date conviven: si esta la fecha, la edad se calcula de ahi.

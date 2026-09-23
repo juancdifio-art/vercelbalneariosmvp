@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plano Balneario Zeus</title>
+<meta name="description" content="Plano del Balneario Zeus, temporada 2025-2026, relevado de la foto del plano original.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="plano-zeus.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="stamp">Relevado de la foto · docs/Plano foto.jpeg</div>
+    <h1>Plano del Balneario Zeus · temporada 2025-2026</h1>
+    <p class="lede">
+      Reproducción del plano en papel que tienen colgado en el balneario. Respeta la disposición de
+      edificios, caminos, columnas de carpas y bloques de sombrillas, con la misma numeración del original.
+      Los nombres escritos a mano (la ocupación de la temporada) no se transcribieron.
+    </p>
+  </header>
+
+  <div class="barra">
+    <span>Carpas en el plano: <b id="t-carpas">—</b></span>
+    <span>Sombrillas en el plano: <b id="t-sombrillas">—</b></span>
+    <span class="sep"></span>
+    <label><input type="checkbox" id="chk-numeros" checked> Mostrar números</label>
+    <a class="tool" href="plano-carpas.html">Vista carpas</a>
+    <a class="tool" href="plano-sombrillas.html">Vista sombrillas</a>
+    <button type="button" class="tool" id="descargar">⬇ Descargar unidades (JSON)</button>
+  </div>
+
+  <div class="planowrap">
+    <svg id="plano" class="plano" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Plano del Balneario Zeus"></svg>
+  </div>
+
+  <div class="refs">
+    <span><i class="sw"></i> Carpa</span>
+    <span><i class="sw circ"></i> Sombrilla</span>
+    <span><i class="sw circ dud"></i> Sombrilla que no se ve en la foto (ubicación supuesta)</span>
+    <span><i class="sw cam"></i> Camino</span>
+    <span><i class="sw edi"></i> Edificio</span>
+  </div>
+
+  <div class="notas">
+    <div>
+      <h3>Qué tiene el plano</h3>
+      <ul>
+        <li><strong>Carpas:</strong> 01 a 03 en el quincho, 12 a 15 y 16 a 25 sobre las dos terrazas, y 28 a 134 en el campo, en columnas de 5 a 10. Las 123 a 134 son una carpa suelta al pie de cada columna.</li>
+        <li><strong>Sombrillas:</strong> 1 a 202 en cuatro bloques, numeradas de derecha a izquierda y del mar hacia atrás. Las 203 a 220 son agregadas en los bordes de los bloques.</li>
+        <li><strong>Edificios:</strong> quincho, dos terrazas con escalera entre medio, admin, depósito, deck con tres duchas, piscina y restaurant. Tres duchas más sueltas entre carpas y sombrillas, y tres accesos a la playa.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Dudas a confirmar con el balneario</h3>
+      <ul>
+        <li><strong>Carpas que no aparecen:</strong> 4 a 11, 26, 27 y 77 a 83. No están dibujadas en ningún lado del plano.</li>
+        <li><strong>Sombrilla 209:</strong> no se ve en la foto (el mouse tapa esa esquina). Se dibujó punteada donde probablemente esté, debajo de la 210.</li>
+        <li><strong>Marcas ×</strong> en el camino sobre las columnas 118, 112, 84 y 71: están en el original y no sabemos qué indican.</li>
+        <li>Las etiquetas <em>Quiosco</em> y <em>Vestuarios</em> están escritas arriba de las terrazas, sin un recuadro propio.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Cómo seguir</h3>
+      <p>Toda la geometría sale del objeto <code>PLANO</code> en <code>plano-zeus.js</code>, compartido con las vistas de carpas y de sombrillas: columnas de carpas y filas de sombrillas con sus números. Corregir una unidad es cambiar un número ahí. El botón de descarga exporta cada unidad con tipo, número y posición para usarla en la app.</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="plano-zeus.js"></script>
+<script>
+  var svg = document.getElementById('plano');
+  var unidades = PlanoZeus.dibujar(svg, { vista: 'completo' });
+  document.getElementById('t-carpas').textContent = unidades.filter(function (u) { return u.tipo === 'carpa'; }).length;
+  document.getElementById('t-sombrillas').textContent = unidades.filter(function (u) { return u.tipo === 'sombrilla'; }).length;
+  document.getElementById('chk-numeros').addEventListener('change', function (e) {
+    svg.classList.toggle('sin-numeros', !e.target.checked);
+  });
+  document.getElementById('descargar').addEventListener('click', function () {
+    PlanoZeus.descargarJSON(unidades, 'plano-zeus.json');
+  });
+</script>
+</body>
+</html>

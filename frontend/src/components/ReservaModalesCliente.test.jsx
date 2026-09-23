@@ -55,7 +55,8 @@ describe.each(MODALES)('modal de $nombre', ({ Modal, clave }) => {
           initialPaymentAmount: '',
           initialPaymentMethod: '',
           parkingInitialPaymentAmount: '',
-          parkingInitialPaymentMethod: ''
+          parkingInitialPaymentMethod: '',
+          vehiclePlate: 'AB123CD'
         }}
         clients={[CLIENTE]}
         establishment={{ carpasCapacity: 100, sombrillasCapacity: 100, parkingCapacity: 100 }}

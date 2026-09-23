@@ -6,6 +6,7 @@ import { formatPesos } from '../lib/money';
 import { otrasReservasVigentes, saldoDe, hoyISO } from '../lib/reservas';
 import { ServiceIcon, COLOR_SERVICIO } from './icons';
 import PersonasReserva from './PersonasReserva';
+import { formatearPatente } from '../lib/patente';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -43,6 +44,8 @@ function ReservationDetailsModal({
     notes,
     status,
     linkedParkingResourceNumber,
+    linkedParkingData,
+    vehiclePlate,
     adultsCount,
     childrenCount
   } = reservation;
@@ -278,7 +281,23 @@ function ReservationDetailsModal({
                   <span className="text-base">🚗</span>
                   <div className="flex-1">
                     <p className="text-[10px] text-slate-500 font-medium">Estacionamiento</p>
-                    <p className="text-xs font-semibold text-slate-900">Plaza {linkedParkingResourceNumber}</p>
+                    <p className="text-xs font-semibold text-slate-900">
+                      Plaza {linkedParkingResourceNumber}
+                      {linkedParkingData?.vehiclePlate ? ` · Patente ${formatearPatente(linkedParkingData.vehiclePlate)}` : ''}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {serviceType === 'parking' && (
+                <div className="flex items-start gap-2">
+                  <span className="text-base">🚗</span>
+                  <div className="flex-1">
+                    <p className="text-[10px] text-slate-500 font-medium">Patente</p>
+                    {vehiclePlate ? (
+                      <p className="text-xs font-semibold tracking-wider text-slate-900">{formatearPatente(vehiclePlate)}</p>
+                    ) : (
+                      <p className="text-xs font-semibold text-amber-700">Sin patente cargada: editá la reserva para agregarla.</p>
+                    )}
                   </div>
                 </div>
               )}

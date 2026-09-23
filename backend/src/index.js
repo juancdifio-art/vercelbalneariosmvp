@@ -910,6 +910,12 @@ app.get('/api/reservations', authenticateToken, async (req, res) => {
   }
 });
 
+// Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
+// Es obligatoria en toda reserva de estacionamiento. Igual que en api/index.js.
+function normalizarPatente(valor) {
+  return String(valor ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
@@ -947,6 +953,7 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.children_count,
         rg.pool_adult_price_per_day,
         rg.pool_child_price_per_day,
+        rg.vehicle_plate,
         c.document_number AS client_document_number,
         COALESCE(SUM(rp.amount), 0) AS paid_amount
       FROM reservation_groups rg
@@ -1039,6 +1046,7 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.children_count,
         rg.pool_adult_price_per_day,
         rg.pool_child_price_per_day,
+        rg.vehicle_plate,
         c.document_number
       ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
@@ -1066,6 +1074,7 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         childrenCount: row.children_count,
         poolAdultPricePerDay: row.pool_adult_price_per_day,
         poolChildPricePerDay: row.pool_child_price_per_day,
+        vehiclePlate: row.vehicle_plate || null,
         clientDocumentNumber: row.client_document_number || null,
         paidAmount: Number(row.paid_amount || 0)
       }))
@@ -1095,11 +1104,16 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       poolAdultPricePerDay,
       poolChildPricePerDay
     } = req.body;
+    const vehiclePlate = normalizarPatente(req.body.vehiclePlate);
 
     const allowedServices = ['carpa', 'sombrilla', 'parking', 'pileta'];
 
     if (!serviceType || !allowedServices.includes(serviceType)) {
       return res.status(400).json({ error: 'invalid_service' });
+    }
+
+    if (serviceType === 'parking' && !vehiclePlate) {
+      return res.status(400).json({ error: 'vehicle_plate_required' });
     }
 
     if (!startDate || !endDate) {
@@ -1256,9 +1270,10 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         children_count,
         pool_adult_price_per_day,
         pool_child_price_per_day,
-        client_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-      RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day`,
+        client_id,
+        vehicle_plate
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate`,
       [
         establishmentId,
         serviceType,
@@ -1274,7 +1289,8 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         childrenCountParsed,
         poolAdultPricePerDayParsed,
         poolChildPricePerDayParsed,
-        clientIdParsed
+        clientIdParsed,
+        vehiclePlate || null
       ]
     );
 
@@ -1305,6 +1321,7 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         childrenCount: groupRow.children_count,
         poolAdultPricePerDay: groupRow.pool_adult_price_per_day,
         poolChildPricePerDay: groupRow.pool_child_price_per_day,
+        vehiclePlate: groupRow.vehicle_plate || null,
         paidAmount: 0
       }
     });
@@ -1358,7 +1375,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     const establishmentId = estResult.rows[0].id;
 
     const existingResult = await pool.query(
-      'SELECT id, establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+      'SELECT id, establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
       [groupId, establishmentId]
     );
 
@@ -1367,6 +1384,14 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     }
 
     const current = existingResult.rows[0];
+
+    // La patente solo se toca si viene en el body; en estacionamiento no se puede vaciar.
+    const nextVehiclePlate = req.body.vehiclePlate !== undefined
+      ? normalizarPatente(req.body.vehiclePlate) || null
+      : current.vehicle_plate;
+    if (current.service_type === 'parking' && req.body.vehiclePlate !== undefined && !nextVehiclePlate) {
+      return res.status(400).json({ error: 'vehicle_plate_required' });
+    }
 
     const nextCustomerName = customerName !== undefined ? customerName : current.customer_name;
     const nextCustomerPhone = customerPhone !== undefined ? customerPhone : current.customer_phone;
@@ -1489,7 +1514,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     }
 
     const updateResult = await pool.query(
-      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, adults_count = $8, children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, updated_at = NOW() WHERE id = $15 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day',
+      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, adults_count = $8, children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, vehicle_plate = $16, updated_at = NOW() WHERE id = $15 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate',
       [
         nextCustomerName || null,
         nextCustomerPhone || null,
@@ -1505,7 +1530,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         nextResourceNumber,
         nextStartDate,
         nextEndDate,
-        groupId
+        groupId,
+        nextVehiclePlate
       ]
     );
 
@@ -1534,7 +1560,8 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         adultsCount: updatedRow.adults_count,
         childrenCount: updatedRow.children_count,
         poolAdultPricePerDay: updatedRow.pool_adult_price_per_day,
-        poolChildPricePerDay: updatedRow.pool_child_price_per_day
+        poolChildPricePerDay: updatedRow.pool_child_price_per_day,
+        vehiclePlate: updatedRow.vehicle_plate || null
       }
     });
   } catch (error) {

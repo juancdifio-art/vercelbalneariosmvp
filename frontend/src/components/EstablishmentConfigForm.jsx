@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { capacidadDelPlano } from '../lib/unidades';
 
 function EstablishmentConfigForm({
   variant = 'light',
@@ -26,6 +27,27 @@ function EstablishmentConfigForm({
   success
 }) {
   const isDark = variant === 'dark';
+
+  // Con el plano del balneario activo, la cantidad de carpas y sombrillas es
+  // la relevada en el plano: el campo queda fijo y se guarda ese valor.
+  const carpasDelPlano = capacidadDelPlano('carpa');
+  const sombrillasDelPlano = capacidadDelPlano('sombrilla');
+
+  useEffect(() => {
+    if (estHasCarpas && carpasDelPlano != null && estCarpasCapacity !== String(carpasDelPlano)) {
+      setEstCarpasCapacity(String(carpasDelPlano));
+    }
+  }, [estHasCarpas, carpasDelPlano, estCarpasCapacity, setEstCarpasCapacity]);
+
+  useEffect(() => {
+    if (estHasSombrillas && sombrillasDelPlano != null && estSombrillasCapacity !== String(sombrillasDelPlano)) {
+      setEstSombrillasCapacity(String(sombrillasDelPlano));
+    }
+  }, [estHasSombrillas, sombrillasDelPlano, estSombrillasCapacity, setEstSombrillasCapacity]);
+
+  const notaPlano = (texto) => (
+    <span className={isDark ? 'text-[10px] text-slate-400' : 'text-[10px] text-slate-500'}>{texto}</span>
+  );
 
   return (
     <>
@@ -181,6 +203,8 @@ function EstablishmentConfigForm({
                       type="number"
                       min="0"
                       value={estCarpasCapacity}
+                      readOnly={carpasDelPlano != null}
+                      aria-readonly={carpasDelPlano != null}
                       onChange={(e) => setEstCarpasCapacity(e.target.value)}
                       placeholder="Ej: 80"
                       className={
@@ -189,6 +213,7 @@ function EstablishmentConfigForm({
                           : 'mt-0.5 w-full rounded-lg border border-cyan-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500'
                       }
                     />
+                    {carpasDelPlano != null && notaPlano('Fijada por el plano del balneario: 117 carpas, numeradas del 1 al 134 con huecos.')}
                   </label>
                 </div>
               )}
@@ -246,6 +271,8 @@ function EstablishmentConfigForm({
                       type="number"
                       min="0"
                       value={estSombrillasCapacity}
+                      readOnly={sombrillasDelPlano != null}
+                      aria-readonly={sombrillasDelPlano != null}
                       onChange={(e) => setEstSombrillasCapacity(e.target.value)}
                       placeholder="Ej: 120"
                       className={
@@ -254,6 +281,7 @@ function EstablishmentConfigForm({
                           : 'mt-0.5 w-full rounded-lg border border-cyan-200 bg-white px-2 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500'
                       }
                     />
+                    {sombrillasDelPlano != null && notaPlano('Fijada por el plano del balneario: sombrillas 1 a 220.')}
                   </label>
                 </div>
               )}

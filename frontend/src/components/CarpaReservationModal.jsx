@@ -3,6 +3,9 @@ import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
 import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
 import PersonasFields from './PersonasFields';
+import { numerosDeUnidades } from '../lib/unidades';
+import { normalizarPatente } from '../lib/patente';
+import PatenteField from './PatenteField';
 
 // Función para formatear montos con separadores de miles (formato argentino)
 const formatCurrency = (value) => {
@@ -64,7 +67,8 @@ function CarpaReservationModal({
     initialPaymentAmount,
     initialPaymentMethod,
     parkingInitialPaymentAmount,
-    parkingInitialPaymentMethod
+    parkingInitialPaymentMethod,
+    vehiclePlate
   } = form;
 
   const hasParking = establishment?.hasParking;
@@ -74,7 +78,9 @@ function CarpaReservationModal({
   const parkingUnits = parkingCapacity > 0 ? Array.from({ length: parkingCapacity }, (_, i) => i + 1) : [];
 
   // Calcular carpas disponibles para el rango de fechas seleccionado
-  const totalCarpas = Number.parseInt(establishment?.carpasCapacity ?? '0', 10);
+  // Con el plano, la numeracion tiene huecos: la lista sale de ahi y no de 1..capacidad.
+  const numerosCarpas = numerosDeUnidades(establishment, 'carpa');
+  const totalCarpas = numerosCarpas.length;
 
   const startStr = startDate || format(day, 'yyyy-MM-dd');
   const endStr = endDate || '';
@@ -149,7 +155,9 @@ function CarpaReservationModal({
     !isReserved && includeParking && parkingSpotNumber && estacionamiento.ocupadas.has(Number(parkingSpotNumber))
   );
   const verificandoDisponibilidad = principal.verificando || Boolean(includeParking && estacionamiento.verificando);
-  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad;
+  // Sin patente no hay estacionamiento: es un dato obligatorio.
+  const faltaPatente = Boolean(includeParking) && !normalizarPatente(vehiclePlate);
+  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad || faltaPatente;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -206,7 +214,7 @@ function CarpaReservationModal({
                       );
                     }}
                   >
-                    {Array.from({ length: totalCarpas }, (_, i) => i + 1).map((num) => {
+                    {numerosCarpas.map((num) => {
                       const isOccupied = principal.ocupadas.has(num);
                       return (
                         <option
@@ -243,7 +251,9 @@ function CarpaReservationModal({
                             ...prev,
                             clientId: client ? client.id : null,
                             customerName: client ? client.fullName : '',
-                            customerPhone: client ? client.phone || '' : ''
+                            customerPhone: client ? client.phone || '' : '',
+                            // Si la ficha tiene patente, se completa sola (se puede cambiar).
+                            vehiclePlate: prev.vehiclePlate || (client && client.vehiclePlate) || ''
                           }
                           : prev
                       );
@@ -525,6 +535,12 @@ function CarpaReservationModal({
                       })}
                     </select>
                   </label>
+                  <PatenteField
+                    value={vehiclePlate}
+                    onChange={(value) =>
+                      onChangeForm((prev) => (prev ? { ...prev, vehiclePlate: value } : prev))
+                    }
+                  />
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-semibold text-slate-700">Valor por día estacionamiento (ARS)</span>
                     <input
@@ -658,6 +674,11 @@ function CarpaReservationModal({
               ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para la carpa.
             </div>
           )}
+          {faltaPatente && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Falta la patente del vehículo: es obligatoria para usar el estacionamiento.
+            </div>
+          )}
           {parkingPaymentMissingMethod && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
               ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para el estacionamiento.
@@ -695,7 +716,8 @@ function CarpaReservationModal({
                     initialPaymentAmount,
                     initialPaymentMethod,
                     parkingInitialPaymentAmount,
-                    parkingInitialPaymentMethod
+                    parkingInitialPaymentMethod,
+                    vehiclePlate: normalizarPatente(vehiclePlate)
                   });
 
                   if (ok) {

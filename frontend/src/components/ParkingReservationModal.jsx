@@ -3,6 +3,8 @@ import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
 import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
 import PersonasFields from './PersonasFields';
+import PatenteField from './PatenteField';
+import { normalizarPatente } from '../lib/patente';
 
 function ParkingReservationModal({
   form,
@@ -31,7 +33,8 @@ function ParkingReservationModal({
     childrenCount,
     dailyPrice,
     initialPaymentAmount,
-    initialPaymentMethod
+    initialPaymentMethod,
+    vehiclePlate
   } = form;
 
   // Calcular plazas disponibles para el rango de fechas seleccionado
@@ -83,7 +86,9 @@ function ParkingReservationModal({
   // La plaza elegida que choca con otra reserva en algun dia del periodo no
   // se guarda.
   const conflictoPlaza = !isReserved && hayRango && ocupacion.ocupadas.has(Number(plazaNumero));
-  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando;
+  // Sin patente no hay estacionamiento: es un dato obligatorio.
+  const faltaPatente = !normalizarPatente(vehiclePlate);
+  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando || faltaPatente;
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -184,7 +189,9 @@ function ParkingReservationModal({
                             ...prev,
                             clientId: client ? client.id : null,
                             customerName: client ? client.fullName : '',
-                            customerPhone: client ? client.phone || '' : ''
+                            customerPhone: client ? client.phone || '' : '',
+                            // Si la ficha tiene patente, se completa sola (se puede cambiar).
+                            vehiclePlate: prev.vehiclePlate || (client && client.vehiclePlate) || ''
                           }
                           : prev
                       );
@@ -231,6 +238,14 @@ function ParkingReservationModal({
                       className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                     />
                   </label>
+                </div>
+                <div className="mt-3">
+                  <PatenteField
+                    value={vehiclePlate}
+                    onChange={(value) =>
+                      onChangeForm((prev) => (prev ? { ...prev, vehiclePlate: value } : prev))
+                    }
+                  />
                 </div>
               </div>
             </div>
@@ -426,6 +441,12 @@ function ParkingReservationModal({
             </div>
           )}
 
+          {faltaPatente && !isReserved && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Falta la patente del vehículo: es obligatoria para usar el estacionamiento.
+            </div>
+          )}
+
           {/* Mensaje de error de pago */}
           {paymentMissingMethod && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
@@ -453,7 +474,8 @@ function ParkingReservationModal({
                     childrenCount,
                     dailyPrice,
                     initialPaymentAmount,
-                    initialPaymentMethod
+                    initialPaymentMethod,
+                    vehiclePlate: normalizarPatente(vehiclePlate)
                   });
 
                   if (ok) {
