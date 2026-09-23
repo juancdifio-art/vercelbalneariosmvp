@@ -15,9 +15,11 @@ import {
  * Plano del Balneario Zeus en SVG.
  *
  * `vista` elige el recorte: 'carpas', 'sombrillas' o 'completo'.
- * `estadoDe(serviceType, numero)` devuelve { estado, title } para pintar cada
- * unidad; estado es 'ocupada', 'proxima' o 'libre'. Sin `estadoDe` las
- * unidades se dibujan neutras.
+ * `estadoDe(serviceType, numero)` devuelve { estado, title, color? } para
+ * pintar cada unidad; estado es 'ocupada', 'proxima' o 'libre'. `color`
+ * (`{ fill, stroke, texto }`), si viene, pisa al color del estado — lo usan
+ * los sectores de tarifas para pintar cada unidad con su propio color. Sin
+ * `estadoDe` las unidades se dibujan neutras.
  * `fichaDe(serviceType, numero)` devuelve el contenido de la tarjeta que sale
  * al instante al pasar el mouse; sin ella queda el `title` nativo.
  */
@@ -130,7 +132,8 @@ function Unidad({ serviceType, numero, estadoDe, onUnidadClick, fichaDe, tooltip
   const prefijo = serviceType === 'carpa' ? 'Carpa' : 'Sombrilla';
   const title = info?.title ?? `${prefijo} ${numero}`;
   const clickable = Boolean(onUnidadClick);
-  const estilo = ESTILO_ESTADO[info?.estado] ?? ESTILO_ESTADO.libre;
+  // Quien pinta el plano puede pedir un color propio (los sectores de tarifas).
+  const estilo = info?.color ?? ESTILO_ESTADO[info?.estado] ?? ESTILO_ESTADO.libre;
 
   const activar = () => {
     tooltipRef?.current?.ocultar();
