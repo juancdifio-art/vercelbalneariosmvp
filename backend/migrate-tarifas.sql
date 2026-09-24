@@ -63,6 +63,14 @@ CREATE TABLE IF NOT EXISTS tarifas (
   )
 );
 
+-- Postgres no soporta ADD CONSTRAINT IF NOT EXISTS: se consulta pg_constraint.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'tarifas_resource_number_positivo') THEN
+    ALTER TABLE tarifas ADD CONSTRAINT tarifas_resource_number_positivo CHECK (resource_number IS NULL OR resource_number > 0);
+  END IF;
+END $$;
+
 CREATE INDEX IF NOT EXISTS idx_tarifas_establecimiento_servicio ON tarifas(establishment_id, service_type);
 
 -- Snapshot del precio al reservar. total_price sigue siendo lo cobrado.

@@ -171,6 +171,7 @@ CREATE TABLE IF NOT EXISTS tarifas (
     (alcance = 'sector' AND sector_id IS NOT NULL AND resource_number IS NULL) OR
     (alcance = 'unidad' AND sector_id IS NULL AND resource_number IS NOT NULL)
   ),
+  CONSTRAINT tarifas_resource_number_positivo CHECK (resource_number IS NULL OR resource_number > 0),
   CONSTRAINT tarifas_clase_coherente CHECK (
     (clase = 'fecha' AND periodo_id IS NOT NULL AND dias_min IS NULL AND dias_max IS NULL AND modo IS NULL) OR
     (clase = 'estadia' AND dias_min >= 1 AND (dias_max IS NULL OR dias_max >= dias_min) AND modo IS NOT NULL)
