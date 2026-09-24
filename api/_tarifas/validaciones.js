@@ -10,7 +10,9 @@ const esEntero = (n) => Number.isInteger(n);
 const diaValido = (mes, dia) => esEntero(mes) && mes >= 1 && mes <= 12 && esEntero(dia) && dia >= 1 && dia <= DIAS_POR_MES[mes - 1];
 
 function validarPeriodo(p) {
-  if (!String(p.nombre ?? '').trim()) return 'nombre_requerido';
+  const nombre = String(p.nombre ?? '').trim();
+  if (!nombre) return 'nombre_requerido';
+  if (nombre.length > 100) return 'nombre_largo';
   if (!diaValido(p.mesInicio, p.diaInicio) || !diaValido(p.mesFin, p.diaFin)) return 'fecha_invalida';
   if (!esEntero(p.prioridad)) return 'prioridad_invalida';
   return null;
@@ -27,12 +29,16 @@ function periodosSeSuperponen(a, b) {
 
 function validarSector(s) {
   if (!SERVICIOS_CON_TARIFA.includes(s.serviceType)) return 'servicio_invalido';
-  if (!String(s.nombre ?? '').trim()) return 'nombre_requerido';
+  const nombre = String(s.nombre ?? '').trim();
+  if (!nombre) return 'nombre_requerido';
+  if (nombre.length > 100) return 'nombre_largo';
+  if (s.color != null && !/^#[0-9a-fA-F]{6}$/.test(s.color)) return 'color_invalido';
   return null;
 }
 
 function validarTarifa(t) {
   if (!SERVICIOS_CON_TARIFA.includes(t.serviceType)) return 'servicio_invalido';
+  if (t.nombre != null && String(t.nombre).length > 100) return 'nombre_largo';
 
   const alcanceOk =
     (t.alcance === 'tipo' && t.sectorId == null && t.resourceNumber == null) ||
@@ -43,6 +49,7 @@ function validarTarifa(t) {
   if (t.clase === 'fecha') {
     if (!esEntero(t.periodoId) || t.diasMin != null || t.diasMax != null || t.modo != null) return 'tarifa_invalida';
   } else if (t.clase === 'estadia') {
+    if (t.periodoId != null && !esEntero(t.periodoId)) return 'tarifa_invalida';
     if (!esEntero(t.diasMin) || t.diasMin < 1) return 'tarifa_invalida';
     if (t.diasMax != null && (!esEntero(t.diasMax) || t.diasMax < t.diasMin)) return 'tarifa_invalida';
     if (!['cerrado', 'por_dia'].includes(t.modo)) return 'tarifa_invalida';

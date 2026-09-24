@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { aNumero, filaCoincide, formatearPesos } from '../../lib/tarifas';
+import { numerosDeUnidades } from '../../lib/unidades';
 
 const entrada = 'rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 const PREFIJO = { carpa: 'Carpa', sombrilla: 'Sombrilla', parking: 'Plaza' };
 const TODAS = { carpa: 'Todas las carpas', sombrilla: 'Todas las sombrillas', parking: 'Todo el estacionamiento' };
 const ESTADIA_VACIA = { nombre: '', diasMin: '', diasMax: '', modo: 'cerrado', precio: '', periodoId: '', alcance: 'tipo', unidad: '' };
+
+// carpa/sombrilla: numeros del plano (con huecos). parking: 1..capacidad, que
+// es exactamente lo que numerosDeUnidades ya devuelve para ese servicio.
+function mensajeUnidadInvalida(serviceType, n) {
+  if (serviceType === 'parking') return `La plaza ${n} no existe.`;
+  return `La ${PREFIJO[serviceType].toLowerCase()} ${n} no está en el plano.`;
+}
 
 // Un precio solo tiene digitos y una coma decimal: el punto se descarta, si no
 // aNumero("150.000") daria 150.
@@ -39,12 +47,17 @@ function CeldaPrecio({ etiqueta, inicial, general, onGuardar }) {
  * Una celda vacia en un sector o unidad significa "usa el precio general".
  * Por estadia: una lista aparte, porque reemplaza a la grilla entera.
  */
-function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
+function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar, establishment }) {
   const [serviceType, setServiceType] = useState(servicios[0]?.id ?? 'carpa');
   const [extras, setExtras] = useState([]);
   const [nuevaUnidad, setNuevaUnidad] = useState('');
   const [estadia, setEstadia] = useState(ESTADIA_VACIA);
   const [error, setError] = useState('');
+
+  // Numeros que de verdad existen: del plano para carpa/sombrilla (con huecos),
+  // 1..capacidad para estacionamiento. Cargar una tarifa para una unidad que
+  // no existe la deja invisible en cualquier grilla o listado.
+  const numerosValidos = numerosDeUnidades(establishment, serviceType);
 
   const propias = tarifas.filter((t) => t.serviceType === serviceType);
   const porFecha = propias.filter((t) => t.clase === 'fecha');
@@ -77,8 +90,18 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
 
   const agregarUnidad = () => {
     const n = Number(nuevaUnidad);
-    if (Number.isInteger(n) && n > 0) setExtras((prev) => [...prev, n]);
+    if (!Number.isInteger(n) || n <= 0) {
+      setNuevaUnidad('');
+      return;
+    }
+    if (!numerosValidos.includes(n)) {
+      setError(mensajeUnidadInvalida(serviceType, n));
+      setNuevaUnidad('');
+      return;
+    }
+    setExtras((prev) => [...prev, n]);
     setNuevaUnidad('');
+    setError('');
   };
 
   const campoEstadia = (clave, limpiar = (v) => v) => (e) => setEstadia((f) => ({ ...f, [clave]: limpiar(e.target.value) }));
@@ -91,6 +114,13 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
 
   const agregarEstadia = async (e) => {
     e.preventDefault();
+    if (estadia.alcance === 'unidad') {
+      const n = aNumero(estadia.unidad);
+      if (n !== null && !numerosValidos.includes(n)) {
+        setError(mensajeUnidadInvalida(serviceType, n));
+        return;
+      }
+    }
     const err = await ejecutar('tarifas', {
       method: 'POST',
       body: {
@@ -224,7 +254,7 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
           {estadia.alcance === 'unidad' && (
             <label className="flex flex-col gap-1">
               <span className="text-[11px] font-semibold text-slate-700">Unidad</span>
-              <input value={estadia.unidad} onChange={campoEstadia('unidad')} inputMode="numeric" className={entrada} />
+              <input value={estadia.unidad} onChange={campoEstadia('unidad', limpiarEntero)} inputMode="numeric" className={entrada} />
             </label>
           )}
           <div className="col-span-2 flex justify-end sm:col-span-4">

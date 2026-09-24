@@ -213,6 +213,25 @@ describe('rutearTarifas', () => {
     expect(r.status).toBe(404);
   });
 
+  it('un id de tarifa que no es entero positivo es 400 id_invalido, sin consultar la base', async () => {
+    const r = await rutearTarifas(query, 7, { method: 'PATCH', partes: ['1.5'], params: {}, body: { precio: 1000 } });
+    expect(r).toEqual({ status: 400, body: { error: 'id_invalido' } });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('un id de periodo que no es numero es 400 id_invalido, sin consultar la base', async () => {
+    const r = await rutearTarifas(query, 7, { method: 'PATCH', partes: ['periodos', 'abc'], params: {}, body: { nombre: 'X' } });
+    expect(r).toEqual({ status: 400, body: { error: 'id_invalido' } });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it('editar un sector con un color invalido responde 400 sin tocarlo', async () => {
+    query.mockResolvedValueOnce({ rows: [{ id: 5, service_type: 'carpa', nombre: 'Terraza', color: '#0EA5E9' }] });
+    const r = await rutearTarifas(query, 7, { method: 'PATCH', partes: ['sectores', '5'], params: {}, body: { color: 'rojo' } });
+    expect(r).toEqual({ status: 400, body: { error: 'color_invalido' } });
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
   it('un error de base no se disfraza de precio 0: se propaga', async () => {
     query.mockRejectedValueOnce(new Error('connection refused'));
     await expect(rutearTarifas(query, 7, { method: 'GET', partes: ['cotizar'], params: { serviceType: 'carpa', resourceNumber: '58', startDate: '2026-01-10', endDate: '2026-01-10' }, body: {} })).rejects.toThrow('connection refused');

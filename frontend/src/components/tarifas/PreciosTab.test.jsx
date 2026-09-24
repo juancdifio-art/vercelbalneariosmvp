@@ -11,9 +11,10 @@ const PERIODOS = [
 ];
 const SECTORES = [{ id: 3, serviceType: 'carpa', nombre: 'Terraza', color: '#F97316', unidades: [118] }];
 const GENERAL_ALTA = { id: 20, serviceType: 'carpa', alcance: 'tipo', sectorId: null, resourceNumber: null, clase: 'fecha', periodoId: 1, precio: 14000 };
+const ESTABLISHMENT = { carpasCapacity: 117, sombrillasCapacity: 220, parkingCapacity: 10, hasCarpas: true };
 
-function renderizar(tarifas = [GENERAL_ALTA], ejecutar = vi.fn().mockResolvedValue('')) {
-  render(<PreciosTab servicios={SERVICIOS} periodos={PERIODOS} sectores={SECTORES} tarifas={tarifas} ejecutar={ejecutar} />);
+function renderizar(tarifas = [GENERAL_ALTA], ejecutar = vi.fn().mockResolvedValue(''), establishment = ESTABLISHMENT) {
+  render(<PreciosTab servicios={SERVICIOS} periodos={PERIODOS} sectores={SECTORES} tarifas={tarifas} ejecutar={ejecutar} establishment={establishment} />);
   return ejecutar;
 }
 
@@ -112,5 +113,33 @@ describe('PreciosTab por estadia', () => {
     expect(screen.getByLabelText('Precio (ARS)')).toHaveValue('12000,50');
     await userEvent.click(screen.getByRole('button', { name: 'Agregar tarifa por estadía' }));
     expect(ejecutar).toHaveBeenCalledWith('tarifas', expect.objectContaining({ body: expect.objectContaining({ precio: 12000.5 }) }));
+  }, 15000);
+
+  it('una unidad que no existe en el plano no llama a ejecutar', async () => {
+    const ejecutar = renderizar();
+    await userEvent.type(screen.getByLabelText('Desde (días)'), '90');
+    await userEvent.type(screen.getByLabelText('Precio (ARS)'), '3500000');
+    await userEvent.selectOptions(screen.getByLabelText('Aplica a'), 'unidad');
+    await userEvent.type(screen.getByLabelText('Unidad'), '5');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar tarifa por estadía' }));
+    expect(ejecutar).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent('La carpa 5 no está en el plano.');
+  }, 15000);
+});
+
+describe('PreciosTab valida unidades contra el plano', () => {
+  it('agregar una carpa que no existe en el plano (huecos 4-11) muestra el error y no crea la fila', async () => {
+    renderizar();
+    await userEvent.type(screen.getByLabelText('Número de unidad'), '5');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar unidad' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('La carpa 5 no está en el plano.');
+    expect(screen.queryByLabelText('Carpa 5 · Alta')).not.toBeInTheDocument();
+  }, 15000);
+
+  it('agregar una carpa que existe en el plano crea la fila', async () => {
+    renderizar();
+    await userEvent.type(screen.getByLabelText('Número de unidad'), '58');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar unidad' }));
+    expect(screen.getByLabelText('Carpa 58 · Alta')).toBeInTheDocument();
   }, 15000);
 });
