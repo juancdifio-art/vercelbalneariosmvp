@@ -120,7 +120,7 @@ cotizar({ tarifas, periodos, sectorId, serviceType, resourceNumber, desde, hasta
 ### Paso 1: tarifa por estadía
 
 1. `dias` = días inclusivos (del 1 al 5 son 5).
-2. Candidatas: tarifas `estadia` del `serviceType` cuyo rango contiene `dias`, que aplican a la unidad (por alcance), y que no tienen período o cuyo período es el vigente en la **fecha de entrada**.
+2. Candidatas: tarifas `estadia` del `serviceType` cuyo rango contiene `dias`, que aplican a la unidad (por alcance), y que no tienen período o cuyo período contiene la fecha de entrada (aunque ese día mande otro período de mayor prioridad).
 3. Si hay varias, gana la de alcance más específico: unidad > sector > tipo.
 4. `cerrado` → total = precio. `por_dia` → total = precio × dias.
 5. Si hubo tarifa por estadía, el cálculo termina ahí. Las tarifas por fecha no se miran.

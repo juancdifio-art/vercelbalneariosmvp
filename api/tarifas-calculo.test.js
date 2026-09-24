@@ -159,6 +159,25 @@ describe('cotizar por estadia', () => {
     expect(cotizar({ tarifas: [nueva, vieja], ...args }).desglose.tarifaId).toBe(1);
     expect(cotizar({ tarifas: [vieja, nueva], ...args }).desglose.tarifaId).toBe(1);
   });
+
+  it('una estadia atada a un periodo aplica si ese periodo contiene la entrada, aunque otro de mayor prioridad rija ese dia', () => {
+    const ENERO = P(5, 'Enero', 1, 1, 1, 31, 5);
+    const tarifas = [E(15, 44, 'por_dia', 42000, { periodoId: 1 })];
+    const quincena = cotizar({ tarifas, periodos: [ALTA, ENERO], ...unidad(), desde: '2027-01-05', hasta: '2027-01-24' });
+    expect(quincena.dias).toBe(20);
+    expect(quincena.desglose.clase).toBe('estadia');
+    expect(quincena.total).toBe(840000);
+
+    // Sigue sin aplicar a una entrada que cae en baja, fuera de ALTA.
+    const baja = cotizar({ tarifas, periodos: [ALTA, ENERO], ...unidad(), desde: '2026-04-01', hasta: '2026-04-20' });
+    expect(baja.desglose.clase).not.toBe('estadia');
+  });
+
+  it('una estadia atada a un periodo que no existe en periodos no aplica', () => {
+    const tarifas = [E(90, null, 'cerrado', 3500000, { periodoId: 999 })];
+    const c = cotizar({ tarifas, periodos: [ALTA, BAJA], ...unidad(), desde: '2026-12-15', hasta: '2027-03-14' });
+    expect(c.desglose.clase).not.toBe('estadia');
+  });
 });
 
 describe('calendarioAnual', () => {

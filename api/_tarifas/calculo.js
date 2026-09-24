@@ -54,9 +54,12 @@ function contiene(periodo, mes, dia) {
   return i <= f ? x >= i && x <= f : x >= i || x <= f;
 }
 
+function mesDiaDe(iso) {
+  return [Number(String(iso).slice(5, 7)), Number(String(iso).slice(8, 10))];
+}
+
 function periodoVigente(periodos, iso) {
-  const mes = Number(String(iso).slice(5, 7));
-  const dia = Number(String(iso).slice(8, 10));
+  const [mes, dia] = mesDiaDe(iso);
   let mejor = null;
   for (const p of periodos) {
     if (!contiene(p, mes, dia)) continue;
@@ -64,6 +67,17 @@ function periodoVigente(periodos, iso) {
     if (!mejor || p.prioridad > mejor.prioridad || (p.prioridad === mejor.prioridad && p.id < mejor.id)) mejor = p;
   }
   return mejor;
+}
+
+// "Atada al periodo X" no significa que X sea el vigente (el de mayor prioridad)
+// el dia de entrada: significa que X, el periodo con ese id, contiene esa fecha,
+// sin importar que otro periodo de mayor prioridad rija ese mismo dia. Si el id
+// no corresponde a ningun periodo cargado, no aplica.
+function periodoIdContieneFecha(periodos, periodoId, iso) {
+  const p = periodos.find((x) => x.id === periodoId);
+  if (!p) return false;
+  const [mes, dia] = mesDiaDe(iso);
+  return contiene(p, mes, dia);
 }
 
 function redondear(n) {
@@ -104,12 +118,11 @@ function cotizar({ tarifas, periodos, sectorId = null, serviceType, resourceNumb
   const propias = tarifas.filter((t) => aplicaA(t, serviceType, Number(resourceNumber), sectorId));
 
   // Paso 1: tarifa por estadia. Si hay, reemplaza a las de fecha para toda la reserva.
-  const periodoEntrada = periodoVigente(periodos, desde);
   const estadia = masEspecifica(propias.filter((t) =>
     t.clase === 'estadia' &&
     dias >= t.diasMin &&
     (t.diasMax == null || dias <= t.diasMax) &&
-    (t.periodoId == null || (periodoEntrada && periodoEntrada.id === t.periodoId))
+    (t.periodoId == null || periodoIdContieneFecha(periodos, t.periodoId, desde))
   ));
   if (estadia) {
     const total = estadia.modo === 'cerrado' ? estadia.precio : redondear(estadia.precio * dias);
