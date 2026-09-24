@@ -52,6 +52,28 @@ describe('PreciosTab por fecha', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Agregar unidad' }));
     expect(screen.getByLabelText('Carpa 58 · Alta')).toBeInTheDocument();
   }, 15000);
+
+  it('una tarifa con centavos se muestra con coma', () => {
+    const TERRAZA_ALTA_CENTAVOS = { id: 21, serviceType: 'carpa', alcance: 'sector', sectorId: 3, resourceNumber: null, clase: 'fecha', periodoId: 1, precio: 14000.5 };
+    renderizar([GENERAL_ALTA, TERRAZA_ALTA_CENTAVOS]);
+    expect(screen.getByLabelText('Terraza · Alta')).toHaveValue('14000,5');
+  });
+
+  it('escribir con coma en una celda nueva crea la tarifa con centavos', async () => {
+    const ejecutar = renderizar();
+    await userEvent.type(screen.getByLabelText('Terraza · Alta'), '18000,5');
+    await userEvent.tab();
+    expect(ejecutar).toHaveBeenCalledWith('tarifas', {
+      method: 'POST',
+      body: { serviceType: 'carpa', alcance: 'sector', sectorId: 3, resourceNumber: null, clase: 'fecha', periodoId: 1, precio: 18000.5 }
+    });
+  }, 15000);
+
+  it('el punto se ignora al escribir en una celda', async () => {
+    renderizar();
+    await userEvent.type(screen.getByLabelText('Terraza · Alta'), '15.000');
+    expect(screen.getByLabelText('Terraza · Alta')).toHaveValue('15000');
+  }, 15000);
 });
 
 describe('PreciosTab por estadia', () => {

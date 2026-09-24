@@ -15,7 +15,11 @@ function CeldaPrecio({ etiqueta, inicial, general, onGuardar }) {
       value={texto}
       inputMode="numeric"
       placeholder={general ? '' : 'usa general'}
-      onChange={(e) => setTexto(e.target.value.replace(/\D/g, ''))}
+      onChange={(e) => {
+        const limpio = e.target.value.replace(/[^\d,]/g, '');
+        const [entero, ...resto] = limpio.split(',');
+        setTexto(resto.length ? `${entero},${resto.join('')}` : entero);
+      }}
       onBlur={() => {
         if (texto !== inicial) onGuardar(texto);
       }}
@@ -136,7 +140,7 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
                         <td key={p.id} className="px-2 py-1 text-right">
                           <CeldaPrecio
                             etiqueta={`${fila.etiqueta} · ${p.nombre}`}
-                            inicial={t ? String(t.precio) : ''}
+                            inicial={t ? String(t.precio).replace('.', ',') : ''}
                             general={fila.alcance === 'tipo'}
                             onGuardar={(texto) => guardarCelda(fila, p, texto)}
                           />
