@@ -23,11 +23,12 @@ beforeEach(() => {
 });
 afterEach(() => vi.restoreAllMocks());
 
-function ConEstado({ onSaveRange }) {
+function ConEstado({ onSaveRange, formOverrides = {} }) {
   const [form, setForm] = useState({
     carpaNumero: 58, isReserved: false, startDate: '2026-09-26', endDate: '2026-09-30',
     clientId: null, customerName: 'Lucia', customerPhone: '', includeParking: false,
-    initialPaymentAmount: '', initialPaymentMethod: ''
+    initialPaymentAmount: '', initialPaymentMethod: '',
+    ...formOverrides
   });
   return (
     <CarpaReservationModal
@@ -70,4 +71,30 @@ describe('precio en el alta de carpa', () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(guardar()).toBeDisabled();
   });
+});
+
+describe('plaza de estacionamiento sin elegir', () => {
+  it('cotiza y guarda la plaza que asignaria el sistema', async () => {
+    const onSaveRange = vi.fn().mockResolvedValue(true);
+    render(
+      <ConEstado
+        onSaveRange={onSaveRange}
+        formOverrides={{ includeParking: true, parkingSpotNumber: null, vehiclePlate: 'AB123CD' }}
+      />
+    );
+
+    await waitFor(() => {
+      const pidioParking = global.fetch.mock.calls.some(
+        ([url]) =>
+          String(url).includes('/tarifas/cotizar') &&
+          String(url).includes('serviceType=parking') &&
+          String(url).includes('resourceNumber=1')
+      );
+      expect(pidioParking).toBe(true);
+    });
+    await screen.findByText('Se asigna la plaza 1.');
+    await waitFor(() => expect(guardar()).toBeEnabled());
+    await userEvent.click(guardar());
+    expect(onSaveRange.mock.calls[0][3].parkingSpotNumber).toBe(1);
+  }, 15000);
 });

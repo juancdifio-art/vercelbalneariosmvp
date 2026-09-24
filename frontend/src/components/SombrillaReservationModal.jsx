@@ -96,6 +96,15 @@ function SombrillaReservationModal({
   const principal = useUnidadesOcupadas('sombrilla', startStr, endStr, !isReserved);
   const estacionamiento = useUnidadesOcupadas('parking', startStr, endStr, !isReserved && Boolean(includeParking));
 
+  // Sin plaza elegida, la que asignaria el sistema: asi se cotiza (y se
+  // guarda) la misma plaza, en vez de cotizar sin numero y asignar otra al guardar.
+  const plazaEfectiva = parkingSpotNumber || (estacionamiento.verificando ? null : parkingUnits.find((n) => !estacionamiento.ocupadas.has(n)) ?? null);
+  const mensajePlaza = parkingSpotNumber || estacionamiento.verificando
+    ? null
+    : plazaEfectiva
+      ? `Se asigna la plaza ${plazaEfectiva}.`
+      : 'No hay plazas libres en esas fechas.';
+
   const startDateObj = parseLocalDateFromInput(startStr);
   const endDateObj = parseLocalDateFromInput(endStr);
   let daysCount = 0;
@@ -504,6 +513,9 @@ function SombrillaReservationModal({
                         );
                       })}
                     </select>
+                    {mensajePlaza && (
+                      <span className="text-[10px] text-slate-600">{mensajePlaza}</span>
+                    )}
                   </label>
                   <PatenteField
                     value={vehiclePlate}
@@ -513,7 +525,7 @@ function SombrillaReservationModal({
                   />
                   <PrecioReserva
                     serviceType="parking"
-                    resourceNumber={parkingSpotNumber}
+                    resourceNumber={plazaEfectiva}
                     desde={startStr}
                     hasta={endStr}
                     valor={precioCochera}
@@ -645,12 +657,6 @@ function SombrillaReservationModal({
                   : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
                   }`}
                 onClick={async () => {
-                  // Sin plaza elegida se asigna la primera libre en todo el
-                  // periodo. App la buscaba mirando solo los proximos 90 dias.
-                  const plazaAsignada =
-                    includeParking && !parkingSpotNumber
-                      ? parkingUnits.find((n) => !estacionamiento.ocupadas.has(n)) ?? null
-                      : parkingSpotNumber;
                   const ok = await onSaveRange(sombrillaNumero, startStr, endStr, {
                     // Sin esto la reserva se guardaba sin vincular al cliente elegido
                     // en el buscador: quedaba solo el nombre como texto.
@@ -661,7 +667,8 @@ function SombrillaReservationModal({
                     childrenCount,
                     precio,
                     includeParking,
-                    parkingSpotNumber: plazaAsignada,
+                    // La plaza que se cotizo arriba: asi lo cotizado es lo que se guarda.
+                    parkingSpotNumber: plazaEfectiva,
                     precioCochera,
                     initialPaymentAmount,
                     initialPaymentMethod,
