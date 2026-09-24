@@ -1,7 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getApiBaseUrl } from '../apiConfig';
+import { EVENTO_SESION_VENCIDA, expiracionDelToken } from '../lib/sesion';
 
 const API_BASE_URL = getApiBaseUrl();
+
+const MENSAJE_SESION_VENCIDA = 'Tu sesión venció. Volvé a iniciar sesión.';
 
 function useAuth(options = {}) {
   const { onLogoutCleanup } = options;
@@ -31,6 +34,16 @@ function useAuth(options = {}) {
     const storedEmail = sessionStorage.getItem('authEmail');
 
     if (token && storedEmail) {
+      // Un token vencido no rehidrata la sesion: la pantalla quedaria cargada
+      // pero cada pedido a la API volveria 401.
+      const vence = expiracionDelToken(token);
+      if (vence !== null && vence <= Date.now()) {
+        sessionStorage.removeItem('authToken');
+        sessionStorage.removeItem('authEmail');
+        setEmail(storedEmail);
+        setError(MENSAJE_SESION_VENCIDA);
+        return;
+      }
       setIsAuthenticated(true);
       setAuthToken(token);
       setUserEmail(storedEmail);
@@ -108,6 +121,30 @@ function useAuth(options = {}) {
       onLogoutCleanup();
     }
   };
+
+  // Los efectos de abajo llaman siempre a la version actual de handleLogout.
+  const cerrarPorVencimiento = useRef(null);
+  cerrarPorVencimiento.current = () => {
+    handleLogout();
+    setError(MENSAJE_SESION_VENCIDA);
+  };
+
+  // La API respondio que el token no sirve (lo detecta lib/sesion.js).
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const alVencer = () => cerrarPorVencimiento.current();
+    window.addEventListener(EVENTO_SESION_VENCIDA, alVencer);
+    return () => window.removeEventListener(EVENTO_SESION_VENCIDA, alVencer);
+  }, [isAuthenticated]);
+
+  // Cierre a la hora exacta de vencimiento, sin esperar al proximo pedido.
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    const vence = expiracionDelToken(authToken || sessionStorage.getItem('authToken'));
+    if (vence === null) return undefined;
+    const id = setTimeout(() => cerrarPorVencimiento.current(), Math.max(0, vence - Date.now()));
+    return () => clearTimeout(id);
+  }, [isAuthenticated, authToken]);
 
   return {
     isAuthenticated,
