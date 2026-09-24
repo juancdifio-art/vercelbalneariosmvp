@@ -56,8 +56,8 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 12 tests del router serverless
-cd frontend && npm test   # 18 tests de componentes y utilidades
+cd api && npm test        # 96 tests del router serverless
+cd frontend && npm test   # 182 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
@@ -71,6 +71,7 @@ cd frontend && npm test   # 18 tests de componentes y utilidades
 - **Patente obligatoria en estacionamiento:** toda reserva `parking` lleva `vehicle_plate`. Las dos APIs la exigen (`vehicle_plate_required`) y la guardan normalizada (`AB123CD`), y los formularios no dejan guardar sin ella. Va en la reserva, no solo en la ficha del cliente, porque el mismo cliente puede venir con otro auto; la ficha solo sirve para completarla sola. Columna nueva: `backend/migrate-reservation-vehicle-plate.sql`.
 - **Calendarios de Carpas y Sombrillas:** los dos usan `CalendarioOcupacion.jsx`. Un cambio en la grilla se hace ahí, no en las secciones.
 - **`App.jsx` tiene ~2800 líneas.** Al agregar una sección, crear un componente aparte y pasarle las props agrupadas en un objeto en vez de sueltas.
+- **Tarifas:** el precio de carpas, sombrillas y estacionamiento lo calcula el servidor con `api/_tarifas/` (`calculo.js` y `validaciones.js` puros, `servicio.js` con las consultas). Es el único código compartido por las dos APIs: `backend/src/index.js` lo requiere desde `../../api/_tarifas/servicio`, así que **un cambio de tarifas se hace ahí y no en cada API**. Lo que manda el navegador solo cuenta como "cobrado"; si difiere del precio de tarifa hace falta `motivoAjuste`. La reserva guarda el snapshot (`precio_tarifa`, `desglose`, `motivo_ajuste`) y no se recalcula si cambia una tarifa, salvo que se editen sus fechas o su unidad. Pileta no pasa por tarifas. Migración: `backend/migrate-tarifas.sql`.
 
 ## Seguridad
 

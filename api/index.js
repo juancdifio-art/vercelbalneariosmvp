@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const reportPaymentsHandler = require('./_handlers/reports/payments');
 const reportOccupancyHandler = require('./_handlers/reports/occupancy');
+const tarifas = require('./_tarifas/servicio');
 
 // Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
 // Es obligatoria en toda reserva de estacionamiento.
@@ -874,6 +875,9 @@ module.exports = async (req, res) => {
             rg.pool_adult_price_per_day,
             rg.pool_child_price_per_day,
             rg.vehicle_plate,
+            rg.precio_tarifa,
+            rg.desglose,
+            rg.motivo_ajuste,
             c.document_number AS client_document_number,
             COALESCE(SUM(rp.amount), 0) AS paid_amount
           FROM reservation_groups rg
@@ -972,6 +976,9 @@ module.exports = async (req, res) => {
             rg.pool_adult_price_per_day,
             rg.pool_child_price_per_day,
             rg.vehicle_plate,
+            rg.precio_tarifa,
+            rg.desglose,
+            rg.motivo_ajuste,
             c.document_number
           ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
@@ -1003,6 +1010,9 @@ module.exports = async (req, res) => {
             poolAdultPricePerDay: row.pool_adult_price_per_day,
             poolChildPricePerDay: row.pool_child_price_per_day,
             vehiclePlate: row.vehicle_plate || null,
+            precioTarifa: row.precio_tarifa ?? null,
+            desglose: row.desglose ?? null,
+            motivoAjuste: row.motivo_ajuste ?? null,
             paidAmount: Number(row.paid_amount || 0)
           }))
         }));
@@ -1021,7 +1031,7 @@ module.exports = async (req, res) => {
 
       try {
         const body = await parseJsonBody(req);
-        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId, adultsCount, childrenCount, poolAdultPricePerDay, poolChildPricePerDay } = body;
+        const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, notes, clientId, adultsCount, childrenCount, poolAdultPricePerDay, poolChildPricePerDay } = body;
         const vehiclePlate = normalizarPatente(body.vehiclePlate);
 
         // Validate required fields
@@ -1083,10 +1093,19 @@ module.exports = async (req, res) => {
           }
         }
 
+        // El precio lo calcula el servidor con las tarifas; lo que manda el
+        // navegador solo cuenta como "cobrado", y si difiere pide motivo.
+        const precio = await tarifas.precioAlCrear(db.query, establishmentId, body);
+        if (precio.error) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: precio.error }));
+        }
+
         // Insert reservation group
         const insertResult = await db.query(
-          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
-          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0, poolAdultPricePerDay || null, poolChildPricePerDay || null, vehiclePlate || null]
+          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate, precio_tarifa, desglose, motivo_ajuste) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20) RETURNING *`,
+          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, precio.dailyPrice ?? null, precio.totalPrice ?? null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0, poolAdultPricePerDay || null, poolChildPricePerDay || null, vehiclePlate || null, precio.precioTarifa, precio.desglose == null ? null : JSON.stringify(precio.desglose), precio.motivoAjuste]
         );
 
         const row = insertResult.rows[0];
@@ -1112,6 +1131,9 @@ module.exports = async (req, res) => {
             poolAdultPricePerDay: row.pool_adult_price_per_day,
             poolChildPricePerDay: row.pool_child_price_per_day,
             vehiclePlate: row.vehicle_plate || null,
+            precioTarifa: row.precio_tarifa ?? null,
+            desglose: row.desglose ?? null,
+            motivoAjuste: row.motivo_ajuste ?? null,
             paidAmount: 0,
             createdAt: row.created_at
           }
@@ -1199,8 +1221,9 @@ module.exports = async (req, res) => {
 
         // Si se quiere cambiar el resourceNumber o las fechas, verificar disponibilidad
         const resourceChanged = resourceNumber !== undefined && resourceNumber !== current.resource_number;
-        const datesChanged = (startDate !== undefined && startDate !== current.start_date) ||
-          (endDate !== undefined && endDate !== current.end_date);
+        // pg devuelve DATE como Date: comparar el texto contra el objeto daba siempre "cambio".
+        const datesChanged = (startDate !== undefined && startDate !== tarifas.fechaISO(current.start_date)) ||
+          (endDate !== undefined && endDate !== tarifas.fechaISO(current.end_date));
 
         if (resourceChanged || datesChanged) {
           // Verificar que no haya conflicto con otra reserva
@@ -1230,13 +1253,35 @@ module.exports = async (req, res) => {
           }
         }
 
+        // Pileta sigue con sus precios por persona; el resto pasa por tarifas.
+        let precio = {
+          dailyPrice: dailyPrice !== undefined ? dailyPrice : current.daily_price,
+          totalPrice: totalPrice !== undefined ? totalPrice : current.total_price,
+          precioTarifa: current.precio_tarifa ?? null,
+          desglose: current.desglose ?? null,
+          motivoAjuste: current.motivo_ajuste ?? null
+        };
+        if (current.service_type !== 'pileta') {
+          precio = await tarifas.precioAlEditar(db.query, establishmentId, current, body, {
+            recalcular: resourceChanged || datesChanged,
+            desde: tarifas.fechaISO(finalStartDate),
+            hasta: tarifas.fechaISO(finalEndDate),
+            resourceNumber: finalResourceNumber
+          });
+          if (precio.error) {
+            res.statusCode = 400;
+            res.setHeader('Content-Type', 'application/json');
+            return res.end(JSON.stringify({ error: precio.error }));
+          }
+        }
+
         const updateResult = await db.query(
-          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10, pool_adult_price_per_day = $11, pool_child_price_per_day = $12, vehicle_plate = $14 WHERE id = $13 RETURNING *`,
+          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10, pool_adult_price_per_day = $11, pool_child_price_per_day = $12, vehicle_plate = $14, precio_tarifa = $15, desglose = $16, motivo_ajuste = $17 WHERE id = $13 RETURNING *`,
           [
             customerName !== undefined ? customerName : current.customer_name,
             customerPhone !== undefined ? customerPhone : current.customer_phone,
-            dailyPrice !== undefined ? dailyPrice : current.daily_price,
-            totalPrice !== undefined ? totalPrice : current.total_price,
+            precio.dailyPrice ?? null,
+            precio.totalPrice ?? null,
             notes !== undefined ? notes : current.notes,
             adultsCount !== undefined ? adultsCount : current.adults_count,
             childrenCount !== undefined ? childrenCount : current.children_count,
@@ -1246,7 +1291,10 @@ module.exports = async (req, res) => {
             poolAdultPricePerDay !== undefined ? poolAdultPricePerDay : current.pool_adult_price_per_day,
             poolChildPricePerDay !== undefined ? poolChildPricePerDay : current.pool_child_price_per_day,
             reservationGroupId,
-            finalVehiclePlate
+            finalVehiclePlate,
+            precio.precioTarifa,
+            precio.desglose == null ? null : JSON.stringify(precio.desglose),
+            precio.motivoAjuste
           ]
         );
 
@@ -1271,7 +1319,10 @@ module.exports = async (req, res) => {
             childrenCount: row.children_count || 0,
             poolAdultPricePerDay: row.pool_adult_price_per_day,
             poolChildPricePerDay: row.pool_child_price_per_day,
-            vehiclePlate: row.vehicle_plate || null
+            vehiclePlate: row.vehicle_plate || null,
+            precioTarifa: row.precio_tarifa ?? null,
+            desglose: row.desglose ?? null,
+            motivoAjuste: row.motivo_ajuste ?? null
           }
         }));
       } catch (error) {
@@ -1612,6 +1663,37 @@ module.exports = async (req, res) => {
         }
       } catch (error) {
         console.error('Error with reservation guest:', error);
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/tarifas/* =============
+    // Toda la logica vive en _tarifas/servicio.js, compartida con el backend local.
+    if (first === 'tarifas') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'establishment_not_found' }));
+        }
+        const body = method === 'POST' || method === 'PATCH' ? await parseJsonBody(req) : {};
+        const r = await tarifas.rutearTarifas(db.query, estResult.rows[0].id, {
+          method,
+          partes: segments.slice(2),
+          params: Object.fromEntries(url.searchParams),
+          body
+        });
+        res.statusCode = r.status;
+        res.setHeader('Content-Type', 'application/json');
+        return res.end(JSON.stringify(r.body));
+      } catch (error) {
+        console.error('Error en tarifas:', error);
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));

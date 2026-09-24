@@ -20,6 +20,14 @@ beforeEach(() => {
   queryMock.mockReset();
 });
 
+// El POST de carpa, sombrilla y estacionamiento cotiza antes del INSERT:
+// tarifas, periodos y sector de la unidad. Sin tarifas, el precio queda el que se mande.
+function sinTarifas() {
+  queryMock.mockResolvedValueOnce({ rows: [] });
+  queryMock.mockResolvedValueOnce({ rows: [] });
+  queryMock.mockResolvedValueOnce({ rows: [] });
+}
+
 describe('GET /api/auth/me', () => {
   it('rechaza el pedido sin token', async () => {
     const res = await request(handler).get('/?route=auth/me');
@@ -223,7 +231,7 @@ describe('precios de pileta en /api/reservation-groups', () => {
 
   it('los actualiza al editar el pase', async () => {
     queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
-    queryMock.mockResolvedValueOnce({ rows: [{ id: 99, adults_count: 2, children_count: 1, pool_adult_price_per_day: '6000.00', pool_child_price_per_day: '3500.00' }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 99, service_type: 'pileta', adults_count: 2, children_count: 1, pool_adult_price_per_day: '6000.00', pool_child_price_per_day: '3500.00' }] });
     queryMock.mockResolvedValueOnce({ rows: [{ id: 99, service_type: 'pileta', adults_count: 3, children_count: 1, pool_adult_price_per_day: '7000.00', pool_child_price_per_day: '3500.00' }] });
 
     const res = await request(handler)
@@ -253,6 +261,7 @@ describe('patente obligatoria en estacionamiento', () => {
   it('guarda la patente normalizada: mayusculas y sin espacios ni guiones', async () => {
     queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] }); // establecimiento
     queryMock.mockResolvedValueOnce({ rows: [] }); // sin solapamiento
+    sinTarifas();
     queryMock.mockResolvedValueOnce({ rows: [{ id: 50, service_type: 'parking', resource_number: 12, vehicle_plate: 'AB123CD' }] });
 
     const res = await request(handler)
@@ -269,7 +278,8 @@ describe('patente obligatoria en estacionamiento', () => {
 
   it('en carpa no la pide', async () => {
     queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
-    queryMock.mockResolvedValueOnce({ rows: [] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin solapamiento
+    sinTarifas();
     queryMock.mockResolvedValueOnce({ rows: [{ id: 51, service_type: 'carpa' }] });
 
     const res = await request(handler)
@@ -318,5 +328,147 @@ describe('patente obligatoria en estacionamiento', () => {
     const update = queryMock.mock.calls.find((c) => String(c[0]).includes('UPDATE reservation_groups'));
     expect(update[1]).toContain('AC456DE');
     expect(res.body.reservationGroup.vehiclePlate).toBe('AC456DE');
+  });
+});
+
+describe('precio por tarifa en /api/reservation-groups', () => {
+  const TARIFA = { id: 10, service_type: 'carpa', alcance: 'tipo', clase: 'fecha', periodo_id: 1, precio: '10000.00' };
+  const PERIODO = { id: 1, nombre: 'Todo el año', mes_inicio: 1, dia_inicio: 1, mes_fin: 12, dia_fin: 31, prioridad: 1 };
+  const alta = { serviceType: 'carpa', resourceNumber: 58, startDate: '2026-01-10', endDate: '2026-01-12', customerName: 'Lucia' };
+  const insertDe = () => queryMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO reservation_groups'));
+  const updateDe = () => queryMock.mock.calls.find((c) => String(c[0]).includes('UPDATE reservation_groups'));
+
+  function conTarifa() {
+    queryMock.mockResolvedValueOnce({ rows: [TARIFA] });
+    queryMock.mockResolvedValueOnce({ rows: [PERIODO] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+  }
+
+  it('al crear calcula el precio y guarda el snapshot', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    conTarifa();
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 60, service_type: 'carpa', precio_tarifa: '30000.00', total_price: '30000.00', desglose: { clase: 'fecha' }, motivo_ajuste: null }] });
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', `Bearer ${tokenPara(2)}`).send(alta);
+
+    expect(res.status).toBe(201);
+    const [sql, params] = insertDe();
+    expect(sql).toContain('precio_tarifa');
+    expect(sql).toContain('desglose');
+    expect(params).toContain(30000); // total y precio de tarifa
+    expect(params).toContain(10000); // daily_price
+    expect(params.find((p) => typeof p === 'string' && p.includes('"tramos"'))).toBeTruthy();
+    expect(res.body.group.precioTarifa).toBe('30000.00');
+  });
+
+  it('no deja cobrar distinto a la tarifa sin motivo', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    conTarifa();
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', `Bearer ${tokenPara(2)}`).send({ ...alta, totalPrice: '25000' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('motivo_ajuste_required');
+    expect(insertDe()).toBeUndefined();
+  });
+
+  it('con motivo guarda lo cobrado y el motivo', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    conTarifa();
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 61, service_type: 'carpa' }] });
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ ...alta, totalPrice: '25000', motivoAjuste: 'cliente de años' });
+
+    expect(res.status).toBe(201);
+    const params = insertDe()[1];
+    expect(params).toContain(25000);
+    expect(params).toContain(30000);
+    expect(params).toContain('cliente de años');
+  });
+
+  it('sin tarifas cargadas guarda el precio que manda el navegador', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    sinTarifas();
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 62, service_type: 'carpa' }] });
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', `Bearer ${tokenPara(2)}`).send({ ...alta, totalPrice: '27000' });
+
+    expect(res.status).toBe(201);
+    const params = insertDe()[1];
+    expect(params).toContain(27000);
+    expect(params).toContain(9000);
+  });
+
+  const guardada = {
+    id: 60, service_type: 'carpa', resource_number: 58,
+    start_date: new Date(2026, 0, 10), end_date: new Date(2026, 0, 12),
+    precio_tarifa: '30000.00', total_price: '30000.00', daily_price: '10000.00',
+    desglose: { clase: 'fecha', tramos: [] }, motivo_ajuste: null
+  };
+
+  it('al editar las fechas recalcula con las tarifas vigentes', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin conflicto
+    conTarifa();
+    queryMock.mockResolvedValueOnce({ rows: [{ ...guardada, end_date: '2026-01-14' }] });
+
+    const res = await request(handler).patch('/?route=reservation-groups/60').set('Authorization', `Bearer ${tokenPara(2)}`).send({ endDate: '2026-01-14' });
+
+    expect(res.status).toBe(200);
+    expect(updateDe()[1]).toContain(50000);
+  });
+
+  it('al editar con la salida antes que la entrada responde 400 rango_invalido', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin conflicto
+    conTarifa();
+
+    const res = await request(handler).patch('/?route=reservation-groups/60').set('Authorization', `Bearer ${tokenPara(2)}`).send({ endDate: '2026-01-05' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('rango_invalido');
+    expect(updateDe()).toBeUndefined();
+  });
+
+  it('al editar solo las notas no recalcula ni pisa el snapshot', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+
+    const res = await request(handler).patch('/?route=reservation-groups/60').set('Authorization', `Bearer ${tokenPara(2)}`).send({ notes: 'llega tarde' });
+
+    expect(res.status).toBe(200);
+    expect(queryMock).toHaveBeenCalledTimes(3);
+    expect(updateDe()[1]).toContain(JSON.stringify(guardada.desglose));
+  });
+
+  it('mandar la misma fecha que ya tenia no cuenta como cambio', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+
+    const res = await request(handler).patch('/?route=reservation-groups/60').set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ startDate: '2026-01-10', endDate: '2026-01-12', notes: 'x' });
+
+    expect(res.status).toBe(200);
+    expect(queryMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('devuelve el snapshot al listar', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 60, service_type: 'carpa', resource_number: 58, start_date: '2026-01-10', end_date: '2026-01-12', precio_tarifa: '30000.00', desglose: { clase: 'fecha', tramos: [] }, motivo_ajuste: 'x', paid_amount: 0 }] });
+
+    const res = await request(handler).get('/?route=reservation-groups').set('Authorization', `Bearer ${tokenPara(2)}`);
+
+    expect(res.body.reservationGroups[0]).toMatchObject({ precioTarifa: '30000.00', motivoAjuste: 'x', desglose: { clase: 'fecha', tramos: [] } });
+    const select = String(queryMock.mock.calls[1][0]);
+    expect(select).toContain('rg.desglose');
   });
 });

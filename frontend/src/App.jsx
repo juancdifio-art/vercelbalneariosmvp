@@ -11,6 +11,7 @@ import SombrillasSection from './components/SombrillasSection';
 import EstacionamientoSection from './components/EstacionamientoSection';
 import PiletaSection from './components/PiletaSection';
 import ReportsPaymentsSection from './components/ReportsPaymentsSection';
+import TarifasSection from './components/tarifas/TarifasSection';
 import CarpaReservationModal from './components/CarpaReservationModal';
 import ParkingReservationModal from './components/ParkingReservationModal';
 import SombrillaReservationModal from './components/SombrillaReservationModal';
@@ -22,6 +23,7 @@ import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
 import { normalizarPatente } from './lib/patente';
+import { precioDesdeReserva } from './lib/tarifas';
 import DashboardSection from './components/DashboardSection';
 import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
@@ -184,6 +186,7 @@ function App() {
   const [reservationPaymentSaving, setReservationPaymentSaving] = useState(false);
   const [reservationEditModal, setReservationEditModal] = useState(null);
   const [reservationEditSaving, setReservationEditSaving] = useState(false);
+  const [reservationEditError, setReservationEditError] = useState('');
 
   const {
     clients,
@@ -683,26 +686,17 @@ function App() {
       customerPhone,
       adultsCount,
       childrenCount,
-      dailyPrice,
+      precio,
       clientId,
       includeParking,
       parkingSpotNumber,
-      parkingDailyPrice,
+      precioCochera,
       initialPaymentAmount,
       initialPaymentMethod,
       parkingInitialPaymentAmount,
       parkingInitialPaymentMethod,
       vehiclePlate
     } = extra;
-
-    let totalPrice = null;
-
-    if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '') {
-      const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-      if (!Number.isNaN(parsedDaily) && daysCount > 0) {
-        totalPrice = parsedDaily * daysCount;
-      }
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
@@ -718,11 +712,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice:
-            dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-              ? String(dailyPrice)
-              : '',
-          totalPrice: totalPrice !== null ? String(totalPrice) : '',
+          totalPrice: precio?.cobrado ?? '',
+          motivoAjuste: precio?.motivo ?? '',
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
@@ -741,6 +732,10 @@ function App() {
       if (!response.ok) {
         if (data && data.error === 'no_availability') {
           setCarpaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
+        } else if (data && data.error === 'motivo_ajuste_required') {
+          setCarpaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setCarpaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error creating reservation group for carpas', data);
           setError('No se pudo crear la reserva.');
@@ -837,7 +832,7 @@ function App() {
             customerPhone,
             adultsCount,
             childrenCount,
-            dailyPrice: parkingDailyPrice ?? '',
+            precio: precioCochera,
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
             initialPaymentMethod: parkingInitialPaymentMethod,
@@ -1087,26 +1082,17 @@ function App() {
       customerPhone,
       adultsCount,
       childrenCount,
-      dailyPrice,
+      precio,
       clientId,
       includeParking,
       parkingSpotNumber,
-      parkingDailyPrice,
+      precioCochera,
       initialPaymentAmount,
       initialPaymentMethod,
       parkingInitialPaymentAmount,
       parkingInitialPaymentMethod,
       vehiclePlate
     } = extra;
-
-    let totalPrice = null;
-
-    if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '') {
-      const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-      if (!Number.isNaN(parsedDaily) && daysCount > 0) {
-        totalPrice = parsedDaily * daysCount;
-      }
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
@@ -1122,11 +1108,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice:
-            dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-              ? String(dailyPrice)
-              : '',
-          totalPrice: totalPrice !== null ? String(totalPrice) : '',
+          totalPrice: precio?.cobrado ?? '',
+          motivoAjuste: precio?.motivo ?? '',
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
@@ -1145,6 +1128,10 @@ function App() {
       if (!response.ok) {
         if (data && data.error === 'no_availability') {
           setSombrillaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
+        } else if (data && data.error === 'motivo_ajuste_required') {
+          setSombrillaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setSombrillaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error creating reservation group for sombrillas', data);
           setError('No se pudo crear la reserva.');
@@ -1240,7 +1227,7 @@ function App() {
             customerPhone,
             adultsCount,
             childrenCount,
-            dailyPrice: parkingDailyPrice ?? '',
+            precio: precioCochera,
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
             initialPaymentMethod: parkingInitialPaymentMethod,
@@ -1306,21 +1293,12 @@ function App() {
       customerPhone,
       adultsCount,
       childrenCount,
-      dailyPrice,
+      precio,
       clientId,
       initialPaymentAmount,
       initialPaymentMethod,
       vehiclePlate
     } = extra;
-
-    let totalPrice = null;
-
-    if (dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== '') {
-      const parsedDaily = Number.parseFloat(String(dailyPrice).replace(',', '.'));
-      if (!Number.isNaN(parsedDaily) && daysCount > 0) {
-        totalPrice = parsedDaily * daysCount;
-      }
-    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/reservation-groups`, {
@@ -1336,11 +1314,8 @@ function App() {
           endDate: toStr,
           customerName: customerName || '',
           customerPhone: customerPhone || '',
-          dailyPrice:
-            dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-              ? String(dailyPrice)
-              : '',
-          totalPrice: totalPrice !== null ? String(totalPrice) : '',
+          totalPrice: precio?.cobrado ?? '',
+          motivoAjuste: precio?.motivo ?? '',
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
@@ -1364,6 +1339,10 @@ function App() {
           const msg = 'Falta la patente del vehículo: es obligatoria para usar el estacionamiento.';
           setParkingReservationError(msg);
           setError(msg);
+        } else if (data && data.error === 'motivo_ajuste_required') {
+          setParkingReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setParkingReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error creating reservation group for parking', data);
           setError('No se pudo crear la reserva.');
@@ -1744,6 +1723,7 @@ function App() {
 
   const handleOpenReservationEditModal = (group) => {
     if (!group) return;
+    setReservationEditError('');
     setReservationEditModal({
       ...group,
       tempCustomerName: group.customerName || '',
@@ -1751,7 +1731,8 @@ function App() {
       tempDailyPrice: group.dailyPrice ?? '',
       tempTotalPrice: group.totalPrice ?? '',
       tempNotes: group.notes || '',
-      tempVehiclePlate: group.vehiclePlate || ''
+      tempVehiclePlate: group.vehiclePlate || '',
+      tempPrecio: precioDesdeReserva(group),
     });
   };
 
@@ -2081,6 +2062,7 @@ function App() {
       tempStartDate,
       tempEndDate,
       dailyPrice,
+      tempPrecio,
       // Pool-specific fields
       tempPoolAdultsCount,
       tempPoolChildrenCount,
@@ -2113,6 +2095,13 @@ function App() {
       // En estacionamiento la patente es obligatoria; el modal no deja guardarla vacia.
       if (serviceType === 'parking') {
         updateBody.vehiclePlate = normalizarPatente(tempVehiclePlate);
+      }
+
+      // Carpa, sombrilla y estacionamiento: el servidor recalcula; se manda lo cobrado y el motivo.
+      if (serviceType !== 'pileta') {
+        delete updateBody.dailyPrice;
+        updateBody.totalPrice = tempPrecio?.cobrado ?? '';
+        updateBody.motivoAjuste = tempPrecio?.motivo ?? '';
       }
 
       // Agregar campos de pileta solo si el servicio es pileta
@@ -2181,9 +2170,18 @@ function App() {
       });
 
       if (!response.ok) {
-        console.error('Error updating reservation group');
+        const data = await response.json().catch(() => null);
+        if (data && data.error === 'motivo_ajuste_required') {
+          setReservationEditError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setReservationEditError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        } else {
+          console.error('Error updating reservation group');
+        }
         return;
       }
+
+      setReservationEditError('');
 
       // Si cambió el resourceNumber o las fechas, actualizar el mapa visual de reservas
       const datesChanged = startDateChanged || endDateChanged;
@@ -2420,6 +2418,7 @@ function App() {
 
     navItems.push({ id: 'clientes', label: 'Clientes', group: 'admin' });
     navItems.push({ id: 'reportes', label: 'Reportes', group: 'admin' });
+    navItems.push({ id: 'tarifas', label: 'Tarifas', group: 'admin' });
     navItems.push({ id: 'panel-usuario', label: 'Panel de usuario', group: 'admin' });
 
     const sectionTitleMap = {
@@ -2427,6 +2426,7 @@ function App() {
       'vista-diaria': 'Vista rápida',
       reservas: 'Reservas',
       reportes: 'Reportes',
+      tarifas: 'Tarifas',
       clientes: 'Clientes',
       carpas: 'Capacidades y reservas',
       sombrillas: 'Capacidades y reservas',
@@ -2547,8 +2547,12 @@ function App() {
               modal={reservationEditModal}
               setModal={setReservationEditModal}
               saving={reservationEditSaving}
+              error={reservationEditError}
               onSave={handleSaveReservationEdit}
-              onClose={() => setReservationEditModal(null)}
+              onClose={() => {
+                setReservationEditModal(null);
+                setReservationEditError('');
+              }}
               establishment={establishment}
               reservationGroups={reservationGroups}
             />
@@ -2686,6 +2690,8 @@ function App() {
             {activeSection === 'reportes' && (
               <ReportsPaymentsSection authToken={authToken} />
             )}
+
+            {activeSection === 'tarifas' && <TarifasSection establishment={establishment} />}
 
             {activeSection === 'clientes' && (
               <ClientsSection

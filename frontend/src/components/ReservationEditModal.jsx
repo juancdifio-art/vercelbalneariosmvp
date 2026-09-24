@@ -1,9 +1,30 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { numerosDeUnidades } from '../lib/unidades';
 import { normalizarPatente } from '../lib/patente';
 import PatenteField from './PatenteField';
+import PrecioReserva from './PrecioReserva';
+import { PRECIO_VACIO, faltaMotivoAjuste, precioDesdeReserva } from '../lib/tarifas';
 
-function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups }) {
+function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups, error }) {
+  // El precio se recotiza solo si cambian las fechas o la unidad; si no, se
+  // muestra el snapshot guardado.
+  const cambioFechasOUnidad = Boolean(modal) && (
+    Boolean(modal.tempStartDate && modal.tempStartDate !== modal.startDate) ||
+    Boolean(modal.tempEndDate && modal.tempEndDate !== modal.endDate) ||
+    (modal.tempResourceNumber !== undefined && modal.tempResourceNumber !== modal.resourceNumber));
+
+  // Si se vuelve a las fechas y la unidad originales, el precio vuelve al
+  // guardado: si no, quedaba la cotizacion de las fechas intermedias.
+  const cambiabaAntes = useRef(cambioFechasOUnidad);
+  useEffect(() => {
+    const antes = cambiabaAntes.current;
+    cambiabaAntes.current = cambioFechasOUnidad;
+    if (antes && !cambioFechasOUnidad) {
+      setModal((prev) => (prev ? { ...prev, tempPrecio: precioDesdeReserva(prev) } : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cambioFechasOUnidad]);
+
   if (!modal) return null;
 
   const serviceIcon = modal.serviceType === 'carpa' ? '🏖️' : modal.serviceType === 'sombrilla' ? '☂️' : modal.serviceType === 'parking' ? '🚗' : '🏊';
@@ -35,6 +56,10 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
   // En estacionamiento no se puede guardar sin patente.
   const faltaPatente = modal.serviceType === 'parking' && !normalizarPatente(modal.tempVehiclePlate);
   const currentResourceNumber = modal.tempResourceNumber ?? modal.resourceNumber;
+
+  const precio = modal.tempPrecio ?? PRECIO_VACIO;
+  const faltaMotivo = modal.serviceType !== 'pileta' && faltaMotivoAjuste(precio);
+  const cotizando = modal.serviceType !== 'pileta' && Boolean(precio.cotizando);
 
   // Función para verificar si una unidad está ocupada en un rango de fechas
   const isUnitOccupied = (unitNumber) => {
@@ -216,134 +241,26 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                     className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                   />
                 </label>
-                {/* Solo mostrar tarifa y total para servicios que no son pileta */}
-                {modal.serviceType !== 'pileta' && (
-                  <>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[11px] font-semibold text-slate-700">Tarifa por día (ARS)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={modal.tempDailyPrice ?? modal.dailyPrice ?? ''}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          setModal((prev) =>
-                            prev
-                              ? {
-                                ...prev,
-                                tempDailyPrice: value
-                              }
-                              : prev
-                          );
-                        }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[11px] font-semibold text-slate-700">Precio total (ARS)</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={modal.tempTotalPrice}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9]/g, '');
-                          setModal((prev) =>
-                            prev
-                              ? {
-                                ...prev,
-                                tempTotalPrice: value
-                              }
-                              : prev
-                          );
-                        }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      />
-                    </label>
-                  </>
-                )}
               </div>
-              {/* Resumen financiero para carpa, sombrilla y estacionamiento */}
-              {modal.serviceType !== 'pileta' && (() => {
-                const dailyPrice = Number.parseFloat(String(modal.tempDailyPrice ?? modal.dailyPrice ?? '0')) || 0;
-                const currentTotal = Number.parseFloat(String(modal.tempTotalPrice ?? '0')) || 0;
-
-                // Calcular días con las nuevas fechas
-                const startStr = modal.tempStartDate || modal.startDate;
-                const endStr = modal.tempEndDate || modal.endDate;
-                let newDaysCount = 1;
-                if (startStr && endStr) {
-                  const startParts = String(startStr).split('-');
-                  const endParts = String(endStr).split('-');
-                  const startDate = new Date(parseInt(startParts[0], 10), parseInt(startParts[1], 10) - 1, parseInt(startParts[2], 10));
-                  const endDate = new Date(parseInt(endParts[0], 10), parseInt(endParts[1], 10) - 1, parseInt(endParts[2], 10));
-                  const msPerDay = 24 * 60 * 60 * 1000;
-                  newDaysCount = Math.round((endDate - startDate) / msPerDay) + 1;
-                  if (newDaysCount <= 0) newDaysCount = 1;
-                }
-
-                // Calcular días originales
-                let originalDaysCount = 1;
-                if (modal.startDate && modal.endDate) {
-                  const origStartParts = String(modal.startDate).split('-');
-                  const origEndParts = String(modal.endDate).split('-');
-                  const origStartDate = new Date(parseInt(origStartParts[0], 10), parseInt(origStartParts[1], 10) - 1, parseInt(origStartParts[2], 10));
-                  const origEndDate = new Date(parseInt(origEndParts[0], 10), parseInt(origEndParts[1], 10) - 1, parseInt(origEndParts[2], 10));
-                  const msPerDay = 24 * 60 * 60 * 1000;
-                  originalDaysCount = Math.round((origEndDate - origStartDate) / msPerDay) + 1;
-                  if (originalDaysCount <= 0) originalDaysCount = 1;
-                }
-
-                const suggestedTotal = dailyPrice * newDaysCount;
-                const daysChanged = newDaysCount !== originalDaysCount;
-                const priceChanged = modal.tempDailyPrice !== undefined && modal.tempDailyPrice !== null;
-
-                if (!dailyPrice || dailyPrice <= 0) return null;
-
-                return (
-                  <div className="mt-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg px-4 py-3 border border-blue-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-semibold text-slate-600">Tarifa por día:</span>
-                      <span className="text-sm font-bold text-slate-800">${dailyPrice.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-semibold text-slate-600">Duración:</span>
-                      <span className="text-sm font-bold text-slate-800">
-                        {newDaysCount} {newDaysCount === 1 ? 'día' : 'días'}
-                        {daysChanged && (
-                          <span className="text-amber-600 ml-1">(antes: {originalDaysCount})</span>
-                        )}
-                      </span>
-                    </div>
-                    <div className="h-px bg-blue-200 my-2" />
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700">Total sugerido:</span>
-                      <span className="text-lg font-bold text-blue-700">${suggestedTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })}</span>
-                    </div>
-                    {(daysChanged || priceChanged) && currentTotal !== suggestedTotal && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setModal((prev) =>
-                            prev
-                              ? {
-                                ...prev,
-                                tempTotalPrice: String(suggestedTotal)
-                              }
-                              : prev
-                          )
-                        }
-                        className="mt-2 w-full text-center text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-white rounded-lg px-3 py-1.5 border border-blue-300 hover:bg-blue-50 transition"
-                      >
-                        Aplicar total sugerido (${suggestedTotal.toLocaleString('es-AR', { minimumFractionDigits: 2 })})
-                      </button>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
           </div>
+
+          {modal.serviceType !== 'pileta' && (
+            <div className="mt-4">
+              <PrecioReserva
+                serviceType={modal.serviceType}
+                resourceNumber={currentResourceNumber}
+                desde={modal.tempStartDate || modal.startDate}
+                hasta={modal.tempEndDate || modal.endDate}
+                cotizar={cambioFechasOUnidad}
+                vaciarSiIncompleta={false}
+                valor={precio}
+                onChange={(patch) =>
+                  setModal((prev) => (prev ? { ...prev, tempPrecio: { ...(prev.tempPrecio ?? PRECIO_VACIO), ...patch } } : prev))
+                }
+              />
+            </div>
+          )}
 
           {/* Detalles de pileta (solo para pases de pileta) */}
           {modal.serviceType === 'pileta' && (
@@ -510,13 +427,22 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
             />
           </div>
 
+          {error && (
+            <div role="alert" className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              <p className="text-xs text-red-700 flex items-center gap-2">
+                <span>⚠️</span>
+                <span>{error}</span>
+              </p>
+            </div>
+          )}
+
           {/* Botones */}
           <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
             <button
               type="button"
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={onSave}
-              disabled={saving || faltaPatente}
+              disabled={saving || faltaPatente || faltaMotivo || cotizando}
             >
               {saving ? '⏳ Guardando...' : '✅ Guardar cambios'}
             </button>

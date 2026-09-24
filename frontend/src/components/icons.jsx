@@ -19,7 +19,8 @@ import {
   ClipboardList,
   Banknote,
   X,
-  TriangleAlert
+  TriangleAlert,
+  Tags
 } from 'lucide-react';
 
 /**
@@ -99,6 +100,7 @@ const POR_SECCION = {
   pileta: conTrazo(Waves),
   clientes: conTrazo(Users),
   reportes: conTrazo(BarChart3),
+  tarifas: conTrazo(Tags),
   'panel-usuario': conTrazo(User)
 };
 
