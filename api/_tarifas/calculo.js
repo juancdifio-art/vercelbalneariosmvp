@@ -116,6 +116,7 @@ function cotizar({ tarifas, periodos, sectorId = null, serviceType, resourceNumb
   const fechas = diasEntre(desde, hasta);
   const dias = fechas.length;
   const propias = tarifas.filter((t) => aplicaA(t, serviceType, Number(resourceNumber), sectorId));
+  const sinTarifas = !tarifas.some((t) => t.serviceType === serviceType);
 
   // Paso 1: tarifa por estadia. Si hay, reemplaza a las de fecha para toda la reserva.
   const estadia = masEspecifica(propias.filter((t) =>
@@ -131,6 +132,7 @@ function cotizar({ tarifas, periodos, sectorId = null, serviceType, resourceNumb
       total,
       completo: true,
       diasSinTarifa: [],
+      sinTarifas,
       desglose: { clase: 'estadia', tarifaId: estadia.id, nombre: estadia.nombre, modo: estadia.modo, dias, precio: estadia.precio, total }
     };
   }
@@ -161,6 +163,7 @@ function cotizar({ tarifas, periodos, sectorId = null, serviceType, resourceNumb
     total,
     completo: diasSinTarifa.length === 0,
     diasSinTarifa,
+    sinTarifas,
     desglose: { clase: 'fecha', tramos, diasSinTarifa }
   };
 }

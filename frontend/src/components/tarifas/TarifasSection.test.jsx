@@ -77,3 +77,28 @@ describe('TarifasSection: periodos', () => {
     expect(global.fetch.mock.calls.some((c) => c[1]?.method === 'POST')).toBe(false);
   }, 15000);
 });
+
+describe('TarifasSection: cartel de servicios sin tarifas', () => {
+  it('avisa por cada servicio que no tiene ninguna tarifa cargada', async () => {
+    respuestas['GET tarifas'] = { tarifas: [{ id: 1, serviceType: 'carpa', alcance: 'tipo', clase: 'fecha', periodoId: 1, precio: 14000 }] };
+    render(<TarifasSection establishment={EST} />);
+    await screen.findByRole('row', { name: /Temporada alta/ });
+    const cartel = screen.getByRole('status');
+    expect(within(cartel).getByText('Sombrillas: sin precios cargados. Las reservas van a pedir el total a mano.')).toBeInTheDocument();
+    expect(within(cartel).getByText('Estacionamiento: sin precios cargados. Las reservas van a pedir el total a mano.')).toBeInTheDocument();
+    expect(within(cartel).queryByText(/^Carpas:/)).not.toBeInTheDocument();
+  });
+
+  it('no muestra el cartel si todos los servicios tienen alguna tarifa', async () => {
+    respuestas['GET tarifas'] = {
+      tarifas: [
+        { id: 1, serviceType: 'carpa', alcance: 'tipo', clase: 'fecha', periodoId: 1, precio: 14000 },
+        { id: 2, serviceType: 'sombrilla', alcance: 'tipo', clase: 'fecha', periodoId: 1, precio: 8000 },
+        { id: 3, serviceType: 'parking', alcance: 'tipo', clase: 'fecha', periodoId: 1, precio: 5000 }
+      ]
+    };
+    render(<TarifasSection establishment={EST} />);
+    await screen.findByRole('row', { name: /Temporada alta/ });
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});

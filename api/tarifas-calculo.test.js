@@ -180,6 +180,19 @@ describe('cotizar por estadia', () => {
   });
 });
 
+describe('cotizar: sinTarifas', () => {
+  it('marca sinTarifas cuando el servicio pedido no tiene ninguna tarifa cargada', () => {
+    const c = cotizar({ tarifas: [F(1, 14000, 'tipo', { serviceType: 'sombrilla' })], periodos: [ALTA], ...unidad(), desde: '2026-01-10', hasta: '2026-01-10' });
+    expect(c.sinTarifas).toBe(true);
+  });
+
+  it('no marca sinTarifas si existe alguna tarifa del servicio, aunque no aplique a estos dias', () => {
+    const c = cotizar({ tarifas: [F(2, 9000)], periodos: [ALTA, BAJA], ...unidad(), desde: '2026-01-10', hasta: '2026-01-10' });
+    expect(c.completo).toBe(false);
+    expect(c.sinTarifas).toBe(false);
+  });
+});
+
 describe('calendarioAnual', () => {
   it('tiene 366 dias con el periodo vigente de cada uno', () => {
     const cal = calendarioAnual([ALTA, BAJA, NAVIDAD]);

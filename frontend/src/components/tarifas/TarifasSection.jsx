@@ -18,6 +18,10 @@ function serviciosDe(establishment) {
   return servicios;
 }
 
+function serviciosSinTarifas(servicios, tarifas) {
+  return servicios.filter((s) => !tarifas.some((t) => t.serviceType === s.id));
+}
+
 /**
  * Configuracion de tarifas: periodos del anio, sectores de unidades y precios.
  * Cada cambio se guarda al momento y recarga todo: son pocas filas y asi la
@@ -58,6 +62,7 @@ function TarifasSection({ establishment }) {
 
   const servicios = serviciosDe(establishment);
   const props = { ...datos, servicios, establishment, ejecutar };
+  const faltantes = cargando ? [] : serviciosSinTarifas(servicios, datos.tarifas);
 
   return (
     <section className="space-y-4">
@@ -67,6 +72,14 @@ function TarifasSection({ establishment }) {
           Los precios por fecha se repiten todos los años. Una tarifa por estadía, si aplica, reemplaza a las de fecha.
         </p>
       </header>
+
+      {faltantes.length > 0 && (
+        <div role="status" className="rounded-lg border border-amber-300 bg-amber-100 px-3 py-2 text-xs font-medium text-amber-900 space-y-0.5">
+          {faltantes.map((s) => (
+            <p key={s.id}>{s.label}: sin precios cargados. Las reservas van a pedir el total a mano.</p>
+          ))}
+        </div>
+      )}
 
       <div role="tablist" aria-label="Tarifas" className="flex gap-1 border-b border-slate-200">
         {PESTANAS.map((p) => (
