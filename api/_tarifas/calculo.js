@@ -78,10 +78,22 @@ function aplicaA(t, serviceType, resourceNumber, sectorId) {
   return false;
 }
 
+// Gana el alcance mas especifico (unidad > sector > tipo); a igual alcance, la
+// atada a un periodo antes que la suelta; y si todavia empatan, el id mas bajo.
+// Asi el resultado no depende del orden en que vengan las filas.
+function ganaA(t, otra) {
+  const a = ORDEN_ALCANCE[t.alcance] - ORDEN_ALCANCE[otra.alcance];
+  if (a !== 0) return a < 0;
+  const atadaT = t.periodoId != null ? 0 : 1;
+  const atadaO = otra.periodoId != null ? 0 : 1;
+  if (atadaT !== atadaO) return atadaT < atadaO;
+  return t.id < otra.id;
+}
+
 function masEspecifica(lista) {
   let mejor = null;
   for (const t of lista) {
-    if (!mejor || ORDEN_ALCANCE[t.alcance] < ORDEN_ALCANCE[mejor.alcance]) mejor = t;
+    if (!mejor || ganaA(t, mejor)) mejor = t;
   }
   return mejor;
 }

@@ -46,6 +46,12 @@ describe('resolverCobro', () => {
   it('sin precio de tarifa acepta el precio a mano sin motivo', () => {
     expect(resolverCobro({ precioTarifa: null, cobrado: 20000, motivo: '' })).toEqual({ totalPrice: 20000, motivoAjuste: null });
   });
+  it('un cobrado que no es numero o es negativo se rechaza', () => {
+    expect(resolverCobro({ precioTarifa: 30000, cobrado: NaN, motivo: 'x' })).toEqual({ error: 'precio_invalido' });
+    expect(resolverCobro({ precioTarifa: null, cobrado: NaN, motivo: '' })).toEqual({ error: 'precio_invalido' });
+    expect(resolverCobro({ precioTarifa: null, cobrado: -5, motivo: '' })).toEqual({ error: 'precio_invalido' });
+    expect(resolverCobro({ precioTarifa: 30000, cobrado: Infinity, motivo: 'x' })).toEqual({ error: 'precio_invalido' });
+  });
 });
 
 describe('precioAlCrear', () => {
@@ -57,6 +63,7 @@ describe('precioAlCrear', () => {
     expect(r).toMatchObject({ precioTarifa: 30000, totalPrice: 30000, dailyPrice: 10000, motivoAjuste: null });
     expect(r.desglose.clase).toBe('fecha');
     expect(query.mock.calls[0][1]).toEqual([7, 'carpa']);
+    expect(query.mock.calls[0][0]).toMatch(/ORDER BY id/);
     expect(query.mock.calls[2][1]).toEqual([7, 'carpa', 58]);
   });
 
@@ -75,6 +82,21 @@ describe('precioAlCrear', () => {
   it('rechaza un ajuste sin motivo', async () => {
     contexto([filaTarifa()]);
     expect(await precioAlCrear(query, 7, { ...body, totalPrice: '25000' })).toEqual({ error: 'motivo_ajuste_required' });
+  });
+
+  it('un total que no es numero se rechaza con precio_invalido', async () => {
+    contexto([filaTarifa()]);
+    expect(await precioAlCrear(query, 7, { ...body, totalPrice: 'abc', motivoAjuste: 'x' })).toEqual({ error: 'precio_invalido' });
+  });
+
+  it('fechas al reves devuelven rango_invalido en vez de tirar', async () => {
+    contexto([filaTarifa()]);
+    expect(await precioAlCrear(query, 7, { ...body, startDate: '2026-01-12', endDate: '2026-01-10' })).toEqual({ error: 'rango_invalido' });
+  });
+
+  it('un error de base al cotizar se propaga', async () => {
+    query.mockRejectedValueOnce(new Error('conexion caida'));
+    await expect(precioAlCrear(query, 7, body)).rejects.toThrow('conexion caida');
   });
 
   it('pileta no pasa por tarifas', async () => {
@@ -105,6 +127,22 @@ describe('precioAlEditar', () => {
     contexto([filaTarifa()]);
     const r = await precioAlEditar(query, 7, current, {}, { recalcular: true, desde: '2026-01-10', hasta: '2026-01-14', resourceNumber: 58 });
     expect(r).toMatchObject({ precioTarifa: 50000, totalPrice: 50000, dailyPrice: 10000 });
+  });
+
+  it('al recalcular con fechas al reves devuelve rango_invalido', async () => {
+    contexto([filaTarifa()]);
+    const r = await precioAlEditar(query, 7, current, {}, { recalcular: true, desde: '2026-01-14', hasta: '2026-01-10', resourceNumber: 58 });
+    expect(r).toEqual({ error: 'rango_invalido' });
+  });
+
+  it('al recalcular, un error de base se propaga', async () => {
+    query.mockRejectedValueOnce(new Error('conexion caida'));
+    await expect(precioAlEditar(query, 7, current, {}, { recalcular: true, desde: '2026-01-10', hasta: '2026-01-14', resourceNumber: 58 })).rejects.toThrow('conexion caida');
+  });
+
+  it('un total negativo se rechaza con precio_invalido', async () => {
+    const opciones = { recalcular: false, desde: '2026-01-10', hasta: '2026-01-12', resourceNumber: 58 };
+    expect(await precioAlEditar(query, 7, current, { totalPrice: '-100', motivoAjuste: 'x' }, opciones)).toEqual({ error: 'precio_invalido' });
   });
 });
 

@@ -424,6 +424,19 @@ describe('precio por tarifa en /api/reservation-groups', () => {
     expect(updateDe()[1]).toContain(50000);
   });
 
+  it('al editar con la salida antes que la entrada responde 400 rango_invalido', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [guardada] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin conflicto
+    conTarifa();
+
+    const res = await request(handler).patch('/?route=reservation-groups/60').set('Authorization', `Bearer ${tokenPara(2)}`).send({ endDate: '2026-01-05' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('rango_invalido');
+    expect(updateDe()).toBeUndefined();
+  });
+
   it('al editar solo las notas no recalcula ni pisa el snapshot', async () => {
     queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
     queryMock.mockResolvedValueOnce({ rows: [guardada] });

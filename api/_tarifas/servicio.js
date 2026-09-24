@@ -64,7 +64,7 @@ const unidadesDesdeBody = (lista) =>
 // ---------- Cotizacion y precio de una reserva ----------
 
 async function cotizarUnidad(query, estId, { serviceType, resourceNumber, desde, hasta }) {
-  const tarifas = (await query('SELECT * FROM tarifas WHERE establishment_id = $1 AND service_type = $2', [estId, serviceType])).rows.map(mapTarifa);
+  const tarifas = (await query('SELECT * FROM tarifas WHERE establishment_id = $1 AND service_type = $2 ORDER BY id', [estId, serviceType])).rows.map(mapTarifa);
   const periodos = (await query('SELECT * FROM periodos_tarifarios WHERE establishment_id = $1', [estId])).rows.map(mapPeriodo);
   const sector = await query(
     'SELECT sector_id FROM sector_unidades WHERE establishment_id = $1 AND service_type = $2 AND resource_number = $3',
@@ -80,7 +80,19 @@ function desgloseParaGuardar(c) {
   return c.desglose.clase === 'fecha' && c.desglose.tramos.length ? c.desglose : null;
 }
 
+// Cotiza y traduce los errores de fecha/rango del calculo a { error }: la API
+// responde 400. Los errores de base (sin .codigo) siguen su camino hacia el 500.
+async function cotizarOError(query, estId, params) {
+  try {
+    return { c: await cotizarUnidad(query, estId, params) };
+  } catch (e) {
+    if (e.codigo) return { error: e.codigo };
+    throw e;
+  }
+}
+
 function resolverCobro({ precioTarifa, cobrado, motivo }) {
+  if (cobrado != null && (!Number.isFinite(cobrado) || cobrado < 0)) return { error: 'precio_invalido' };
   const total = cobrado ?? precioTarifa;
   const motivoLimpio = String(motivo ?? '').trim() || null;
   const difiere = precioTarifa != null && total != null && redondear(total) !== redondear(precioTarifa);
@@ -94,9 +106,11 @@ async function precioAlCrear(query, estId, body) {
   if (body.serviceType === 'pileta') {
     return { precioTarifa: null, desglose: null, totalPrice: body.totalPrice || null, dailyPrice: body.dailyPrice || null, motivoAjuste: null };
   }
-  const c = await cotizarUnidad(query, estId, {
+  const cot = await cotizarOError(query, estId, {
     serviceType: body.serviceType, resourceNumber: body.resourceNumber, desde: body.startDate, hasta: body.endDate
   });
+  if (cot.error) return { error: cot.error };
+  const { c } = cot;
   const precioTarifa = c.completo ? c.total : null;
   const r = resolverCobro({ precioTarifa, cobrado: num(body.totalPrice), motivo: body.motivoAjuste });
   if (r.error) return r;
@@ -107,7 +121,9 @@ async function precioAlEditar(query, estId, current, body, { recalcular, desde, 
   let precioTarifa = num(current.precio_tarifa);
   let desglose = current.desglose ?? null;
   if (recalcular) {
-    const c = await cotizarUnidad(query, estId, { serviceType: current.service_type, resourceNumber, desde, hasta });
+    const cot = await cotizarOError(query, estId, { serviceType: current.service_type, resourceNumber, desde, hasta });
+    if (cot.error) return { error: cot.error };
+    const { c } = cot;
     precioTarifa = c.completo ? c.total : null;
     desglose = desgloseParaGuardar(c);
   }

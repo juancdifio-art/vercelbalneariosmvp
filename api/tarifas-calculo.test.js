@@ -143,6 +143,22 @@ describe('cotizar por estadia', () => {
     const c = cotizar({ tarifas, periodos: [ALTA, BAJA], ...unidad(58, 7), desde: '2026-12-15', hasta: '2027-03-14' });
     expect(c.total).toBe(4200000);
   });
+
+  it('a igual alcance, la estadia atada al periodo de entrada gana a la suelta, en cualquier orden', () => {
+    const atada = E(90, null, 'cerrado', 3000000, { periodoId: 1 });
+    const suelta = E(90, null, 'cerrado', 3500000);
+    const args = { periodos: [ALTA, BAJA], ...unidad(), desde: '2026-12-15', hasta: '2027-03-14' };
+    expect(cotizar({ tarifas: [suelta, atada], ...args }).total).toBe(3000000);
+    expect(cotizar({ tarifas: [atada, suelta], ...args }).total).toBe(3000000);
+  });
+
+  it('a igual alcance y periodo desempata el id mas bajo, en cualquier orden', () => {
+    const vieja = E(90, null, 'cerrado', 3000000, { id: 1 });
+    const nueva = E(90, 120, 'cerrado', 3500000, { id: 2 });
+    const args = { periodos: [ALTA, BAJA], ...unidad(), desde: '2026-12-15', hasta: '2027-03-14' };
+    expect(cotizar({ tarifas: [nueva, vieja], ...args }).desglose.tarifaId).toBe(1);
+    expect(cotizar({ tarifas: [vieja, nueva], ...args }).desglose.tarifaId).toBe(1);
+  });
 });
 
 describe('calendarioAnual', () => {
