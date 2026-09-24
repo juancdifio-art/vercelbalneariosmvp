@@ -21,6 +21,7 @@ import PanelUsuarioSection from './components/PanelUsuarioSection';
 import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
+import { normalizarPatente } from './lib/patente';
 import DashboardSection from './components/DashboardSection';
 import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
@@ -690,7 +691,8 @@ function App() {
       initialPaymentAmount,
       initialPaymentMethod,
       parkingInitialPaymentAmount,
-      parkingInitialPaymentMethod
+      parkingInitialPaymentMethod,
+      vehiclePlate
     } = extra;
 
     let totalPrice = null;
@@ -838,7 +840,8 @@ function App() {
             dailyPrice: parkingDailyPrice ?? '',
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
-            initialPaymentMethod: parkingInitialPaymentMethod
+            initialPaymentMethod: parkingInitialPaymentMethod,
+            vehiclePlate
           });
         } else {
           setError(
@@ -1092,7 +1095,8 @@ function App() {
       initialPaymentAmount,
       initialPaymentMethod,
       parkingInitialPaymentAmount,
-      parkingInitialPaymentMethod
+      parkingInitialPaymentMethod,
+      vehiclePlate
     } = extra;
 
     let totalPrice = null;
@@ -1239,7 +1243,8 @@ function App() {
             dailyPrice: parkingDailyPrice ?? '',
             clientId,
             initialPaymentAmount: parkingInitialPaymentAmount,
-            initialPaymentMethod: parkingInitialPaymentMethod
+            initialPaymentMethod: parkingInitialPaymentMethod,
+            vehiclePlate
           });
         } else {
           setError(
@@ -1304,7 +1309,8 @@ function App() {
       dailyPrice,
       clientId,
       initialPaymentAmount,
-      initialPaymentMethod
+      initialPaymentMethod,
+      vehiclePlate
     } = extra;
 
     let totalPrice = null;
@@ -1338,7 +1344,8 @@ function App() {
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
-          childrenCount: String(childrenCount ?? '')
+          childrenCount: String(childrenCount ?? ''),
+          vehiclePlate: vehiclePlate || ''
         })
       });
 
@@ -1353,6 +1360,10 @@ function App() {
       if (!response.ok) {
         if (data && data.error === 'no_availability') {
           setParkingReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
+        } else if (data && data.error === 'vehicle_plate_required') {
+          const msg = 'Falta la patente del vehículo: es obligatoria para usar el estacionamiento.';
+          setParkingReservationError(msg);
+          setError(msg);
         } else {
           console.error('Error creating reservation group for parking', data);
           setError('No se pudo crear la reserva.');
@@ -1739,7 +1750,8 @@ function App() {
       tempCustomerPhone: group.customerPhone || '',
       tempDailyPrice: group.dailyPrice ?? '',
       tempTotalPrice: group.totalPrice ?? '',
-      tempNotes: group.notes || ''
+      tempNotes: group.notes || '',
+      tempVehiclePlate: group.vehiclePlate || ''
     });
   };
 
@@ -1786,7 +1798,8 @@ function App() {
         linkedParkingResourceNumber = maybeParking.resourceNumber;
         linkedParkingData = {
           totalPrice: maybeParking.totalPrice,
-          paidAmount: maybeParking.paidAmount
+          paidAmount: maybeParking.paidAmount,
+          vehiclePlate: maybeParking.vehiclePlate || null
         };
       }
     }
@@ -1864,7 +1877,8 @@ function App() {
                   linkedParkingResourceNumber: maybeParking.resourceNumber,
                   linkedParkingData: {
                     totalPrice: maybeParking.totalPrice,
-                    paidAmount: maybeParking.paidAmount
+                    paidAmount: maybeParking.paidAmount,
+                    vehiclePlate: maybeParking.vehiclePlate || null
                   }
                 }
                 : prev
@@ -2058,6 +2072,7 @@ function App() {
       tempDailyPrice,
       tempTotalPrice,
       tempNotes,
+      tempVehiclePlate,
       tempResourceNumber,
       resourceNumber,
       serviceType,
@@ -2094,6 +2109,11 @@ function App() {
             : String(tempTotalPrice),
         notes: tempNotes || ''
       };
+
+      // En estacionamiento la patente es obligatoria; el modal no deja guardarla vacia.
+      if (serviceType === 'parking') {
+        updateBody.vehiclePlate = normalizarPatente(tempVehiclePlate);
+      }
 
       // Agregar campos de pileta solo si el servicio es pileta
       if (serviceType === 'pileta') {

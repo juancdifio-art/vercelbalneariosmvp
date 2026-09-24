@@ -4,6 +4,12 @@ const bcrypt = require('bcryptjs');
 const reportPaymentsHandler = require('./_handlers/reports/payments');
 const reportOccupancyHandler = require('./_handlers/reports/occupancy');
 
+// Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
+// Es obligatoria en toda reserva de estacionamiento.
+function normalizarPatente(valor) {
+  return String(valor ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 // ============= DB Utilities =============
 // Para serverless, no mantener pool global sino crear conexiones efímeras
 function createPool() {
@@ -867,6 +873,7 @@ module.exports = async (req, res) => {
             rg.children_count,
             rg.pool_adult_price_per_day,
             rg.pool_child_price_per_day,
+            rg.vehicle_plate,
             c.document_number AS client_document_number,
             COALESCE(SUM(rp.amount), 0) AS paid_amount
           FROM reservation_groups rg
@@ -964,6 +971,7 @@ module.exports = async (req, res) => {
             rg.children_count,
             rg.pool_adult_price_per_day,
             rg.pool_child_price_per_day,
+            rg.vehicle_plate,
             c.document_number
           ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
@@ -994,6 +1002,7 @@ module.exports = async (req, res) => {
             childrenCount: row.children_count || 0,
             poolAdultPricePerDay: row.pool_adult_price_per_day,
             poolChildPricePerDay: row.pool_child_price_per_day,
+            vehiclePlate: row.vehicle_plate || null,
             paidAmount: Number(row.paid_amount || 0)
           }))
         }));
@@ -1013,12 +1022,19 @@ module.exports = async (req, res) => {
       try {
         const body = await parseJsonBody(req);
         const { serviceType, resourceNumber, startDate, endDate, customerName, customerPhone, dailyPrice, totalPrice, notes, clientId, adultsCount, childrenCount, poolAdultPricePerDay, poolChildPricePerDay } = body;
+        const vehiclePlate = normalizarPatente(body.vehiclePlate);
 
         // Validate required fields
         if (!serviceType || !resourceNumber || !startDate || !endDate || !customerName) {
           res.statusCode = 400;
           res.setHeader('Content-Type', 'application/json');
           return res.end(JSON.stringify({ error: 'missing_required_fields' }));
+        }
+
+        if (serviceType === 'parking' && !vehiclePlate) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'vehicle_plate_required' }));
         }
 
         // Validate service type
@@ -1069,8 +1085,8 @@ module.exports = async (req, res) => {
 
         // Insert reservation group
         const insertResult = await db.query(
-          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16) RETURNING *`,
-          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0, poolAdultPricePerDay || null, poolChildPricePerDay || null]
+          `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17) RETURNING *`,
+          [establishmentId, serviceType, resourceNumber, startDate, endDate, customerName, customerPhone || null, dailyPrice || null, totalPrice || null, notes || null, 'active', clientId || null, adultsCount || 0, childrenCount || 0, poolAdultPricePerDay || null, poolChildPricePerDay || null, vehiclePlate || null]
         );
 
         const row = insertResult.rows[0];
@@ -1095,6 +1111,7 @@ module.exports = async (req, res) => {
             childrenCount: row.children_count || 0,
             poolAdultPricePerDay: row.pool_adult_price_per_day,
             poolChildPricePerDay: row.pool_child_price_per_day,
+            vehiclePlate: row.vehicle_plate || null,
             paidAmount: 0,
             createdAt: row.created_at
           }
@@ -1165,6 +1182,16 @@ module.exports = async (req, res) => {
         // Update other fields
         const { customerName, customerPhone, dailyPrice, totalPrice, notes, adultsCount, childrenCount, poolAdultPricePerDay, poolChildPricePerDay, resourceNumber, startDate, endDate } = body;
 
+        // La patente solo se toca si viene en el body; en estacionamiento no se puede vaciar.
+        const finalVehiclePlate = body.vehiclePlate !== undefined
+          ? normalizarPatente(body.vehiclePlate) || null
+          : current.vehicle_plate;
+        if (current.service_type === 'parking' && body.vehiclePlate !== undefined && !finalVehiclePlate) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          return res.end(JSON.stringify({ error: 'vehicle_plate_required' }));
+        }
+
         // Calcular las fechas finales (nuevas o actuales)
         const finalStartDate = startDate !== undefined ? startDate : current.start_date;
         const finalEndDate = endDate !== undefined ? endDate : current.end_date;
@@ -1204,7 +1231,7 @@ module.exports = async (req, res) => {
         }
 
         const updateResult = await db.query(
-          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10, pool_adult_price_per_day = $11, pool_child_price_per_day = $12 WHERE id = $13 RETURNING *`,
+          `UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, adults_count = $6, children_count = $7, resource_number = $8, start_date = $9, end_date = $10, pool_adult_price_per_day = $11, pool_child_price_per_day = $12, vehicle_plate = $14 WHERE id = $13 RETURNING *`,
           [
             customerName !== undefined ? customerName : current.customer_name,
             customerPhone !== undefined ? customerPhone : current.customer_phone,
@@ -1218,7 +1245,8 @@ module.exports = async (req, res) => {
             finalEndDate,
             poolAdultPricePerDay !== undefined ? poolAdultPricePerDay : current.pool_adult_price_per_day,
             poolChildPricePerDay !== undefined ? poolChildPricePerDay : current.pool_child_price_per_day,
-            reservationGroupId
+            reservationGroupId,
+            finalVehiclePlate
           ]
         );
 
@@ -1242,7 +1270,8 @@ module.exports = async (req, res) => {
             adultsCount: row.adults_count || 0,
             childrenCount: row.children_count || 0,
             poolAdultPricePerDay: row.pool_adult_price_per_day,
-            poolChildPricePerDay: row.pool_child_price_per_day
+            poolChildPricePerDay: row.pool_child_price_per_day,
+            vehiclePlate: row.vehicle_plate || null
           }
         }));
       } catch (error) {

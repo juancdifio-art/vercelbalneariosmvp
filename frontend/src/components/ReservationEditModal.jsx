@@ -1,4 +1,7 @@
 import React from 'react';
+import { numerosDeUnidades } from '../lib/unidades';
+import { normalizarPatente } from '../lib/patente';
+import PatenteField from './PatenteField';
 
 function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups }) {
   if (!modal) return null;
@@ -24,7 +27,13 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
     }
   };
 
-  const capacity = getCapacity();
+  // Carpas y sombrillas pueden venir del plano, con huecos en la numeracion.
+  const numerosUnidad = ['carpa', 'sombrilla'].includes(modal.serviceType) && establishment
+    ? numerosDeUnidades(establishment, modal.serviceType)
+    : Array.from({ length: getCapacity() || 0 }, (_, i) => i + 1);
+  const capacity = numerosUnidad.length;
+  // En estacionamiento no se puede guardar sin patente.
+  const faltaPatente = modal.serviceType === 'parking' && !normalizarPatente(modal.tempVehiclePlate);
   const currentResourceNumber = modal.tempResourceNumber ?? modal.resourceNumber;
 
   // Función para verificar si una unidad está ocupada en un rango de fechas
@@ -87,7 +96,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                       );
                     }}
                   >
-                    {Array.from({ length: capacity }, (_, i) => i + 1).map((num) => {
+                    {numerosUnidad.map((num) => {
                       const isOccupied = isUnitOccupied(num);
                       const isCurrent = num === Number(modal.resourceNumber);
                       return (
@@ -465,6 +474,18 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
               })()}
             </div>
           )}
+          {modal.serviceType === 'parking' && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
+                <span>🚗</span>
+                <span>Vehículo</span>
+              </h3>
+              <PatenteField
+                value={modal.tempVehiclePlate}
+                onChange={(value) => setModal((prev) => (prev ? { ...prev, tempVehiclePlate: value } : prev))}
+              />
+            </div>
+          )}
           {/* Notas */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
@@ -495,7 +516,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
               type="button"
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={onSave}
-              disabled={saving}
+              disabled={saving || faltaPatente}
             >
               {saving ? '⏳ Guardando...' : '✅ Guardar cambios'}
             </button>

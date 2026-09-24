@@ -59,6 +59,7 @@ function modalCarpa(form, onSaveRange = vi.fn().mockResolvedValue(true)) {
         initialPaymentMethod: '',
         parkingInitialPaymentAmount: '',
         parkingInitialPaymentMethod: '',
+        vehiclePlate: 'AB123CD',
         ...form
       }}
       clients={[]}

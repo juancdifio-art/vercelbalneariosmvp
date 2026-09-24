@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Plano de sombrillas</title>
+<meta name="description" content="Vista del Balneario Zeus con solo las sombrillas: los cuatro bloques frente a la playa.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="plano-zeus.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <div class="stamp">Vista rápida · sombrillas</div>
+    <h1>Sombrillas · Balneario Zeus</h1>
+    <p class="lede">Solo la parte de sombrillas: los cuatro bloques frente a la playa, con sus caminos y accesos. Con el botón de plano completo se ve todo el balneario encima del sistema, y se cierra con otro botón o con Esc.</p>
+  </header>
+
+  <div class="barra">
+    <span>Sombrillas: <b id="total">—</b></span>
+    <span class="sep"></span>
+    <label><input type="checkbox" id="chk-numeros" checked> Mostrar números</label>
+    <a class="tool" href="plano-carpas.html">Ir a carpas</a>
+    <button type="button" class="tool fuerte" id="ver-completo">⛶ Ver plano completo</button>
+  </div>
+
+  <div class="planowrap parcial">
+    <svg id="plano" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Sombrillas · Balneario Zeus"></svg>
+  </div>
+
+  <div class="refs">
+    <span><i class="sw circ"></i> Sombrilla</span>
+    <span><i class="sw circ dud"></i> No se ve en la foto (ubicación supuesta)</span>
+    <span><i class="sw cam"></i> Camino</span>
+  </div>
+
+</div>
+
+<script src="plano-zeus.js"></script>
+<script>
+  var svg = document.getElementById('plano');
+  var unidades = PlanoZeus.dibujar(svg, { vista: 'sombrillas' });
+  document.getElementById('total').textContent = unidades.length;
+  document.getElementById('chk-numeros').addEventListener('change', function (e) {
+    svg.classList.toggle('sin-numeros', !e.target.checked);
+  });
+  PlanoZeus.cubrePantalla(document.getElementById('ver-completo'));
+</script>
+</body>
+</html>

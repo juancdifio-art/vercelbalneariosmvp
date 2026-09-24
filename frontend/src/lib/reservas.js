@@ -161,3 +161,47 @@ export function unidadesOcupadas(reservas, serviceType, desde, hasta) {
   }
   return ocupadas;
 }
+
+function deLaUnidad(reservas, serviceType, resourceNumber) {
+  return (reservas || []).filter(
+    (g) =>
+      g.status !== 'cancelled' &&
+      g.serviceType === serviceType &&
+      Number(g.resourceNumber) === Number(resourceNumber)
+  );
+}
+
+/** La reserva que ocupa la unidad en esa fecha, o null. */
+export function reservaEnFecha(reservas, serviceType, resourceNumber, fecha) {
+  return (
+    deLaUnidad(reservas, serviceType, resourceNumber).find(
+      (g) => g.startDate <= fecha && g.endDate >= fecha
+    ) || null
+  );
+}
+
+/** La primera reserva de la unidad que empieza despues de esa fecha, o null. */
+export function proximaReserva(reservas, serviceType, resourceNumber, fecha) {
+  const futuras = deLaUnidad(reservas, serviceType, resourceNumber)
+    .filter((g) => g.startDate > fecha)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+  return futuras[0] || null;
+}
+
+/**
+ * La plaza de estacionamiento reservada junto con una carpa o sombrilla: mismo
+ * cliente (o, si no hay cliente cargado, mismo nombre) y mismas fechas. Es el
+ * mismo criterio que usa el detalle de la reserva.
+ */
+export function estacionamientoVinculado(reservas, reserva) {
+  if (!reserva) return null;
+  const nombre = (reserva.customerName || '').trim().toLowerCase();
+  return (
+    (reservas || []).find((g) => {
+      if (!g || g.serviceType !== 'parking' || g.status === 'cancelled') return false;
+      if (g.startDate !== reserva.startDate || g.endDate !== reserva.endDate) return false;
+      if (reserva.clientId && g.clientId) return String(g.clientId) === String(reserva.clientId);
+      return Boolean(nombre) && (g.customerName || '').trim().toLowerCase() === nombre;
+    }) || null
+  );
+}

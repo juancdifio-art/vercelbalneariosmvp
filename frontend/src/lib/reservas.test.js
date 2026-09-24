@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
+  reservaEnFecha,
+  proximaReserva,
+  estacionamientoVinculado,
   diasInclusivos,
   reservasDelCliente,
   otrasReservasVigentes,
@@ -234,5 +237,42 @@ describe('unidadesOcupadas', () => {
 
   it('sin las dos fechas no hay nada que chequear', () => {
     expect(unidadesOcupadas([p(1, '2026-09-25', '2026-09-26')], 'parking', '2026-09-22', '').size).toBe(0);
+  });
+});
+
+describe('reservaEnFecha y proximaReserva', () => {
+  const reservas = [
+    { id: 1, serviceType: 'carpa', resourceNumber: 5, startDate: '2026-01-10', endDate: '2026-01-15', status: 'active' },
+    { id: 2, serviceType: 'carpa', resourceNumber: 5, startDate: '2026-01-20', endDate: '2026-01-25', status: 'active' },
+    { id: 3, serviceType: 'carpa', resourceNumber: 5, startDate: '2026-01-17', endDate: '2026-01-18', status: 'cancelled' },
+    { id: 4, serviceType: 'sombrilla', resourceNumber: 5, startDate: '2026-01-16', endDate: '2026-01-16', status: 'active' }
+  ];
+
+  it('encuentra la reserva activa de la unidad ese dia, con los extremos incluidos', () => {
+    expect(reservaEnFecha(reservas, 'carpa', 5, '2026-01-15').id).toBe(1);
+    expect(reservaEnFecha(reservas, 'carpa', '5', '2026-01-10').id).toBe(1);
+    expect(reservaEnFecha(reservas, 'carpa', 5, '2026-01-16')).toBeNull();
+  });
+
+  it('la proxima reserva ignora canceladas y otros servicios', () => {
+    expect(proximaReserva(reservas, 'carpa', 5, '2026-01-16').id).toBe(2);
+    expect(proximaReserva(reservas, 'carpa', 5, '2026-01-26')).toBeNull();
+  });
+});
+
+describe('estacionamientoVinculado', () => {
+  const carpa = { id: 1, serviceType: 'carpa', resourceNumber: 3, clientId: 7, customerName: 'Ana', startDate: '2026-01-10', endDate: '2026-01-15', status: 'active' };
+
+  it('encuentra la plaza del mismo cliente y mismas fechas', () => {
+    const plaza = { id: 2, serviceType: 'parking', resourceNumber: 12, clientId: 7, startDate: '2026-01-10', endDate: '2026-01-15', status: 'active' };
+    expect(estacionamientoVinculado([carpa, plaza], carpa)).toBe(plaza);
+  });
+
+  it('sin cliente, cae al nombre; con otras fechas o cancelada no vincula', () => {
+    const sinCliente = { ...carpa, clientId: null };
+    const porNombre = { id: 3, serviceType: 'parking', resourceNumber: 4, clientId: null, customerName: 'ana', startDate: '2026-01-10', endDate: '2026-01-15', status: 'active' };
+    expect(estacionamientoVinculado([sinCliente, porNombre], sinCliente)).toBe(porNombre);
+    expect(estacionamientoVinculado([carpa, { ...porNombre, clientId: 7, endDate: '2026-01-16' }], carpa)).toBeNull();
+    expect(estacionamientoVinculado([carpa, { ...porNombre, clientId: 7, status: 'cancelled' }], carpa)).toBeNull();
   });
 });

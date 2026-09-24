@@ -49,6 +49,7 @@ function formBase(clave, extra = {}) {
     initialPaymentMethod: '',
     parkingInitialPaymentAmount: '',
     parkingInitialPaymentMethod: '',
+    vehiclePlate: 'AB123CD',
     ...extra
   };
 }

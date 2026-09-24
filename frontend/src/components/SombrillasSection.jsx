@@ -1,7 +1,8 @@
 import React from 'react';
-import { addDays, isSameDay } from 'date-fns';
-import { format, weekdayInitial } from '../lib/dates';
-import ReservaEtiqueta from './ReservaEtiqueta';
+import { addDays } from 'date-fns';
+import { format } from '../lib/dates';
+import CalendarioOcupacion from './CalendarioOcupacion';
+import { numerosDeUnidades } from '../lib/unidades';
 function SombrillasSection({
   establishment,
   sombrillasDayOffset,
@@ -10,7 +11,6 @@ function SombrillasSection({
   reservationGroups,
   hoveredReservationGroupId,
   setHoveredReservationGroupId,
-  parseLocalDateFromInput,
   onViewReservationDetails,
   authToken,
   fetchClients,
@@ -18,20 +18,35 @@ function SombrillasSection({
   setSombrillaReservationForm,
   CARPA_RESERVATION_COLORS
 }) {
-  const getGroupColorIndex = (groupId, serviceType) => {
-    const paletteSize = CARPA_RESERVATION_COLORS.length || 1;
-    if (!groupId || !paletteSize) return 0;
+  const numerosSombrillas = numerosDeUnidades(establishment, 'sombrilla');
 
-    const str = `${serviceType || ''}:${groupId}`;
-    let hash = 0;
-
-    for (let i = 0; i < str.length; i += 1) {
-      const ch = str.charCodeAt(i);
-      hash = (hash * 31 + ch) | 0;
+  // Desde el calendario: un clic trae solo la entrada; un arrastre, entrada y salida.
+  const abrirNuevaReserva = (sombrillaNumero, day, startDate, endDate) => {
+    const token = authToken || sessionStorage.getItem('authToken');
+    if (token) {
+      fetchClients(token);
     }
-
-    const index = Math.abs(hash) % paletteSize;
-    return index;
+    setSombrillaReservationError('');
+    setSombrillaReservationForm({
+      sombrillaNumero,
+      day,
+      isReserved: false,
+      startDate,
+      endDate,
+      clientId: null,
+      customerName: '',
+      customerPhone: '',
+      adultsCount: '',
+      childrenCount: '',
+      dailyPrice: '',
+      includeParking: false,
+      parkingSpotNumber: '',
+      parkingDailyPrice: '',
+      initialPaymentAmount: '',
+      initialPaymentMethod: '',
+      parkingInitialPaymentAmount: '',
+      parkingInitialPaymentMethod: ''
+    });
   };
 
   return (
@@ -41,7 +56,7 @@ function SombrillasSection({
         Capacidad configurada: {establishment?.sombrillasCapacity ?? 'sin definir'} sombrillas.
       </p>
       <p className="text-[11px] text-slate-600 mb-3">
-        Disponibilidad de los próximos 30 días: cada fila es una sombrilla, cada columna un día.
+        Disponibilidad de los próximos 30 días: cada fila es una sombrilla, cada columna un día. Arrastrá sobre una fila para cargar una reserva con entrada y salida.
       </p>
 
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600 bg-sky-50 pb-2">
@@ -70,217 +85,27 @@ function SombrillasSection({
       </div>
 
       <div className="mt-2 rounded-xl border border-slate-300 bg-white max-h-[600px] overflow-y-auto overflow-x-auto">
-        {(() => {
-          const totalSombrillas = Number.parseInt(
-            establishment?.sombrillasCapacity ?? '0',
-            10
-          );
-
-          if (!totalSombrillas || Number.isNaN(totalSombrillas)) {
-            return (
-              <div className="px-4 py-6 text-[11px] text-slate-600">
-                Configurá primero la cantidad de sombrillas en la sección de configuración del establecimiento.
-              </div>
-            );
-          }
-
-          const today = new Date();
-          const days = Array.from({ length: 30 }, (_, i) => addDays(today, sombrillasDayOffset + i));
-
-          return (
-            <table className="w-full table-fixed text-[10px]">
-              <thead>
-                <tr>
-                  {/* Con table-fixed el ancho lo define esta celda, no las del
-                      cuerpo. Necesita entrar "Sombrilla 218" en una sola linea:
-                      si wrapea, esa fila queda mas alta y desalinea la grilla. */}
-                  <th className="bg-cyan-50 px-1 py-1 text-left font-semibold text-cyan-900 border-b border-slate-400 w-24 sticky top-0 z-10">
-                    Sombrilla
-                  </th>
-                  {days.map((day, idx) => {
-                    const isToday = isSameDay(day, today);
-                    return (
-                      <th
-                        key={idx}
-                        className={
-                          'px-0.5 py-1 text-center font-medium border-b border-slate-200 sticky top-0 z-10 ' +
-                          (isToday
-                            ? 'text-cyan-900 bg-cyan-200'
-                            : 'text-slate-700 bg-white')
-                        }
-                      >
-                        <div>{format(day, 'dd')}</div>
-                        <div className="text-[9px] text-slate-500">
-                          {weekdayInitial(day)}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {Array.from({ length: totalSombrillas }, (_, i) => i + 1).map((sombrillaNumero) => {
-                  return (
-                    <tr key={sombrillaNumero} className="border-t border-slate-200">
-                      <td className="bg-cyan-50 px-1 py-1 text-cyan-900 border-r border-slate-300 w-20 whitespace-nowrap">
-                        Sombrilla {sombrillaNumero}
-                      </td>
-                      {days.map((day, idx) => {
-                        const isToday = isSameDay(day, today);
-                        const dateStr = format(day, 'yyyy-MM-dd');
-                        const key = `${dateStr}-${sombrillaNumero}`;
-                        const isReserved = Boolean(sombrillasReservations[key]);
-
-                        let colorIndexForCell = 0;
-                        let groupForCell = null;
-
-                        if (isReserved) {
-                          groupForCell = reservationGroups.find(
-                            (g) =>
-                              g.serviceType === 'sombrilla' &&
-                              g.resourceNumber === sombrillaNumero &&
-                              g.status === 'active' &&
-                              g.startDate <= dateStr &&
-                              g.endDate >= dateStr
-                          );
-
-                          const groupId = groupForCell?.id ?? null;
-
-                          if (groupId !== null) {
-                            colorIndexForCell = getGroupColorIndex(groupId, 'sombrilla');
-                          }
-                        }
-
-                        let cellClasses =
-                          'relative h-5 border-l border-slate-300 transition-colors cursor-pointer ';
-
-                        if (isReserved) {
-                          const paletteSize = CARPA_RESERVATION_COLORS.length || 1;
-                          const index = ((colorIndexForCell % paletteSize) + paletteSize) % paletteSize;
-                          const colorDef = CARPA_RESERVATION_COLORS[index];
-
-                          if (colorDef) {
-                            cellClasses += isToday ? colorDef.today : colorDef.normal;
-                          } else {
-                            cellClasses += isToday
-                              ? 'bg-amber-500 hover:bg-amber-600'
-                              : 'bg-amber-300 hover:bg-amber-400';
-                          }
-
-                          if (
-                            groupForCell &&
-                            hoveredReservationGroupId &&
-                            hoveredReservationGroupId === groupForCell.id
-                          ) {
-                            cellClasses += ' border-2 border-slate-900';
-                          }
-                        } else {
-                          cellClasses += isToday
-                            ? 'bg-cyan-400 hover:bg-cyan-500'
-                            : 'bg-white hover:bg-slate-200';
-                        }
-
-                        const groupForClick = groupForCell;
-
-                        let tooltip = '';
-
-                        if (groupForCell) {
-                          const customerLabel = (groupForCell.customerName || '').trim() || 'Sin cliente';
-                          const startObj = parseLocalDateFromInput(groupForCell.startDate);
-                          const endObj = parseLocalDateFromInput(groupForCell.endDate);
-
-                          let rangeLabel = '';
-
-                          if (startObj && endObj) {
-                            const startStr = format(startObj, 'dd/MM');
-                            const endStr = format(endObj, 'dd/MM');
-                            rangeLabel = `Del ${startStr} al ${endStr}`;
-                          } else {
-                            rangeLabel = `Del ${groupForCell.startDate} al ${groupForCell.endDate}`;
-                          }
-
-                          tooltip = `${customerLabel}\n${rangeLabel}`;
-                        }
-
-                        return (
-                          <td
-                            key={idx}
-                            className={cellClasses}
-                            title={tooltip}
-                            onMouseEnter={() => {
-                              if (groupForClick) {
-                                setHoveredReservationGroupId(groupForClick.id);
-                              } else {
-                                setHoveredReservationGroupId(null);
-                              }
-                            }}
-                            onMouseLeave={() => {
-                              setHoveredReservationGroupId(null);
-                            }}
-                            onClick={() => {
-                              if (isReserved) {
-                                const group =
-                                  groupForClick ||
-                                  reservationGroups.find(
-                                    (g) =>
-                                      g.serviceType === 'sombrilla' &&
-                                      g.resourceNumber === sombrillaNumero &&
-                                      g.status === 'active' &&
-                                      g.startDate <= dateStr &&
-                                      g.endDate >= dateStr
-                                  );
-
-                                if (group) {
-                                  onViewReservationDetails(group);
-                                  return;
-                                }
-                              }
-
-                              const token = authToken || sessionStorage.getItem('authToken');
-                              if (token) {
-                                fetchClients(token);
-                              }
-
-                              setSombrillaReservationError('');
-
-                              setSombrillaReservationForm({
-                                sombrillaNumero,
-                                day,
-                                isReserved,
-                                startDate: dateStr,
-                                endDate: '',
-                                clientId: null,
-                                customerName: '',
-                                customerPhone: '',
-                                adultsCount: '',
-                                childrenCount: '',
-                                dailyPrice: '',
-                                includeParking: false,
-                                parkingSpotNumber: '',
-                                parkingDailyPrice: '',
-                                initialPaymentAmount: '',
-                                initialPaymentMethod: '',
-                                parkingInitialPaymentAmount: '',
-                                parkingInitialPaymentMethod: ''
-                              });
-                            }}
-                          >
-                            <ReservaEtiqueta
-                              group={groupForCell}
-                              dateStr={dateStr}
-                              esPrimeraColumna={idx === 0}
-                              ultimoDiaVentana={format(days[days.length - 1], 'yyyy-MM-dd')}
-                            />
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          );
-        })()}
+        {numerosSombrillas.length === 0 ? (
+          <div className="px-4 py-6 text-[11px] text-slate-600">
+            Configurá primero la cantidad de sombrillas en la sección de configuración del establecimiento.
+          </div>
+        ) : (
+          <CalendarioOcupacion
+            serviceType="sombrilla"
+            prefijo="Sombrilla"
+            numeros={numerosSombrillas}
+            reservations={sombrillasReservations}
+            reservationGroups={reservationGroups}
+            dayOffset={sombrillasDayOffset}
+            hoveredReservationGroupId={hoveredReservationGroupId}
+            setHoveredReservationGroupId={setHoveredReservationGroupId}
+            onViewReservationDetails={onViewReservationDetails}
+            onNuevaReserva={abrirNuevaReserva}
+            colores={CARPA_RESERVATION_COLORS}
+            anchoTh="w-24"
+            anchoTd="w-20"
+          />
+        )}
       </div>
     </div>
   );

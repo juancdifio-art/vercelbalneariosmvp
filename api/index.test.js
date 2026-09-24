@@ -237,3 +237,86 @@ describe('precios de pileta en /api/reservation-groups', () => {
     expect(res.body.reservationGroup.poolAdultPricePerDay).toBe('7000.00');
   });
 });
+
+describe('patente obligatoria en estacionamiento', () => {
+  it('rechaza una reserva de estacionamiento sin patente', async () => {
+    const res = await request(handler)
+      .post('/?route=reservation-groups')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ serviceType: 'parking', resourceNumber: 12, startDate: '2026-09-26', endDate: '2026-09-30', customerName: 'Lucia' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('vehicle_plate_required');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('guarda la patente normalizada: mayusculas y sin espacios ni guiones', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] }); // establecimiento
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin solapamiento
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 50, service_type: 'parking', resource_number: 12, vehicle_plate: 'AB123CD' }] });
+
+    const res = await request(handler)
+      .post('/?route=reservation-groups')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ serviceType: 'parking', resourceNumber: 12, startDate: '2026-09-26', endDate: '2026-09-30', customerName: 'Lucia', vehiclePlate: ' ab 123-cd ' });
+
+    expect(res.status).toBe(201);
+    const insert = queryMock.mock.calls.find((c) => String(c[0]).includes('INSERT INTO reservation_groups'));
+    expect(String(insert[0])).toContain('vehicle_plate');
+    expect(insert[1]).toContain('AB123CD');
+    expect(res.body.group.vehiclePlate).toBe('AB123CD');
+  });
+
+  it('en carpa no la pide', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 51, service_type: 'carpa' }] });
+
+    const res = await request(handler)
+      .post('/?route=reservation-groups')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ serviceType: 'carpa', resourceNumber: 58, startDate: '2026-09-26', endDate: '2026-09-30', customerName: 'Lucia' });
+
+    expect(res.status).toBe(201);
+  });
+
+  it('la devuelve al listar', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 50, service_type: 'parking', resource_number: 12, start_date: '2026-09-26', end_date: '2026-09-30', vehicle_plate: 'AB123CD', paid_amount: 0 }] });
+
+    const res = await request(handler).get('/?route=reservation-groups').set('Authorization', `Bearer ${tokenPara(2)}`);
+
+    expect(res.body.reservationGroups[0].vehiclePlate).toBe('AB123CD');
+    const select = String(queryMock.mock.calls[1][0]);
+    expect(select).toContain('rg.vehicle_plate');
+  });
+
+  it('al editar un estacionamiento no deja borrar la patente', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 50, service_type: 'parking', vehicle_plate: 'AB123CD' }] });
+
+    const res = await request(handler)
+      .patch('/?route=reservation-groups/50')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ vehiclePlate: '  ' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('vehicle_plate_required');
+  });
+
+  it('al editar actualiza la patente', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 50, service_type: 'parking', vehicle_plate: 'AB123CD' }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 50, service_type: 'parking', vehicle_plate: 'AC456DE' }] });
+
+    const res = await request(handler)
+      .patch('/?route=reservation-groups/50')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({ vehiclePlate: 'ac 456 de' });
+
+    expect(res.status).toBe(200);
+    const update = queryMock.mock.calls.find((c) => String(c[0]).includes('UPDATE reservation_groups'));
+    expect(update[1]).toContain('AC456DE');
+    expect(res.body.reservationGroup.vehiclePlate).toBe('AC456DE');
+  });
+});
