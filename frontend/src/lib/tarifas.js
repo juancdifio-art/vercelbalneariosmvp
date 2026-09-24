@@ -5,7 +5,7 @@
 
 // `cotizando` lo informa PrecioReserva mientras espera la cotizacion: los modales
 // no dejan guardar hasta que llegue.
-export const PRECIO_VACIO = { precioTarifa: null, desglose: null, cobrado: '', motivo: '', editadoEn: null, cotizando: false };
+export const PRECIO_VACIO = { precioTarifa: null, desglose: null, cobrado: '', motivo: '', editadoEn: null, cotizando: false, sinTarifas: false };
 
 export function aNumero(valor) {
   if (valor === null || valor === undefined || valor === '') return null;
@@ -56,7 +56,8 @@ export function precioDesdeReserva(group) {
     cobrado: group.totalPrice != null && group.totalPrice !== '' ? String(Number(group.totalPrice)) : '',
     motivo: group.motivoAjuste ?? '',
     editadoEn: null,
-    cotizando: false
+    cotizando: false,
+    sinTarifas: false
   };
 }
 

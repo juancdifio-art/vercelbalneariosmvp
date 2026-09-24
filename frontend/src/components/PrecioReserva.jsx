@@ -30,6 +30,10 @@ const aValorPlano = (texto) => {
 
 const ddmm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 
+const AVISO_TARIFAS = 'rounded-lg border border-amber-300 bg-amber-100 px-3 py-2 text-[11px] font-medium text-amber-900';
+
+const LABEL_SERVICIO_SIN_TARIFAS = { carpa: 'las carpas', sombrilla: 'las sombrillas', parking: 'el estacionamiento' };
+
 function listaDeFechas(fechas) {
   const primeras = fechas.slice(0, 5).map(ddmm);
   const resto = fechas.length - primeras.length;
@@ -67,7 +71,7 @@ function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onCha
   useEffect(() => {
     if (!cotizacion) return;
     const precioTarifa = cotizacion.completo ? cotizacion.total : null;
-    const patch = { precioTarifa, desglose: cotizacion.desglose };
+    const patch = { precioTarifa, desglose: cotizacion.desglose, sinTarifas: Boolean(cotizacion.sinTarifas) };
     // Si las fechas cambiaron (editadoEn !== clave), el cobrado anterior era
     // para otra estadia: se reemplaza por el de la tarifa nueva, o se vacia
     // si la tarifa nueva quedo incompleta (no queda un total viejo colgado),
@@ -102,9 +106,15 @@ function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onCha
         </div>
       )}
 
-      {faltan.length > 0 && (
-        <p role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-medium text-amber-900">
-          Consultar precio: faltan tarifas para el {listaDeFechas(faltan)}.
+      {valor.sinTarifas && (
+        <p role="status" className={AVISO_TARIFAS}>
+          No hay tarifas cargadas para {LABEL_SERVICIO_SIN_TARIFAS[serviceType] ?? 'las carpas'}. Cargá el total a mano o configuralas en Tarifas → Precios.
+        </p>
+      )}
+
+      {!valor.sinTarifas && faltan.length > 0 && (
+        <p role="status" className={AVISO_TARIFAS}>
+          Consultar precio: faltan tarifas para el {listaDeFechas(faltan)}. Cargá el total a mano o completá los precios en Tarifas → Precios.
         </p>
       )}
 

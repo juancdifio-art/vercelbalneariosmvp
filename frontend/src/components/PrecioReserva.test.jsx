@@ -10,7 +10,11 @@ const COMPLETA = {
   desglose: { clase: 'fecha', tramos: [{ desde: '2026-01-10', hasta: '2026-01-12', periodoId: 1, periodo: 'Alta', dias: 3, precioDia: 10000, subtotal: 30000 }], diasSinTarifa: [] }
 };
 const INCOMPLETA = {
-  dias: 2, total: 0, completo: false, diasSinTarifa: ['2026-03-14', '2026-03-15'],
+  dias: 2, total: 0, completo: false, diasSinTarifa: ['2026-03-14', '2026-03-15'], sinTarifas: false,
+  desglose: { clase: 'fecha', tramos: [], diasSinTarifa: ['2026-03-14', '2026-03-15'] }
+};
+const SIN_TARIFAS = {
+  dias: 2, total: 0, completo: false, diasSinTarifa: ['2026-03-14', '2026-03-15'], sinTarifas: true,
   desglose: { clase: 'fecha', tramos: [], diasSinTarifa: ['2026-03-14', '2026-03-15'] }
 };
 const COMPLETA_DECIMAL = {
@@ -78,10 +82,19 @@ describe('PrecioReserva', () => {
   it('sin tarifa completa avisa Consultar precio y deja cargar a mano', async () => {
     responder(INCOMPLETA);
     render(<ConEstado desde="2026-03-14" hasta="2026-03-15" />);
-    await waitFor(() => expect(screen.getByText('Consultar precio: faltan tarifas para el 14/03 y 15/03.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Consultar precio: faltan tarifas para el 14/03 y 15/03. Cargá el total a mano o completá los precios en Tarifas → Precios.')).toBeInTheDocument());
     expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('');
     await userEvent.type(screen.getByLabelText('Total cobrado (ARS)'), '20000');
     expect(screen.queryByLabelText(/Motivo del ajuste/)).not.toBeInTheDocument();
+  });
+
+  it('sin ninguna tarifa cargada para el servicio avisa con un mensaje distinto', async () => {
+    responder(SIN_TARIFAS);
+    render(<ConEstado desde="2026-03-14" hasta="2026-03-15" />);
+    await waitFor(() => expect(screen.getByText('No hay tarifas cargadas para las carpas. Cargá el total a mano o configuralas en Tarifas → Precios.')).toBeInTheDocument());
+    expect(screen.getByText('No hay tarifas cargadas para las carpas. Cargá el total a mano o configuralas en Tarifas → Precios.')).toHaveAttribute('role', 'status');
+    expect(screen.queryByText(/Consultar precio: faltan tarifas/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('');
   });
 
   it('sin cotizar muestra lo guardado y no llama al servidor', () => {
@@ -115,7 +128,7 @@ describe('PrecioReserva', () => {
   it('con vaciarSiIncompleta=false una cotizacion incompleta conserva el total cobrado', async () => {
     responder(INCOMPLETA);
     render(<ConEstado desde="2026-03-14" hasta="2026-03-15" vaciarSiIncompleta={false} inicial={{ ...PRECIO_VACIO, precioTarifa: 30000, cobrado: '30000' }} />);
-    await waitFor(() => expect(screen.getByText('Consultar precio: faltan tarifas para el 14/03 y 15/03.')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Consultar precio: faltan tarifas para el 14/03 y 15/03. Cargá el total a mano o completá los precios en Tarifas → Precios.')).toBeInTheDocument());
     expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('30.000');
     expect(ultimo.cobrado).toBe('30000');
     expect(ultimo.precioTarifa).toBeNull();
@@ -124,7 +137,7 @@ describe('PrecioReserva', () => {
   it('tipear solo una coma deja el total vacio, no un punto suelto', async () => {
     responder(INCOMPLETA);
     render(<ConEstado desde="2026-03-14" hasta="2026-03-15" />);
-    await screen.findByText('Consultar precio: faltan tarifas para el 14/03 y 15/03.');
+    await screen.findByText('Consultar precio: faltan tarifas para el 14/03 y 15/03. Cargá el total a mano o completá los precios en Tarifas → Precios.');
     await userEvent.type(screen.getByLabelText('Total cobrado (ARS)'), ',');
     expect(ultimo.cobrado).toBe('');
     expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('');
