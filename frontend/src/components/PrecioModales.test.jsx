@@ -59,4 +59,15 @@ describe('precio en el alta de carpa', () => {
     await userEvent.type(screen.getByLabelText(/Motivo del ajuste/), 'amigo');
     await waitFor(() => expect(guardar()).toBeEnabled());
   });
+
+  it('no deja guardar mientras la cotizacion esta en viaje', async () => {
+    global.fetch = vi.fn((url) => (String(url).includes('/tarifas/cotizar')
+      ? new Promise(() => {})
+      : Promise.resolve({ ok: true, json: () => Promise.resolve({ reservationGroups: [] }) })));
+    render(<ConEstado onSaveRange={vi.fn()} />);
+    await screen.findByText('Calculando precio…');
+    // Que termine todo lo demas (disponibilidad) antes de mirar el boton.
+    await new Promise((r) => setTimeout(r, 300));
+    expect(guardar()).toBeDisabled();
+  });
 });

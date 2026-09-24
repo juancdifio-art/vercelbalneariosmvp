@@ -24,7 +24,8 @@ const aValorPlano = (texto) => {
   limpio = limpio.replace(/[^\d.]/g, '');
   const i = limpio.indexOf('.');
   if (i !== -1) limpio = `${limpio.slice(0, i + 1)}${limpio.slice(i + 1).replace(/\./g, '')}`;
-  return limpio;
+  // Una coma sola (".") no es un numero: el servidor la guardaria como NaN.
+  return /\d/.test(limpio) ? limpio : '';
 };
 
 const ddmm = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
@@ -46,9 +47,22 @@ function listaDeFechas(fechas) {
  * fechas, el total vuelve al de la tarifa nueva, porque el ajuste era para otra estadia.
  *
  * `cotizar=false` (al editar sin tocar fechas ni unidad) muestra lo guardado.
+ *
+ * `vaciarSiIncompleta` (true al crear): si la tarifa nueva queda incompleta, el
+ * total se vacia. Al editar va en false: el servidor conserva el total guardado
+ * cuando no llega uno, asi que la pantalla tambien lo conserva.
+ *
+ * Informa `cotizando` mientras la cotizacion esta en viaje, para que el modal
+ * no deje guardar con el precio de las fechas anteriores.
  */
-function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onChange, cotizar = true, titulo = 'Precio' }) {
+function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onChange, cotizar = true, titulo = 'Precio', vaciarSiIncompleta = true }) {
   const { clave, cotizacion, verificando, fallo } = useCotizacion(serviceType, resourceNumber, desde, hasta, cotizar);
+
+  // Solo avisa cuando cambia: si llamara siempre, cada render del padre volveria a disparar el efecto.
+  useEffect(() => {
+    if (Boolean(valor.cotizando) !== verificando) onChange({ cotizando: verificando });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verificando, valor.cotizando]);
 
   useEffect(() => {
     if (!cotizacion) return;
@@ -56,8 +70,12 @@ function PrecioReserva({ serviceType, resourceNumber, desde, hasta, valor, onCha
     const patch = { precioTarifa, desglose: cotizacion.desglose };
     // Si las fechas cambiaron (editadoEn !== clave), el cobrado anterior era
     // para otra estadia: se reemplaza por el de la tarifa nueva, o se vacia
-    // si la tarifa nueva quedo incompleta (no queda un total viejo colgado).
-    if (valor.editadoEn !== clave) patch.cobrado = precioTarifa != null ? String(precioTarifa) : '';
+    // si la tarifa nueva quedo incompleta (no queda un total viejo colgado),
+    // salvo con vaciarSiIncompleta=false, que lo deja como estaba.
+    if (valor.editadoEn !== clave && (precioTarifa != null || vaciarSiIncompleta)) {
+      patch.cobrado = precioTarifa != null ? String(precioTarifa) : '';
+      patch.editadoEn = null;
+    }
     onChange(patch);
     // Solo reacciona a una cotizacion nueva, no a cada tecla del total.
     // eslint-disable-next-line react-hooks/exhaustive-deps

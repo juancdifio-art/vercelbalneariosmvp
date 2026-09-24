@@ -6,6 +6,15 @@ const PREFIJO = { carpa: 'Carpa', sombrilla: 'Sombrilla', parking: 'Plaza' };
 const TODAS = { carpa: 'Todas las carpas', sombrilla: 'Todas las sombrillas', parking: 'Todo el estacionamiento' };
 const ESTADIA_VACIA = { nombre: '', diasMin: '', diasMax: '', modo: 'cerrado', precio: '', periodoId: '', alcance: 'tipo', unidad: '' };
 
+// Un precio solo tiene digitos y una coma decimal: el punto se descarta, si no
+// aNumero("150.000") daria 150.
+function limpiarPrecio(valor) {
+  const [entero, ...resto] = String(valor).replace(/[^\d,]/g, '').split(',');
+  return resto.length ? `${entero},${resto.join('')}` : entero;
+}
+
+const limpiarEntero = (valor) => String(valor).replace(/\D/g, '');
+
 function CeldaPrecio({ etiqueta, inicial, general, onGuardar }) {
   const [texto, setTexto] = useState(inicial);
   useEffect(() => setTexto(inicial), [inicial]);
@@ -15,11 +24,7 @@ function CeldaPrecio({ etiqueta, inicial, general, onGuardar }) {
       value={texto}
       inputMode="numeric"
       placeholder={general ? '' : 'usa general'}
-      onChange={(e) => {
-        const limpio = e.target.value.replace(/[^\d,]/g, '');
-        const [entero, ...resto] = limpio.split(',');
-        setTexto(resto.length ? `${entero},${resto.join('')}` : entero);
-      }}
+      onChange={(e) => setTexto(limpiarPrecio(e.target.value))}
       onBlur={() => {
         if (texto !== inicial) onGuardar(texto);
       }}
@@ -76,7 +81,7 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
     setNuevaUnidad('');
   };
 
-  const campoEstadia = (clave) => (e) => setEstadia((f) => ({ ...f, [clave]: e.target.value }));
+  const campoEstadia = (clave, limpiar = (v) => v) => (e) => setEstadia((f) => ({ ...f, [clave]: limpiar(e.target.value) }));
 
   const alcanceEstadia = () => {
     if (estadia.alcance === 'tipo') return { alcance: 'tipo', sectorId: null, resourceNumber: null };
@@ -184,11 +189,11 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-semibold text-slate-700">Desde (días)</span>
-            <input value={estadia.diasMin} onChange={campoEstadia('diasMin')} inputMode="numeric" className={entrada} />
+            <input value={estadia.diasMin} onChange={campoEstadia('diasMin', limpiarEntero)} inputMode="numeric" className={entrada} />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-semibold text-slate-700">Hasta (días, vacío = sin tope)</span>
-            <input value={estadia.diasMax} onChange={campoEstadia('diasMax')} inputMode="numeric" className={entrada} />
+            <input value={estadia.diasMax} onChange={campoEstadia('diasMax', limpiarEntero)} inputMode="numeric" className={entrada} />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-semibold text-slate-700">Cómo se cobra</span>
@@ -199,7 +204,7 @@ function PreciosTab({ servicios, periodos, sectores, tarifas, ejecutar }) {
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-semibold text-slate-700">Precio (ARS)</span>
-            <input value={estadia.precio} onChange={campoEstadia('precio')} inputMode="numeric" className={entrada} />
+            <input value={estadia.precio} onChange={campoEstadia('precio', limpiarPrecio)} inputMode="numeric" className={entrada} />
           </label>
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-semibold text-slate-700">Solo si entra en</span>

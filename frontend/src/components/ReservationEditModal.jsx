@@ -1,11 +1,30 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { numerosDeUnidades } from '../lib/unidades';
 import { normalizarPatente } from '../lib/patente';
 import PatenteField from './PatenteField';
 import PrecioReserva from './PrecioReserva';
-import { PRECIO_VACIO, faltaMotivoAjuste } from '../lib/tarifas';
+import { PRECIO_VACIO, faltaMotivoAjuste, precioDesdeReserva } from '../lib/tarifas';
 
 function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups, error }) {
+  // El precio se recotiza solo si cambian las fechas o la unidad; si no, se
+  // muestra el snapshot guardado.
+  const cambioFechasOUnidad = Boolean(modal) && (
+    Boolean(modal.tempStartDate && modal.tempStartDate !== modal.startDate) ||
+    Boolean(modal.tempEndDate && modal.tempEndDate !== modal.endDate) ||
+    (modal.tempResourceNumber !== undefined && modal.tempResourceNumber !== modal.resourceNumber));
+
+  // Si se vuelve a las fechas y la unidad originales, el precio vuelve al
+  // guardado: si no, quedaba la cotizacion de las fechas intermedias.
+  const cambiabaAntes = useRef(cambioFechasOUnidad);
+  useEffect(() => {
+    const antes = cambiabaAntes.current;
+    cambiabaAntes.current = cambioFechasOUnidad;
+    if (antes && !cambioFechasOUnidad) {
+      setModal((prev) => (prev ? { ...prev, tempPrecio: precioDesdeReserva(prev) } : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cambioFechasOUnidad]);
+
   if (!modal) return null;
 
   const serviceIcon = modal.serviceType === 'carpa' ? '🏖️' : modal.serviceType === 'sombrilla' ? '☂️' : modal.serviceType === 'parking' ? '🚗' : '🏊';
@@ -38,14 +57,9 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
   const faltaPatente = modal.serviceType === 'parking' && !normalizarPatente(modal.tempVehiclePlate);
   const currentResourceNumber = modal.tempResourceNumber ?? modal.resourceNumber;
 
-  // El precio se recotiza solo si cambian las fechas o la unidad; si no, se
-  // muestra el snapshot guardado.
-  const cambioFechasOUnidad =
-    Boolean(modal.tempStartDate && modal.tempStartDate !== modal.startDate) ||
-    Boolean(modal.tempEndDate && modal.tempEndDate !== modal.endDate) ||
-    (modal.tempResourceNumber !== undefined && modal.tempResourceNumber !== modal.resourceNumber);
   const precio = modal.tempPrecio ?? PRECIO_VACIO;
   const faltaMotivo = modal.serviceType !== 'pileta' && faltaMotivoAjuste(precio);
+  const cotizando = modal.serviceType !== 'pileta' && Boolean(precio.cotizando);
 
   // Función para verificar si una unidad está ocupada en un rango de fechas
   const isUnitOccupied = (unitNumber) => {
@@ -239,6 +253,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                 desde={modal.tempStartDate || modal.startDate}
                 hasta={modal.tempEndDate || modal.endDate}
                 cotizar={cambioFechasOUnidad}
+                vaciarSiIncompleta={false}
                 valor={precio}
                 onChange={(patch) =>
                   setModal((prev) => (prev ? { ...prev, tempPrecio: { ...(prev.tempPrecio ?? PRECIO_VACIO), ...patch } } : prev))
@@ -427,7 +442,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
               type="button"
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={onSave}
-              disabled={saving || faltaPatente || faltaMotivo}
+              disabled={saving || faltaPatente || faltaMotivo || cotizando}
             >
               {saving ? '⏳ Guardando...' : '✅ Guardar cambios'}
             </button>

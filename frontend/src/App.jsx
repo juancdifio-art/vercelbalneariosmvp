@@ -734,6 +734,8 @@ function App() {
           setCarpaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
         } else if (data && data.error === 'motivo_ajuste_required') {
           setCarpaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setCarpaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error creating reservation group for carpas', data);
           setError('No se pudo crear la reserva.');
@@ -1128,6 +1130,8 @@ function App() {
           setSombrillaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
         } else if (data && data.error === 'motivo_ajuste_required') {
           setSombrillaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setSombrillaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error creating reservation group for sombrillas', data);
           setError('No se pudo crear la reserva.');
@@ -1337,6 +1341,8 @@ function App() {
           setError(msg);
         } else if (data && data.error === 'motivo_ajuste_required') {
           setParkingReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setParkingReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error creating reservation group for parking', data);
           setError('No se pudo crear la reserva.');
@@ -2167,6 +2173,8 @@ function App() {
         const data = await response.json().catch(() => null);
         if (data && data.error === 'motivo_ajuste_required') {
           setReservationEditError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
+        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
+          setReservationEditError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
         } else {
           console.error('Error updating reservation group');
         }

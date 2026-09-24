@@ -144,7 +144,9 @@ function SombrillaReservationModal({
   // Sin patente no hay estacionamiento: es un dato obligatorio.
   const faltaPatente = Boolean(includeParking) && !normalizarPatente(vehiclePlate);
   const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad || faltaPatente ||
-    faltaMotivoAjuste(precio) || (Boolean(includeParking) && faltaMotivoAjuste(precioCochera));
+    faltaMotivoAjuste(precio) || (Boolean(includeParking) && faltaMotivoAjuste(precioCochera)) ||
+    // Sin la cotizacion de las fechas actuales se guardaria el precio de las anteriores.
+    Boolean(precio.cotizando) || (Boolean(includeParking) && Boolean(precioCochera.cotizando));
 
   useEffect(() => {
     const handleKeyDown = (event) => {

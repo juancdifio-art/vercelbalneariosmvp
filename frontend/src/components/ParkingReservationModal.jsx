@@ -88,7 +88,8 @@ function ParkingReservationModal({
   const conflictoPlaza = !isReserved && hayRango && ocupacion.ocupadas.has(Number(plazaNumero));
   // Sin patente no hay estacionamiento: es un dato obligatorio.
   const faltaPatente = !normalizarPatente(vehiclePlate);
-  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando || faltaPatente || faltaMotivoAjuste(precio);
+  const bloqueaGuardar = hasPaymentError || conflictoPlaza || ocupacion.verificando || faltaPatente || faltaMotivoAjuste(precio) ||
+    Boolean(precio.cotizando);
 
   useEffect(() => {
     const handleKeyDown = (event) => {

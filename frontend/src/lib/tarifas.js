@@ -3,7 +3,9 @@
  * (api/_tarifas); aca solo se muestra y se valida lo que carga el encargado.
  */
 
-export const PRECIO_VACIO = { precioTarifa: null, desglose: null, cobrado: '', motivo: '', editadoEn: null };
+// `cotizando` lo informa PrecioReserva mientras espera la cotizacion: los modales
+// no dejan guardar hasta que llegue.
+export const PRECIO_VACIO = { precioTarifa: null, desglose: null, cobrado: '', motivo: '', editadoEn: null, cotizando: false };
 
 export function aNumero(valor) {
   if (valor === null || valor === undefined || valor === '') return null;
@@ -53,7 +55,8 @@ export function precioDesdeReserva(group) {
     desglose: group.desglose ?? null,
     cobrado: group.totalPrice != null && group.totalPrice !== '' ? String(Number(group.totalPrice)) : '',
     motivo: group.motivoAjuste ?? '',
-    editadoEn: null
+    editadoEn: null,
+    cotizando: false
   };
 }
 

@@ -90,4 +90,27 @@ describe('PreciosTab por estadia', () => {
       body: { serviceType: 'carpa', alcance: 'tipo', sectorId: null, resourceNumber: null, clase: 'estadia', nombre: 'Temporada completa', diasMin: 90, diasMax: null, modo: 'cerrado', precio: 3500000, periodoId: 1 }
     });
   }, 15000);
+
+  it('el precio con puntos de miles se guarda entero', async () => {
+    const ejecutar = renderizar();
+    await userEvent.type(screen.getByLabelText('Desde (días)'), '9a0');
+    await userEvent.type(screen.getByLabelText('Hasta (días, vacío = sin tope)'), '1.20');
+    await userEvent.type(screen.getByLabelText('Precio (ARS)'), '3.500.000');
+    expect(screen.getByLabelText('Desde (días)')).toHaveValue('90');
+    expect(screen.getByLabelText('Hasta (días, vacío = sin tope)')).toHaveValue('120');
+    expect(screen.getByLabelText('Precio (ARS)')).toHaveValue('3500000');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar tarifa por estadía' }));
+    expect(ejecutar).toHaveBeenCalledWith('tarifas', expect.objectContaining({
+      body: expect.objectContaining({ diasMin: 90, diasMax: 120, precio: 3500000 })
+    }));
+  }, 15000);
+
+  it('el precio de la estadia acepta una coma decimal', async () => {
+    const ejecutar = renderizar();
+    await userEvent.type(screen.getByLabelText('Desde (días)'), '3');
+    await userEvent.type(screen.getByLabelText('Precio (ARS)'), '12000,5,0');
+    expect(screen.getByLabelText('Precio (ARS)')).toHaveValue('12000,50');
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar tarifa por estadía' }));
+    expect(ejecutar).toHaveBeenCalledWith('tarifas', expect.objectContaining({ body: expect.objectContaining({ precio: 12000.5 }) }));
+  }, 15000);
 });

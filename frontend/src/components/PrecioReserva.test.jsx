@@ -23,7 +23,7 @@ function responder(cotizacion) {
 }
 
 let ultimo;
-function ConEstado({ desde = '2026-01-10', hasta = '2026-01-12', inicial = PRECIO_VACIO, cotizar = true }) {
+function ConEstado({ desde = '2026-01-10', hasta = '2026-01-12', inicial = PRECIO_VACIO, cotizar = true, vaciarSiIncompleta }) {
   const [valor, setValor] = useState(inicial);
   const [fechas, setFechas] = useState({ desde, hasta });
   ultimo = valor;
@@ -32,7 +32,7 @@ function ConEstado({ desde = '2026-01-10', hasta = '2026-01-12', inicial = PRECI
       <button type="button" onClick={() => setFechas({ desde, hasta: '2026-01-14' })}>alargar</button>
       <PrecioReserva
         serviceType="carpa" resourceNumber={58} desde={fechas.desde} hasta={fechas.hasta}
-        valor={valor} cotizar={cotizar}
+        valor={valor} cotizar={cotizar} vaciarSiIncompleta={vaciarSiIncompleta}
         onChange={(patch) => setValor((prev) => ({ ...prev, ...patch }))}
       />
     </>
@@ -71,6 +71,8 @@ describe('PrecioReserva', () => {
     await userEvent.click(screen.getByText('alargar'));
     await waitFor(() => expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('50.000'));
     expect(ultimo.motivo).toBe('amigo');
+    // El ajuste era para otra estadia: al reemplazarlo se olvida la marca de editado.
+    expect(ultimo.editadoEn).toBeNull();
   });
 
   it('sin tarifa completa avisa Consultar precio y deja cargar a mano', async () => {
@@ -108,5 +110,33 @@ describe('PrecioReserva', () => {
     responder(INCOMPLETA);
     await userEvent.click(screen.getByText('alargar'));
     await waitFor(() => expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue(''));
+  });
+
+  it('con vaciarSiIncompleta=false una cotizacion incompleta conserva el total cobrado', async () => {
+    responder(INCOMPLETA);
+    render(<ConEstado desde="2026-03-14" hasta="2026-03-15" vaciarSiIncompleta={false} inicial={{ ...PRECIO_VACIO, precioTarifa: 30000, cobrado: '30000' }} />);
+    await waitFor(() => expect(screen.getByText('Consultar precio: faltan tarifas para el 14/03 y 15/03.')).toBeInTheDocument());
+    expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('30.000');
+    expect(ultimo.cobrado).toBe('30000');
+    expect(ultimo.precioTarifa).toBeNull();
+  });
+
+  it('tipear solo una coma deja el total vacio, no un punto suelto', async () => {
+    responder(INCOMPLETA);
+    render(<ConEstado desde="2026-03-14" hasta="2026-03-15" />);
+    await screen.findByText('Consultar precio: faltan tarifas para el 14/03 y 15/03.');
+    await userEvent.type(screen.getByLabelText('Total cobrado (ARS)'), ',');
+    expect(ultimo.cobrado).toBe('');
+    expect(screen.getByLabelText('Total cobrado (ARS)')).toHaveValue('');
+  });
+
+  it('avisa cotizando mientras la cotizacion esta en viaje', async () => {
+    let resolver;
+    global.fetch = vi.fn(() => new Promise((r) => { resolver = r; }));
+    render(<ConEstado />);
+    await waitFor(() => expect(ultimo.cotizando).toBe(true));
+    resolver({ ok: true, json: () => Promise.resolve({ cotizacion: COMPLETA }) });
+    await waitFor(() => expect(ultimo.cotizando).toBe(false));
+    expect(ultimo.cobrado).toBe('30000');
   });
 });
