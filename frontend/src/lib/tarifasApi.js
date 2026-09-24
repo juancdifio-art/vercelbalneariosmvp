@@ -12,7 +12,10 @@ const MENSAJES = {
   alcance_invalido: 'Elegí a qué unidades aplica.',
   precio_invalido: 'El precio tiene que ser un número mayor o igual a cero.',
   sector_invalido: 'Ese sector no existe.',
-  periodo_invalido: 'Ese período no existe.'
+  periodo_invalido: 'Ese período no existe.',
+  id_invalido: 'Ese dato no es válido.',
+  nombre_largo: 'El nombre es demasiado largo (máximo 100 caracteres).',
+  color_invalido: 'Elegí un color de la paleta.'
 };
 
 export function mensajeError(error) {

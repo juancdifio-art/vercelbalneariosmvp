@@ -21,6 +21,10 @@ describe('validarPeriodo', () => {
     expect(validarPeriodo(P(13, 1, 1, 1))).toBe('fecha_invalida');
     expect(validarPeriodo(P(1, 1, 1, 2, { prioridad: 1.5 }))).toBe('prioridad_invalida');
   });
+  it('rechaza un nombre de mas de 100 caracteres', () => {
+    expect(validarPeriodo(P(1, 1, 1, 2, { nombre: 'x'.repeat(101) }))).toBe('nombre_largo');
+    expect(validarPeriodo(P(1, 1, 1, 2, { nombre: 'x'.repeat(100) }))).toBeNull();
+  });
 });
 
 describe('periodosSeSuperponen', () => {
@@ -36,6 +40,13 @@ describe('validarSector', () => {
     expect(validarSector({ serviceType: 'carpa', nombre: 'Terraza', unidades: [1] })).toBeNull();
     expect(validarSector({ serviceType: 'pileta', nombre: 'Terraza', unidades: [] })).toBe('servicio_invalido');
     expect(validarSector({ serviceType: 'carpa', nombre: '', unidades: [] })).toBe('nombre_requerido');
+  });
+  it('rechaza un nombre de mas de 100 caracteres', () => {
+    expect(validarSector({ serviceType: 'carpa', nombre: 'x'.repeat(101), unidades: [] })).toBe('nombre_largo');
+  });
+  it('rechaza un color que no es hexadecimal de 6 digitos', () => {
+    expect(validarSector({ serviceType: 'carpa', nombre: 'Terraza', color: 'rojo', unidades: [] })).toBe('color_invalido');
+    expect(validarSector({ serviceType: 'carpa', nombre: 'Terraza', color: '#0EA5E9', unidades: [] })).toBeNull();
   });
 });
 
@@ -57,6 +68,14 @@ describe('validarTarifa', () => {
     expect(validarTarifa(EST(0, null))).toBe('tarifa_invalida');
     expect(validarTarifa(T({ precio: -1 }))).toBe('precio_invalido');
     expect(validarTarifa(T({ precio: null }))).toBe('precio_invalido');
+  });
+  it('rechaza un nombre de mas de 100 caracteres', () => {
+    expect(validarTarifa(T({ nombre: 'x'.repeat(101) }))).toBe('nombre_largo');
+    expect(validarTarifa(T({ nombre: 'x'.repeat(100) }))).toBeNull();
+  });
+  it('en una tarifa por estadia, el periodoId si viene no puede ser fraccionario', () => {
+    expect(validarTarifa(EST(90, null, { periodoId: 1.5 }))).toBe('tarifa_invalida');
+    expect(validarTarifa(EST(90, null, { periodoId: 1 }))).toBeNull();
   });
 });
 

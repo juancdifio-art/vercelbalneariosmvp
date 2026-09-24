@@ -248,7 +248,8 @@ async function editarSector(query, estId, id, body) {
   const actual = r.rows[0];
   const nombre = body.nombre !== undefined ? String(body.nombre).trim() : actual.nombre;
   const color = body.color || actual.color;
-  if (!nombre) return falla(400, 'nombre_requerido');
+  const error = validarSector({ serviceType: actual.service_type, nombre, color });
+  if (error) return falla(400, error);
   const unidades = body.unidades !== undefined
     ? unidadesDesdeBody(body.unidades)
     : (await query('SELECT resource_number FROM sector_unidades WHERE sector_id = $1', [id])).rows.map((x) => Number(x.resource_number));
@@ -324,35 +325,52 @@ async function editarTarifa(query, estId, id, body) {
 
 // ---------- Ruteo ----------
 
+// Un id de ruta que no es entero positivo (p.ej. 'tarifas/1.5', 'tarifas/periodos/abc')
+// es 400 id_invalido y no llega a la base: ni 404 (que sugiere "consulte y no
+// encontro") ni una consulta con un id invalido.
+const esIdValido = (v) => Number.isInteger(v) && v > 0;
+
 async function rutearTarifas(query, estId, { method, partes, params, body }) {
   const [recurso = '', idTexto] = partes;
-  const id = num(idTexto);
 
   if (recurso === 'cotizar' && method === 'GET') return cotizarRuta(query, estId, params);
 
-  if (recurso === 'periodos') {
-    if (!idTexto && method === 'GET') return listarPeriodos(query, estId);
-    if (!idTexto && method === 'POST') return guardarPeriodo(query, estId, periodoDesdeBody(body));
-    if (id && method === 'PATCH') return editarPeriodo(query, estId, id, body);
-    if (id && method === 'DELETE') return borrar(query, 'DELETE FROM periodos_tarifarios WHERE id = $1 AND establishment_id = $2 RETURNING id', [id, estId], 'periodo_not_found');
-  }
-
-  if (recurso === 'sectores') {
-    if (!idTexto && method === 'GET') return listarSectores(query, estId);
-    if (!idTexto && method === 'POST') return crearSector(query, estId, body);
-    if (id && method === 'PATCH') return editarSector(query, estId, id, body);
-    if (id && method === 'DELETE') return borrar(query, 'DELETE FROM sectores WHERE id = $1 AND establishment_id = $2 RETURNING id', [id, estId], 'sector_not_found');
+  if (recurso === 'periodos' || recurso === 'sectores') {
+    if (!idTexto) {
+      if (recurso === 'periodos') {
+        if (method === 'GET') return listarPeriodos(query, estId);
+        if (method === 'POST') return guardarPeriodo(query, estId, periodoDesdeBody(body));
+      } else {
+        if (method === 'GET') return listarSectores(query, estId);
+        if (method === 'POST') return crearSector(query, estId, body);
+      }
+      return falla(404, 'not_found');
+    }
+    if (method === 'PATCH' || method === 'DELETE') {
+      const id = num(idTexto);
+      if (!esIdValido(id)) return falla(400, 'id_invalido');
+      if (recurso === 'periodos') {
+        if (method === 'PATCH') return editarPeriodo(query, estId, id, body);
+        return borrar(query, 'DELETE FROM periodos_tarifarios WHERE id = $1 AND establishment_id = $2 RETURNING id', [id, estId], 'periodo_not_found');
+      }
+      if (method === 'PATCH') return editarSector(query, estId, id, body);
+      return borrar(query, 'DELETE FROM sectores WHERE id = $1 AND establishment_id = $2 RETURNING id', [id, estId], 'sector_not_found');
+    }
+    return falla(404, 'not_found');
   }
 
   if (!recurso) {
     if (method === 'GET') return listarTarifas(query, estId);
     if (method === 'POST') return guardarTarifa(query, estId, tarifaDesdeBody(body));
+    return falla(404, 'not_found');
   }
 
-  const tarifaId = num(recurso);
-  if (tarifaId && !idTexto) {
+  // Sin sub-recurso, `recurso` es el id de una tarifa (PATCH/DELETE directo).
+  if (!idTexto && (method === 'PATCH' || method === 'DELETE')) {
+    const tarifaId = num(recurso);
+    if (!esIdValido(tarifaId)) return falla(400, 'id_invalido');
     if (method === 'PATCH') return editarTarifa(query, estId, tarifaId, body);
-    if (method === 'DELETE') return borrar(query, 'DELETE FROM tarifas WHERE id = $1 AND establishment_id = $2 RETURNING id', [tarifaId, estId], 'tarifa_not_found');
+    return borrar(query, 'DELETE FROM tarifas WHERE id = $1 AND establishment_id = $2 RETURNING id', [tarifaId, estId], 'tarifa_not_found');
   }
 
   return falla(404, 'not_found');
