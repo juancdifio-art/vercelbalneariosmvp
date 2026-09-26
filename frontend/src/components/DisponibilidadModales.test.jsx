@@ -4,6 +4,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CarpaReservationModal from './CarpaReservationModal';
 import ParkingReservationModal from './ParkingReservationModal';
+import { cocheraVacia } from '../lib/incluidos';
 
 // Los modales de alta mostraban libre lo que estaba ocupado: miraban la lista
 // de reservas de la seccion (en Carpas, solo carpas y solo 30 dias). Ahora le
@@ -48,18 +49,14 @@ function modalCarpa(form, onSaveRange = vi.fn().mockResolvedValue(true)) {
         isReserved: false,
         startDate: '2026-09-22',
         endDate: '2027-04-10', // 201 dias
-        clientId: null,
+        // Con cochera incluida la reserva va a nombre de un cliente guardado.
+        clientId: 7,
         customerName: 'Prueba',
         customerPhone: '',
         dailyPrice: '15000',
-        includeParking: true,
-        parkingSpotNumber: null,
-        parkingDailyPrice: '4000',
+        cocheras: [{ ...cocheraVacia(), vehiclePlate: 'AB123CD' }],
         initialPaymentAmount: '',
         initialPaymentMethod: '',
-        parkingInitialPaymentAmount: '',
-        parkingInitialPaymentMethod: '',
-        vehiclePlate: 'AB123CD',
         ...form
       }}
       clients={[]}
@@ -89,7 +86,7 @@ describe('disponibilidad en el alta de carpa con estacionamiento', () => {
   });
 
   it('con una plaza ocupada elegida, avisa y no deja guardar', async () => {
-    modalCarpa({ parkingSpotNumber: 1 });
+    modalCarpa({ cocheras: [{ ...cocheraVacia(), plaza: 1, vehiclePlate: 'AB123CD' }] });
     expect(await screen.findByText(/La plaza 1 está ocupada/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Guardar reserva/ })).toBeDisabled();
   });
@@ -102,14 +99,14 @@ describe('disponibilidad en el alta de carpa con estacionamiento', () => {
 
   it('sin plaza elegida, asigna la primera libre en todo el periodo', async () => {
     const user = userEvent.setup();
-    const onSaveRange = modalCarpa({ parkingSpotNumber: null });
+    const onSaveRange = modalCarpa({});
 
     const guardar = screen.getByRole('button', { name: /Guardar reserva/ });
     await waitFor(() => expect(guardar).toBeEnabled());
     await user.click(guardar);
 
     // La 1 esta ocupada todo el periodo: le toca la 2.
-    expect(onSaveRange.mock.calls[0][3].parkingSpotNumber).toBe(2);
+    expect(onSaveRange.mock.calls[0][3].cocheras[0].plaza).toBe(2);
   });
 });
 

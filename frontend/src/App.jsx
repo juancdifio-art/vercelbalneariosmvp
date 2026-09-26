@@ -24,6 +24,7 @@ import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
 import { normalizarPatente } from './lib/patente';
 import { precioDesdeReserva } from './lib/tarifas';
+import { armarIncluidos, mensajeErrorIncluidos } from './lib/incluidos';
 import DashboardSection from './components/DashboardSection';
 import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
@@ -131,6 +132,13 @@ function App() {
     }
   });
 
+  // Sube cada vez que un cambio toca varias reservas a la vez (una carpa con
+  // sus incluidos): las grillas y listas que dependen de esto se vuelven a pedir.
+  const [datosVersion, setDatosVersion] = useState(0);
+  const refrescarDatos = () => setDatosVersion((v) => v + 1);
+  // A que reserva abierta va el cliente que se esta creando desde un modal.
+  const [clienteNuevoPara, setClienteNuevoPara] = useState(null);
+
   const {
     establishment,
     establishmentLoaded,
@@ -228,6 +236,7 @@ function App() {
     // Cargar reservas (si no hay servicio seleccionado, carga todas)
     fetchReservationGroups(token);
   }, [
+    datosVersion,
     isAuthenticated,
     activeSection,
     authToken,
@@ -256,7 +265,7 @@ function App() {
       from,
       to
     });
-  }, [isAuthenticated, activeSection, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, activeSection, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -272,7 +281,7 @@ function App() {
       from: '',
       to: ''
     });
-  }, [isAuthenticated, activeSection, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, activeSection, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -286,7 +295,7 @@ function App() {
       service: 'pileta',
       status: 'active'
     });
-  }, [isAuthenticated, establishment, activeSection, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -370,7 +379,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, establishment, carpasDayOffset, authToken]);
+  }, [datosVersion, isAuthenticated, establishment, carpasDayOffset, authToken]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -390,7 +399,7 @@ function App() {
       from: format(startDate, 'yyyy-MM-dd'),
       to: format(endDate, 'yyyy-MM-dd')
     });
-  }, [isAuthenticated, establishment, activeSection, carpasDayOffset, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, carpasDayOffset, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -462,7 +471,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, establishment, sombrillasDayOffset, authToken]);
+  }, [datosVersion, isAuthenticated, establishment, sombrillasDayOffset, authToken]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -482,7 +491,7 @@ function App() {
       from: format(startDate, 'yyyy-MM-dd'),
       to: format(endDate, 'yyyy-MM-dd')
     });
-  }, [isAuthenticated, establishment, activeSection, sombrillasDayOffset, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, sombrillasDayOffset, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -554,7 +563,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, establishment, parkingDayOffset, authToken]);
+  }, [datosVersion, isAuthenticated, establishment, parkingDayOffset, authToken]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -574,7 +583,7 @@ function App() {
       from: format(startDate, 'yyyy-MM-dd'),
       to: format(endDate, 'yyyy-MM-dd')
     });
-  }, [isAuthenticated, establishment, activeSection, parkingDayOffset, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, parkingDayOffset, authToken, fetchReservationGroups]);
 
   // Toggle individual deshabilitado - Ahora se usan solo modales para crear reservas
   const handleToggleCarpaReservation = (carpaNumero, day) => {
@@ -609,38 +618,20 @@ function App() {
     return new Date(year, month - 1, dayNum);
   };
 
-  const findAvailableParkingSpotForRange = (startDateObj, endDateObj, preferredSpot) => {
-    if (!establishment || !establishment.hasParking) return null;
-
-    const totalPlazasRaw = establishment.parkingCapacity ?? '0';
-    const totalPlazas = Number.parseInt(totalPlazasRaw, 10);
-    if (!totalPlazas || Number.isNaN(totalPlazas)) return null;
-
-    const preferred =
-      preferredSpot && Number.isInteger(preferredSpot) && preferredSpot >= 1 && preferredSpot <= totalPlazas
-        ? preferredSpot
-        : 1;
-
-    for (let offset = 0; offset < totalPlazas; offset += 1) {
-      const plazaNumero = ((preferred - 1 + offset) % totalPlazas) + 1;
-
-      let disponible = true;
-
-      for (let d = new Date(startDateObj); d <= endDateObj; d = addDays(d, 1)) {
-        const dateKeyStr = format(d, 'yyyy-MM-dd');
-        const key = `${dateKeyStr}-${plazaNumero}`;
-        if (parkingReservations[key]) {
-          disponible = false;
-          break;
-        }
-      }
-
-      if (disponible) {
-        return plazaNumero;
-      }
+  // Pago inicial de una reserva recien creada. Si falla, la reserva queda igual
+  // y el pago se carga despues desde el detalle.
+  const pagarAlCrear = async (token, groupId, monto, metodo) => {
+    const amountNum = Number.parseFloat(String(monto ?? '').replace(',', '.'));
+    if (!metodo || !groupId || Number.isNaN(amountNum) || amountNum <= 0) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/reservation-groups/${groupId}/payments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ amount: String(monto), paymentDate: format(new Date(), 'yyyy-MM-dd'), method: metodo, notes: '' })
+      });
+    } catch (err) {
+      console.error('Error creating initial payment for included parking', err);
     }
-
-    return null;
   };
 
   const handleSaveCarpaReservationRange = async (
@@ -690,14 +681,10 @@ function App() {
       childrenCount,
       precio,
       clientId,
-      includeParking,
-      parkingSpotNumber,
-      precioCochera,
+      incluyePileta,
+      cocheras,
       initialPaymentAmount,
-      initialPaymentMethod,
-      parkingInitialPaymentAmount,
-      parkingInitialPaymentMethod,
-      vehiclePlate
+      initialPaymentMethod
     } = extra;
 
     try {
@@ -719,7 +706,9 @@ function App() {
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
-          childrenCount: String(childrenCount ?? '')
+          childrenCount: String(childrenCount ?? ''),
+          // Pileta y cocheras: el servidor crea todo junto o nada.
+          incluidos: armarIncluidos({ incluyePileta, cocheras })
         })
       });
 
@@ -732,12 +721,10 @@ function App() {
       }
 
       if (!response.ok) {
-        if (data && data.error === 'no_availability') {
-          setCarpaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
-        } else if (data && data.error === 'motivo_ajuste_required') {
-          setCarpaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
-        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
-          setCarpaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        // Si una cochera o la pileta no se pudo reservar, no se guardo nada.
+        const mensaje = mensajeErrorIncluidos(data);
+        if (mensaje) {
+          setCarpaReservationError(mensaje);
         } else {
           console.error('Error creating reservation group for carpas', data);
           setError('No se pudo crear la reserva.');
@@ -820,31 +807,17 @@ function App() {
       });
       setCarpaReservationError('');
 
-      if (
-        includeParking &&
-        establishment &&
-        establishment.hasParking
-      ) {
-        const preferredRaw = parkingSpotNumber ? Number.parseInt(String(parkingSpotNumber), 10) : null;
-        const plazaNumero = findAvailableParkingSpotForRange(start, end, preferredRaw);
-
-        if (plazaNumero !== null) {
-          await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
-            customerName,
-            customerPhone,
-            adultsCount,
-            childrenCount,
-            precio: precioCochera,
-            clientId,
-            initialPaymentAmount: parkingInitialPaymentAmount,
-            initialPaymentMethod: parkingInitialPaymentMethod,
-            vehiclePlate
-          });
-        } else {
-          setError(
-            'Se creó la reserva de carpa, pero no se encontró ninguna plaza de estacionamiento disponible para ese rango de fechas.'
-          );
-        }
+      // Pago inicial de cada cochera incluida, con el id que devolvio el servidor.
+      const cocherasCreadas = data?.incluidos?.cocheras || [];
+      for (let i = 0; i < cocherasCreadas.length; i += 1) {
+        await pagarAlCrear(token, cocherasCreadas[i].id, cocheras?.[i]?.pagoMonto, cocheras?.[i]?.pagoMetodo);
+      }
+      if (cocherasCreadas.length) {
+        const plazas = cocherasCreadas.map((c) => c.plaza).join(', ');
+        setSuccess(`Reserva guardada. ${cocherasCreadas.length === 1 ? 'Cochera en la plaza' : 'Cocheras en las plazas'} ${plazas}.`);
+      }
+      if (cocherasCreadas.length || data?.incluidos?.pileta) {
+        refrescarDatos();
       }
 
       return true;
@@ -1086,14 +1059,10 @@ function App() {
       childrenCount,
       precio,
       clientId,
-      includeParking,
-      parkingSpotNumber,
-      precioCochera,
+      incluyePileta,
+      cocheras,
       initialPaymentAmount,
-      initialPaymentMethod,
-      parkingInitialPaymentAmount,
-      parkingInitialPaymentMethod,
-      vehiclePlate
+      initialPaymentMethod
     } = extra;
 
     try {
@@ -1115,7 +1084,9 @@ function App() {
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
-          childrenCount: String(childrenCount ?? '')
+          childrenCount: String(childrenCount ?? ''),
+          // Pileta y cocheras: el servidor crea todo junto o nada.
+          incluidos: armarIncluidos({ incluyePileta, cocheras })
         })
       });
 
@@ -1128,12 +1099,10 @@ function App() {
       }
 
       if (!response.ok) {
-        if (data && data.error === 'no_availability') {
-          setSombrillaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
-        } else if (data && data.error === 'motivo_ajuste_required') {
-          setSombrillaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
-        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
-          setSombrillaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        // Si una cochera o la pileta no se pudo reservar, no se guardo nada.
+        const mensaje = mensajeErrorIncluidos(data);
+        if (mensaje) {
+          setSombrillaReservationError(mensaje);
         } else {
           console.error('Error creating reservation group for sombrillas', data);
           setError('No se pudo crear la reserva.');
@@ -1215,31 +1184,17 @@ function App() {
       });
       setSombrillaReservationError('');
 
-      if (
-        includeParking &&
-        establishment &&
-        establishment.hasParking
-      ) {
-        const preferredRaw = parkingSpotNumber ? Number.parseInt(String(parkingSpotNumber), 10) : null;
-        const plazaNumero = findAvailableParkingSpotForRange(start, end, preferredRaw);
-
-        if (plazaNumero !== null) {
-          await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
-            customerName,
-            customerPhone,
-            adultsCount,
-            childrenCount,
-            precio: precioCochera,
-            clientId,
-            initialPaymentAmount: parkingInitialPaymentAmount,
-            initialPaymentMethod: parkingInitialPaymentMethod,
-            vehiclePlate
-          });
-        } else {
-          setError(
-            'Se creó la reserva de sombrilla, pero no se encontró ninguna plaza de estacionamiento disponible para ese rango de fechas.'
-          );
-        }
+      // Pago inicial de cada cochera incluida, con el id que devolvio el servidor.
+      const cocherasCreadas = data?.incluidos?.cocheras || [];
+      for (let i = 0; i < cocherasCreadas.length; i += 1) {
+        await pagarAlCrear(token, cocherasCreadas[i].id, cocheras?.[i]?.pagoMonto, cocheras?.[i]?.pagoMetodo);
+      }
+      if (cocherasCreadas.length) {
+        const plazas = cocherasCreadas.map((c) => c.plaza).join(', ');
+        setSuccess(`Reserva guardada. ${cocherasCreadas.length === 1 ? 'Cochera en la plaza' : 'Cocheras en las plazas'} ${plazas}.`);
+      }
+      if (cocherasCreadas.length || data?.incluidos?.pileta) {
+        refrescarDatos();
       }
 
       return true;
@@ -1454,13 +1409,10 @@ function App() {
       adultsCount: '',
       childrenCount: '',
       dailyPrice: '',
-      includeParking: false,
-      parkingSpotNumber: '',
-      parkingDailyPrice: '',
+      incluyePileta: false,
+      cocheras: [],
       initialPaymentAmount: '',
-      initialPaymentMethod: '',
-      parkingInitialPaymentAmount: '',
-      parkingInitialPaymentMethod: ''
+      initialPaymentMethod: ''
     });
   };
 
@@ -1485,13 +1437,10 @@ function App() {
       adultsCount: '',
       childrenCount: '',
       dailyPrice: '',
-      includeParking: false,
-      parkingSpotNumber: '',
-      parkingDailyPrice: '',
+      incluyePileta: false,
+      cocheras: [],
       initialPaymentAmount: '',
-      initialPaymentMethod: '',
-      parkingInitialPaymentAmount: '',
-      parkingInitialPaymentMethod: ''
+      initialPaymentMethod: ''
     });
   };
 
@@ -2512,6 +2461,11 @@ function App() {
               onReleaseRange={handleReleaseCarpaReservationRange}
               onClose={() => setCarpaReservationForm(null)}
               reservationGroups={reservationGroups}
+              onNuevoCliente={() => {
+                handleResetClientForm();
+                setClienteNuevoPara('carpa');
+                setClientFormOpen(true);
+              }}
             />
           )}
 
@@ -2544,6 +2498,11 @@ function App() {
               onReleaseRange={handleReleaseSombrillaReservationRange}
               onClose={() => setSombrillaReservationForm(null)}
               reservationGroups={reservationGroups}
+              onNuevoCliente={() => {
+                handleResetClientForm();
+                setClienteNuevoPara('sombrilla');
+                setClientFormOpen(true);
+              }}
             />
           )}
 
@@ -2639,10 +2598,27 @@ function App() {
               clientForm={clientForm}
               clientSaving={clientSaving}
               onFieldChange={handleClientFieldChange}
-              onSubmit={handleSubmitClientForm}
+              onSubmit={async (e) => {
+                const cliente = await handleSubmitClientForm(e);
+                // Creado desde una reserva abierta: queda elegido en ella.
+                if (cliente && clienteNuevoPara) {
+                  const setForm = clienteNuevoPara === 'sombrilla' ? setSombrillaReservationForm : setCarpaReservationForm;
+                  setForm((prev) => (prev ? {
+                    ...prev,
+                    clientId: cliente.id,
+                    customerName: cliente.fullName || '',
+                    customerPhone: cliente.phone || '',
+                    cocheras: (prev.cocheras || []).map((c, i) =>
+                      i === 0 && !c.vehiclePlate && cliente.vehiclePlate ? { ...c, vehiclePlate: cliente.vehiclePlate } : c
+                    )
+                  } : prev));
+                  setClienteNuevoPara(null);
+                }
+              }}
               onCancel={() => {
                 handleResetClientForm();
                 setClientFormOpen(false);
+                setClienteNuevoPara(null);
               }}
             />
           )}

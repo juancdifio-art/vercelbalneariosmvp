@@ -4,7 +4,8 @@
 // Spec: docs/superpowers/specs/2026-09-26-servicios-incluidos-design.md
 
 import { edadDe } from './personas';
-import { PRECIO_VACIO } from './tarifas';
+import { PRECIO_VACIO, aNumero, faltaMotivoAjuste } from './tarifas';
+import { normalizarPatente } from './patente';
 
 const EDAD_ADULTO = 18;
 const PASES_POR_DEFECTO = { carpa: 4, sombrilla: 0 };
@@ -123,4 +124,63 @@ export const maxPersonasPara = (establishment) => entero(establishment?.maxPerso
 
 export function superaTope(establishment, adultsCount, childrenCount) {
   return (entero(adultsCount) || 0) + (entero(childrenCount) || 0) > maxPersonasPara(establishment);
+}
+
+const montoPago = (v) => {
+  if (v === null || v === undefined || v === '') return 0;
+  const n = Number.parseFloat(String(v).replace(',', '.'));
+  return Number.isNaN(n) ? 0 : n;
+};
+
+/**
+ * Estado de las cocheras del formulario frente a la disponibilidad real.
+ *
+ * Una cochera sin plaza elegida toma la primera libre que no haya elegido
+ * otra cochera del mismo formulario: es la que se cotiza y la que se manda,
+ * asi lo cotizado es lo que se guarda. El servidor la vuelve a confirmar.
+ */
+export function analizarCocheras({ cocheras, ocupadas, capacidad, verificando }) {
+  const lista = Array.isArray(cocheras) ? cocheras : [];
+  const elegidas = lista.map((c) => entero(c.plaza)).filter((n) => n && n > 0);
+  const tomadas = new Set(elegidas);
+
+  const efectivas = lista.map((c) => {
+    const plaza = entero(c.plaza);
+    if (plaza && plaza > 0) return plaza;
+    if (verificando) return null;
+    for (let n = 1; n <= capacidad; n += 1) {
+      if (!ocupadas.has(n) && !tomadas.has(n)) {
+        tomadas.add(n);
+        return n;
+      }
+    }
+    return null;
+  });
+
+  const mensajes = lista.map((c, i) => {
+    if (entero(c.plaza) || verificando) return null;
+    return efectivas[i] ? `Se asigna la plaza ${efectivas[i]}.` : 'No hay plazas libres en esas fechas.';
+  });
+
+  const conflicto = lista.map((c) => {
+    const plaza = entero(c.plaza);
+    return Boolean(plaza && ocupadas.has(plaza));
+  });
+  const pagoExcede = lista.map((c) => {
+    const total = aNumero(c.precio?.cobrado);
+    return total !== null && montoPago(c.pagoMonto) > total;
+  });
+  const pagoSinMetodo = lista.map((c) => montoPago(c.pagoMonto) > 0 && !c.pagoMetodo);
+  const faltaPatente = lista.some((c) => !normalizarPatente(c.vehiclePlate));
+  const faltaMotivo = lista.some((c) => faltaMotivoAjuste(c.precio ?? PRECIO_VACIO));
+  const cotizando = lista.some((c) => Boolean(c.precio?.cotizando));
+  const sinPlaza = !verificando && efectivas.some((p) => p === null);
+  const total = lista.reduce((suma, c) => suma + (aNumero(c.precio?.cobrado) ?? 0), 0);
+
+  const bloquea = lista.length > 0 && (
+    verificando || sinPlaza || faltaPatente || faltaMotivo || cotizando ||
+    conflicto.some(Boolean) || pagoExcede.some(Boolean) || pagoSinMetodo.some(Boolean)
+  );
+
+  return { efectivas, mensajes, conflicto, pagoExcede, pagoSinMetodo, faltaPatente, faltaMotivo, cotizando, sinPlaza, total, bloquea };
 }

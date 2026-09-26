@@ -8,7 +8,8 @@ import {
   pasesIncluidosPara,
   maxPersonasPara,
   superaTope,
-  cocheraVacia
+  cocheraVacia,
+  analizarCocheras
 } from './incluidos';
 
 const HOY = new Date(2026, 8, 26);
@@ -84,5 +85,53 @@ describe('ajustes del establecimiento', () => {
     expect(maxPersonasPara({ maxPersonasPorUnidad: 8 })).toBe(8);
     expect(superaTope({}, '4', '2')).toBe(false);
     expect(superaTope({}, '5', '2')).toBe(true);
+  });
+});
+
+describe('analizarCocheras', () => {
+  const cochera = (extra = {}) => ({ ...cocheraVacia(), vehiclePlate: 'AB123CD', precio: { cobrado: '1000', motivo: '', precioTarifa: 1000 }, ...extra });
+  const analizar = (cocheras, ocupadas = [], extra = {}) =>
+    analizarCocheras({ cocheras, ocupadas: new Set(ocupadas), capacidad: 5, verificando: false, ...extra });
+
+  it('sin plaza elegida asigna la primera libre, sin repetir la de otra cochera', () => {
+    const r = analizar([cochera(), cochera({ plaza: '2' }), cochera()], [1]);
+    expect(r.efectivas).toEqual([3, 2, 4]);
+    expect(r.mensajes[0]).toBe('Se asigna la plaza 3.');
+    expect(r.bloquea).toBe(false);
+  });
+
+  it('una plaza elegida ocupada es conflicto y bloquea', () => {
+    const r = analizar([cochera({ plaza: '1' })], [1]);
+    expect(r.conflicto).toEqual([true]);
+    expect(r.bloquea).toBe(true);
+  });
+
+  it('sin plazas libres avisa y bloquea', () => {
+    const r = analizar([cochera()], [1, 2, 3, 4, 5]);
+    expect(r.efectivas).toEqual([null]);
+    expect(r.mensajes[0]).toBe('No hay plazas libres en esas fechas.');
+    expect(r.bloquea).toBe(true);
+  });
+
+  it('sin patente bloquea', () => {
+    expect(analizar([cochera({ vehiclePlate: ' ' })]).faltaPatente).toBe(true);
+  });
+
+  it('un pago mayor al total o sin metodo bloquea', () => {
+    expect(analizar([cochera({ pagoMonto: '2000', pagoMetodo: 'cash' })]).pagoExcede).toEqual([true]);
+    const sinMetodo = analizar([cochera({ pagoMonto: '500', pagoMetodo: '' })]);
+    expect(sinMetodo.pagoSinMetodo).toEqual([true]);
+    expect(sinMetodo.bloquea).toBe(true);
+  });
+
+  it('suma el total de todas las cocheras', () => {
+    expect(analizar([cochera(), cochera({ precio: { cobrado: '500' } })]).total).toBe(1500);
+  });
+
+  it('mientras verifica disponibilidad no asigna ni deja guardar', () => {
+    const r = analizar([cochera()], [], { verificando: true });
+    expect(r.efectivas).toEqual([null]);
+    expect(r.mensajes[0]).toBeNull();
+    expect(r.bloquea).toBe(true);
   });
 });

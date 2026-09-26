@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event';
 import CarpaReservationModal from './CarpaReservationModal';
 import ParkingReservationModal from './ParkingReservationModal';
 import ReservationEditModal from './ReservationEditModal';
+import { cocheraVacia } from '../lib/incluidos';
 
 // La patente es obligatoria para usar el estacionamiento.
 
@@ -54,25 +55,26 @@ function ConEstado({ Modal, inicial, onSaveRange, clients = [] }) {
 }
 
 const guardar = () => screen.getByRole('button', { name: /Guardar reserva/ });
+const conCochera = { ...BASE, carpaNumero: 58, clientId: 9, cocheras: [{ ...cocheraVacia(), plaza: 3 }] };
 
 describe('patente en el alta de carpa con estacionamiento', () => {
   it('sin patente no deja guardar y avisa', async () => {
-    render(<ConEstado Modal={CarpaReservationModal} inicial={{ ...BASE, carpaNumero: 58, includeParking: true }} onSaveRange={vi.fn()} />);
+    render(<ConEstado Modal={CarpaReservationModal} inicial={conCochera} onSaveRange={vi.fn()} />);
     await waitFor(() => expect(screen.getByText(/Falta la patente del vehículo/)).toBeInTheDocument());
     expect(guardar()).toBeDisabled();
   });
 
   it('con patente guarda y la manda normalizada', async () => {
     const onSaveRange = vi.fn().mockResolvedValue(true);
-    render(<ConEstado Modal={CarpaReservationModal} inicial={{ ...BASE, carpaNumero: 58, includeParking: true }} onSaveRange={onSaveRange} />);
+    render(<ConEstado Modal={CarpaReservationModal} inicial={conCochera} onSaveRange={onSaveRange} />);
     await userEvent.type(screen.getByLabelText(/Patente del vehículo/), 'ab 123 cd');
     await waitFor(() => expect(guardar()).toBeEnabled());
     await userEvent.click(guardar());
-    expect(onSaveRange.mock.calls[0][3].vehiclePlate).toBe('AB123CD');
+    expect(onSaveRange.mock.calls[0][3].cocheras[0].vehiclePlate).toBe('AB123CD');
   });
 
   it('sin estacionamiento no la pide', async () => {
-    render(<ConEstado Modal={CarpaReservationModal} inicial={{ ...BASE, carpaNumero: 58, includeParking: false }} onSaveRange={vi.fn()} />);
+    render(<ConEstado Modal={CarpaReservationModal} inicial={{ ...BASE, carpaNumero: 58, cocheras: [] }} onSaveRange={vi.fn()} />);
     expect(screen.queryByLabelText(/Patente del vehículo/)).not.toBeInTheDocument();
     await waitFor(() => expect(guardar()).toBeEnabled());
   });
