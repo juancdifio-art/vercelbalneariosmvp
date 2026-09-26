@@ -2,6 +2,7 @@ import React from 'react';
 import { addDays, isSameDay } from 'date-fns';
 import { format, weekdayInitial } from '../lib/dates';
 import ReservaEtiqueta from './ReservaEtiqueta';
+import { etiquetaVinculo } from '../lib/incluidos';
 function EstacionamientoSection({
   establishment,
   parkingDayOffset,
@@ -196,7 +197,8 @@ function EstacionamientoSection({
                             rangeLabel = `Del ${groupForCell.startDate} al ${groupForCell.endDate}`;
                           }
 
-                          tooltip = `${customerLabel}\n${rangeLabel}`;
+                          // Una cochera incluida dice de que carpa es.
+                          tooltip = [customerLabel, rangeLabel, etiquetaVinculo(groupForCell)].filter(Boolean).join('\n');
                         }
 
                         return (
