@@ -209,3 +209,71 @@ export function cambiosIncluidos(modal, plazasCocheras = []) {
   }
   return Object.keys(cambios).length ? cambios : undefined;
 }
+
+/**
+ * Las filas de personas del alta de una carpa o sombrilla: el titular primero
+ * (con los datos de la ficha del cliente, que se pueden completar ahi) y una
+ * por acompanante segun adultos + menores, sin pasar el tope.
+ *
+ * Con pileta, cada fila dice si tiene pase. Por defecto lo tienen los primeros
+ * con nombre, DNI y edad, hasta la cantidad de pases; lo que el operador marco
+ * o desmarco a mano (`pileta` en el dato guardado) manda sobre eso.
+ */
+export function filasDePersonas({
+  adultsCount, childrenCount, cliente, customerName = '', titularDatos, acompanantes = [],
+  max = MAX_PERSONAS_POR_DEFECTO, pases = 0, incluyePileta = false
+}) {
+  const total = Math.min((entero(adultsCount) || 0) + (entero(childrenCount) || 0), max);
+  if (total <= 0) return [];
+
+  const t = titularDatos || {};
+  const titular = cliente
+    ? {
+      esTitular: true,
+      fullName: cliente.fullName || '',
+      documentNumber: t.documentNumber ?? cliente.documentNumber ?? '',
+      birthDate: t.birthDate ?? (cliente.birthDate ? String(cliente.birthDate).slice(0, 10) : ''),
+      piletaElegida: t.pileta
+    }
+    : { esTitular: true, fullName: customerName || '', documentNumber: '', birthDate: '', sinFicha: true, piletaElegida: false };
+
+  const filas = [titular];
+  for (let i = 0; i < total - 1; i += 1) {
+    const a = acompanantes[i] || {};
+    filas.push({
+      esTitular: false,
+      indice: i,
+      fullName: a.fullName || '',
+      documentNumber: a.documentNumber || '',
+      age: a.age ?? '',
+      piletaElegida: a.pileta
+    });
+  }
+
+  let usados = 0;
+  return filas.map((f) => {
+    const completa = !f.sinFicha && personaCompletaParaPase(f);
+    let pileta = false;
+    if (incluyePileta && completa) {
+      const quiere = f.piletaElegida === undefined ? true : Boolean(f.piletaElegida);
+      if (quiere && usados < pases) {
+        pileta = true;
+        usados += 1;
+      }
+    }
+    return { ...f, completa, pileta };
+  });
+}
+
+/** Lo que se manda al crear: datos del titular (van a su ficha) y acompanantes de esta reserva. */
+export function armarPersonasAlta(filas) {
+  const lista = Array.isArray(filas) ? filas : [];
+  const out = {
+    personas: lista
+      .filter((f) => !f.esTitular && String(f.fullName ?? '').trim() !== '')
+      .map((f) => ({ fullName: f.fullName, documentNumber: f.documentNumber, age: f.age, pileta: f.pileta }))
+  };
+  const titular = lista.find((f) => f.esTitular && !f.sinFicha);
+  if (titular) out.titular = { documentNumber: titular.documentNumber, birthDate: titular.birthDate, pileta: titular.pileta };
+  return out;
+}

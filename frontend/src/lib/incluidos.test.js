@@ -12,6 +12,7 @@ import {
   analizarCocheras,
   cambiosIncluidos
 } from './incluidos';
+import * as incluidosLib from './incluidos';
 
 const HOY = new Date(2026, 8, 26);
 
@@ -156,5 +157,55 @@ describe('cambiosIncluidos', () => {
       pileta: true,
       cocherasNuevas: [{ plaza: 7, vehiclePlate: 'AB123CD', precio: { cobrado: '700', motivoAjuste: '' } }]
     });
+  });
+});
+
+describe('filas de personas en el alta', () => {
+  const { filasDePersonas, armarPersonasAlta } = incluidosLib;
+  const cliente = { id: 7, fullName: 'Lucia', documentNumber: '30111222', birthDate: '1990-05-01T03:00:00.000Z' };
+
+  it('una fila de titular y una por acompanante segun la cantidad', () => {
+    const filas = filasDePersonas({ adultsCount: '2', childrenCount: '2', cliente, titularDatos: undefined, acompanantes: [], max: 6 });
+    expect(filas).toHaveLength(4);
+    expect(filas[0]).toMatchObject({ esTitular: true, fullName: 'Lucia', documentNumber: '30111222', birthDate: '1990-05-01' });
+    expect(filas[1]).toMatchObject({ esTitular: false, indice: 0, fullName: '' });
+  });
+
+  it('nunca pasa del tope de personas', () => {
+    expect(filasDePersonas({ adultsCount: '9', childrenCount: '0', cliente, acompanantes: [], max: 6 })).toHaveLength(6);
+  });
+
+  it('por defecto da pase a los primeros completos hasta el maximo; lo elegido a mano manda', () => {
+    const acompanantes = [
+      { fullName: 'Ana', documentNumber: '1', age: '40' },
+      { fullName: 'Beto', documentNumber: '', age: '10' },
+      { fullName: 'Caro', documentNumber: '3', age: '12', pileta: false },
+      { fullName: 'Dani', documentNumber: '4', age: '15' },
+      { fullName: 'Eli', documentNumber: '5', age: '30' }
+    ];
+    const filas = filasDePersonas({ adultsCount: '6', childrenCount: '0', cliente, acompanantes, max: 6, pases: 4, incluyePileta: true });
+    expect(filas.map((f) => f.pileta)).toEqual([true, true, false, false, true, true]);
+  });
+
+  it('sin pileta nadie tiene pase', () => {
+    const filas = filasDePersonas({ adultsCount: '2', childrenCount: '0', cliente, acompanantes: [{ fullName: 'Ana', documentNumber: '1', age: '40' }], max: 6, pases: 4, incluyePileta: false });
+    expect(filas.map((f) => f.pileta)).toEqual([false, false]);
+  });
+
+  it('arma lo que se manda: titular y acompanantes con nombre', () => {
+    const filas = filasDePersonas({
+      adultsCount: '3', childrenCount: '0', cliente, max: 6, pases: 4, incluyePileta: true,
+      acompanantes: [{ fullName: 'Ana', documentNumber: '1', age: '40' }, { fullName: '' }]
+    });
+    expect(armarPersonasAlta(filas)).toEqual({
+      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true },
+      personas: [{ fullName: 'Ana', documentNumber: '1', age: '40', pileta: true }]
+    });
+  });
+
+  it('sin cliente guardado no hay datos de titular para mandar', () => {
+    const filas = filasDePersonas({ adultsCount: '2', childrenCount: '0', cliente: null, customerName: 'Juan', acompanantes: [{ fullName: 'Ana' }], max: 6 });
+    expect(filas[0]).toMatchObject({ esTitular: true, fullName: 'Juan', sinFicha: true });
+    expect(armarPersonasAlta(filas).titular).toBeUndefined();
   });
 });

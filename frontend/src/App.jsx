@@ -689,6 +689,8 @@ function App() {
       clientId,
       incluyePileta,
       cocheras,
+      personas,
+      titular,
       initialPaymentAmount,
       initialPaymentMethod
     } = extra;
@@ -714,7 +716,10 @@ function App() {
           adultsCount: String(adultsCount ?? ''),
           childrenCount: String(childrenCount ?? ''),
           // Pileta y cocheras: el servidor crea todo junto o nada.
-          incluidos: armarIncluidos({ incluyePileta, cocheras })
+          incluidos: armarIncluidos({ incluyePileta, cocheras }),
+          // Acompanantes de esta reserva y datos del titular (van a su ficha).
+          personas,
+          titular
         })
       });
 
@@ -824,6 +829,10 @@ function App() {
       }
       if (cocherasCreadas.length || data?.incluidos?.pileta) {
         refrescarDatos();
+      }
+      // La ficha del titular pudo haberse completado con DNI y fecha de nacimiento.
+      if (titular && clientId) {
+        fetchClients(token);
       }
 
       return true;
@@ -1146,6 +1155,8 @@ function App() {
       clientId,
       incluyePileta,
       cocheras,
+      personas,
+      titular,
       initialPaymentAmount,
       initialPaymentMethod
     } = extra;
@@ -1171,7 +1182,10 @@ function App() {
           adultsCount: String(adultsCount ?? ''),
           childrenCount: String(childrenCount ?? ''),
           // Pileta y cocheras: el servidor crea todo junto o nada.
-          incluidos: armarIncluidos({ incluyePileta, cocheras })
+          incluidos: armarIncluidos({ incluyePileta, cocheras }),
+          // Acompanantes de esta reserva y datos del titular (van a su ficha).
+          personas,
+          titular
         })
       });
 
@@ -1280,6 +1294,10 @@ function App() {
       }
       if (cocherasCreadas.length || data?.incluidos?.pileta) {
         refrescarDatos();
+      }
+      // La ficha del titular pudo haberse completado con DNI y fecha de nacimiento.
+      if (titular && clientId) {
+        fetchClients(token);
       }
 
       return true;

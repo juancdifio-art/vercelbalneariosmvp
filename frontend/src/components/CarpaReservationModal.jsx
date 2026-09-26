@@ -8,7 +8,8 @@ import PrecioReserva from './PrecioReserva';
 import ServiciosIncluidosFields from './ServiciosIncluidosFields';
 import useCocherasIncluidas from '../hooks/useCocherasIncluidas';
 import { PRECIO_VACIO, aNumero, faltaMotivoAjuste } from '../lib/tarifas';
-import { maxPersonasPara, superaTope } from '../lib/incluidos';
+import { maxPersonasPara, superaTope, filasDePersonas, armarPersonasAlta, pasesIncluidosPara } from '../lib/incluidos';
+import PersonasAltaFields from './PersonasAltaFields';
 import { normalizarPatente } from '../lib/patente';
 
 // Función para formatear montos con separadores de miles (formato argentino)
@@ -365,6 +366,16 @@ function CarpaReservationModal({
             />
           )}
 
+          {!isReserved && (
+            <PersonasAltaFields
+              form={form}
+              onChangeForm={onChangeForm}
+              cliente={clienteElegido}
+              establishment={establishment}
+              serviceType="carpa"
+            />
+          )}
+
           {!isReserved && error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               <p className="text-xs text-red-700 flex items-center gap-2">
@@ -538,7 +549,19 @@ function CarpaReservationModal({
                     // Cada cochera con la plaza que se cotizo: lo cotizado es lo que se guarda.
                     cocheras: cocheras.map((c, i) => ({ ...c, plaza: cocherasAnalisis.efectivas[i], vehiclePlate: normalizarPatente(c.vehiclePlate) })),
                     initialPaymentAmount,
-                    initialPaymentMethod
+                    initialPaymentMethod,
+                    // Personas de esta reserva y datos del titular (van a su ficha).
+                    ...armarPersonasAlta(filasDePersonas({
+                      adultsCount,
+                      childrenCount,
+                      cliente: clienteElegido,
+                      customerName,
+                      titularDatos: form.titularDatos,
+                      acompanantes: form.acompanantes || [],
+                      max: maxPersonasPara(establishment),
+                      pases: pasesIncluidosPara(establishment, 'carpa'),
+                      incluyePileta: Boolean(incluyePileta)
+                    }))
                   });
 
                   if (ok) {

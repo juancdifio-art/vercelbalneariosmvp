@@ -56,8 +56,8 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 188 tests del router serverless y de _incluidos / _tarifas
-cd frontend && npm test   # 261 tests de componentes y utilidades
+cd api && npm test        # 198 tests del router serverless y de _incluidos / _tarifas
+cd frontend && npm test   # 272 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
