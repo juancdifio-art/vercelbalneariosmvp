@@ -172,6 +172,8 @@ function responder(res, status, body) {
 function responderFalla(res, r) {
   const body = { error: r.error };
   if (r.message) body.message = r.message;
+  if (r.personas) body.personas = r.personas;
+  if (r.max !== undefined) body.max = r.max;
   return responder(res, r.status || 400, body);
 }
 
@@ -1133,6 +1135,15 @@ module.exports = async (req, res) => {
         const pedido = reglasIncluidos.normalizarPedido(body.incluidos, est, serviceType);
         if (pedido.error) return responder(res, 400, { error: pedido.error });
 
+        // Acompanantes cargados en el alta: son de esta reserva. Los datos del
+        // titular van a su ficha. El titular cuenta para el tope de personas.
+        const personasPedido = reglasIncluidos.UNIDADES_DE_SOMBRA.includes(serviceType)
+          ? reglasIncluidos.normalizarPersonas(body.personas, body.titular)
+          : null;
+        if (personasPedido && personasPedido.personas.length + (clientId ? 1 : 0) > reglasIncluidos.maxPersonas(est)) {
+          return responder(res, 400, { error: 'too_many_people', max: reglasIncluidos.maxPersonas(est) });
+        }
+
         // Pase de pileta pago asociado a una carpa (vinculo 'adicional').
         let asociadaA = null;
         if (serviceType === 'pileta' && body.incluidaEnReservaId) {
@@ -1174,8 +1185,8 @@ module.exports = async (req, res) => {
             if (precio.error) return { status: 400, error: precio.error };
 
             const creada = await insertar(query, precio);
-            if (!reglasIncluidos.hayIncluidos(pedido)) return { row: creada };
-            const inc = await incluidos.crearIncluidos(query, est, creada, pedido);
+            if (!reglasIncluidos.hayIncluidos(pedido) && !personasPedido) return { row: creada };
+            const inc = await incluidos.completarAlta(query, est, creada, pedido, personasPedido);
             if (inc.error) return inc;
             return { row: creada, incluidos: inc };
           });

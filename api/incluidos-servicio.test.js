@@ -337,3 +337,66 @@ describe('enTransaccion', () => {
     expect(sqls(c)).toEqual(['BEGIN', 'ROLLBACK']);
   });
 });
+
+describe('completarAlta: personas cargadas en el alta', () => {
+  const { completarAlta } = servicio;
+  let proximoGuest;
+  const reglasBase = () => {
+    proximoGuest = 900;
+    return [
+      [/INSERT INTO reservation_groups/, insertDevuelve],
+      [/INSERT INTO reservation_guests/, (p) => [{ id: proximoGuest++, full_name: p[2] }]],
+      [/SELECT id, full_name, document_number, birth_date FROM clients/, [{ id: 7, full_name: 'Lucia Gomez', document_number: '30111222', birth_date: '1990-05-01' }]]
+    ];
+  };
+  const personasPedido = (extra = {}) => ({
+    personas: [
+      { fullName: 'Ana', documentNumber: '1', age: 40, birthDate: null, pileta: true },
+      { fullName: 'Beto', documentNumber: null, age: 10, birthDate: null, pileta: false }
+    ],
+    titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true },
+    ...extra
+  });
+
+  it('guarda los acompanantes y completa la ficha del titular', async () => {
+    const query = fakeDb(reglasBase());
+    const r = await completarAlta(query, EST, CARPA, { pileta: false, cocheras: [] }, personasPedido());
+
+    expect(r.error).toBeUndefined();
+    expect(llamadas(query, /INSERT INTO reservation_guests/)).toHaveLength(2);
+    const ficha = llamadas(query, /UPDATE clients SET/)[0];
+    expect(ficha[1]).toEqual(['30111222', '1990-05-01', 7, 1]);
+    // Sin pileta no se asignan pases aunque vengan tildados.
+    expect(llamadas(query, /INSERT INTO pase_pileta_personas/)).toHaveLength(0);
+  });
+
+  it('con pileta asigna exactamente a los elegidos', async () => {
+    const query = fakeDb(reglasBase());
+    const r = await completarAlta(query, EST, CARPA, { pileta: true, cocheras: [] }, personasPedido());
+
+    expect(r.error).toBeUndefined();
+    const asignadas = llamadas(query, /INSERT INTO pase_pileta_personas/).map(([, p]) => ({ guestId: p[2], clientId: p[3] }));
+    expect(asignadas).toEqual([{ guestId: null, clientId: 7 }, { guestId: 900, clientId: null }]);
+  });
+
+  it('mas elegidos que pases incluidos es demasiados_pases', async () => {
+    const personas = [1, 2, 3, 4].map((i) => ({ fullName: `P${i}`, documentNumber: `${i}`, age: 30, birthDate: null, pileta: true }));
+    const r = await completarAlta(fakeDb(reglasBase()), EST, CARPA, { pileta: true, cocheras: [] }, personasPedido({ personas }));
+    expect(r).toMatchObject({ status: 400, error: 'demasiados_pases' });
+  });
+
+  it('un elegido sin DNI o edad es persona_incompleta', async () => {
+    const personas = [{ fullName: 'Beto', documentNumber: null, age: 10, birthDate: null, pileta: true }];
+    const r = await completarAlta(fakeDb(reglasBase()), EST, CARPA, { pileta: true, cocheras: [] }, personasPedido({ personas }));
+    expect(r).toMatchObject({ status: 400, error: 'persona_incompleta', personas: ['Beto'] });
+  });
+
+  it('sin personas en el pedido la pileta asigna sola al titular, como antes', async () => {
+    const query = fakeDb([
+      [/INSERT INTO reservation_groups/, insertDevuelve],
+      [/FROM clients/, [{ id: 7, full_name: 'Lucia Gomez', document_number: '30111222', birth_date: '1990-05-01' }]]
+    ]);
+    await completarAlta(query, EST, CARPA, { pileta: true, cocheras: [] }, null);
+    expect(llamadas(query, /INSERT INTO pase_pileta_personas/)).toHaveLength(1);
+  });
+});

@@ -279,3 +279,44 @@ describe('personas de la reserva', () => {
     expect(queryMock.mock.calls.some(([sql]) => /INSERT INTO pase_pileta_personas/.test(sql))).toBe(true);
   });
 });
+
+describe('POST de carpa con personas cargadas en el alta', () => {
+  it('guarda los acompanantes en la reserva y los pases elegidos, en la misma transaccion', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin solapamiento
+    sinTarifas();
+    queryMock.mockResolvedValueOnce({ rows: [CARPA] }); // INSERT carpa
+    queryMock.mockResolvedValueOnce({ rows: [] }); // UPDATE ficha del titular
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 900 }] }); // INSERT acompanante
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 7, full_name: 'Lucia', document_number: '30111222', birth_date: '1990-05-01' }] }); // titular
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 501, service_type: 'pileta' }] }); // INSERT pase
+    queryMock.mockResolvedValueOnce({ rows: [] }); // persona titular
+    queryMock.mockResolvedValueOnce({ rows: [] }); // persona acompanante
+    queryMock.mockResolvedValueOnce({ rows: [{ client_id: 7, full_name: 'Lucia', birth_date: '1990-05-01' }, { guest_id: 900, full_name: 'Ana', age: 40 }] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // UPDATE conteo
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', token).send({
+      ...alta,
+      incluidos: { pileta: true },
+      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true },
+      personas: [{ fullName: 'Ana', documentNumber: '1', age: 40, pileta: true }]
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.incluidos.pileta).toEqual({ id: 501, asignados: 2 });
+    const guest = queryMock.mock.calls.find(([sql]) => /INSERT INTO reservation_guests/.test(sql));
+    expect(guest[1]).toEqual([1, 60, 'Ana', '1', 40, null]);
+    expect(txSql()).toEqual(['BEGIN', 'COMMIT']);
+  });
+
+  it('mas personas cargadas que el tope es too_many_people', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    const personas = [1, 2, 3, 4, 5, 6].map((i) => ({ fullName: `P${i}` }));
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', token)
+      .send({ ...alta, adultsCount: 2, childrenCount: 0, personas });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('too_many_people');
+  });
+});

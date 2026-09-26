@@ -98,6 +98,33 @@ function normalizarPedido(incluidos, est, serviceType) {
   return { pileta, cocheras };
 }
 
+// Personas cargadas en el alta de la carpa: acompanantes (solo el nombre es
+// obligatorio; una fila sin nombre no se guarda) y los datos del titular, que
+// van a la ficha del cliente. `pileta` dice a quien le toca un pase incluido.
+// null si no vino nada: el alta sigue como antes.
+function normalizarPersonas(personas, titular) {
+  if (personas === undefined && titular === undefined) return null;
+  const textoONull = (v) => (texto(v) === '' ? null : texto(v));
+  const lista = (Array.isArray(personas) ? personas : [])
+    .filter((p) => texto(p?.fullName) !== '')
+    .map((p) => {
+      const edad = entero(p.age);
+      return {
+        fullName: texto(p.fullName),
+        documentNumber: textoONull(p.documentNumber),
+        age: edad !== null && edad >= 0 ? edad : null,
+        birthDate: textoONull(p.birthDate),
+        pileta: Boolean(p.pileta)
+      };
+    });
+  return {
+    personas: lista,
+    titular: titular
+      ? { documentNumber: textoONull(titular.documentNumber), birthDate: textoONull(titular.birthDate), pileta: Boolean(titular.pileta) }
+      : null
+  };
+}
+
 const hayIncluidos = (pedido) => Boolean(pedido && (pedido.pileta || pedido.cocheras.length));
 
 // Un incluido se maneja desde su carpa. La cochera deja cambiar plaza y
@@ -132,6 +159,7 @@ module.exports = {
   maxPersonas,
   validarTope,
   normalizarPedido,
+  normalizarPersonas,
   hayIncluidos,
   validarEdicionIncluido
 };

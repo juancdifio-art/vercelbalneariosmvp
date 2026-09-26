@@ -146,3 +146,31 @@ describe('validarEdicionIncluido', () => {
     expect(validarEdicionIncluido(cochera, { clientId: 9 })).toBe('servicio_incluido_no_editable');
   });
 });
+
+describe('normalizarPersonas', () => {
+  const { normalizarPersonas } = reglas;
+
+  it('sin personas ni titular no hay nada que cargar', () => {
+    expect(normalizarPersonas(undefined, undefined)).toBeNull();
+  });
+
+  it('descarta filas sin nombre y limpia los datos', () => {
+    const r = normalizarPersonas([
+      { fullName: ' Ana ', documentNumber: ' 1 ', age: '40', pileta: true },
+      { fullName: '  ', documentNumber: '2' },
+      { fullName: 'Beto', age: '' }
+    ], { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true });
+    expect(r).toEqual({
+      personas: [
+        { fullName: 'Ana', documentNumber: '1', age: 40, birthDate: null, pileta: true },
+        { fullName: 'Beto', documentNumber: null, age: null, birthDate: null, pileta: false }
+      ],
+      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true }
+    });
+  });
+
+  it('un titular sin datos no pide pase', () => {
+    expect(normalizarPersonas([], { documentNumber: '', birthDate: '' }).titular)
+      .toEqual({ documentNumber: null, birthDate: null, pileta: false });
+  });
+});

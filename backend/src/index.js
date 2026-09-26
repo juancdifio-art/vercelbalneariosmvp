@@ -33,6 +33,8 @@ async function conTransaccion(fn) {
 function responderFalla(res, r) {
   const body = { error: r.error };
   if (r.message) body.message = r.message;
+  if (r.personas) body.personas = r.personas;
+  if (r.max !== undefined) body.max = r.max;
   return res.status(r.status || 400).json(body);
 }
 
@@ -1232,6 +1234,15 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
     const pedido = reglasIncluidos.normalizarPedido(req.body.incluidos, est, serviceType);
     if (pedido.error) return res.status(400).json({ error: pedido.error });
 
+    // Acompanantes cargados en el alta: son de esta reserva. Los datos del
+    // titular van a su ficha. El titular cuenta para el tope de personas.
+    const personasPedido = reglasIncluidos.UNIDADES_DE_SOMBRA.includes(serviceType)
+      ? reglasIncluidos.normalizarPersonas(req.body.personas, req.body.titular)
+      : null;
+    if (personasPedido && personasPedido.personas.length + (clientId ? 1 : 0) > reglasIncluidos.maxPersonas(est)) {
+      return res.status(400).json({ error: 'too_many_people', max: reglasIncluidos.maxPersonas(est) });
+    }
+
     // Pase de pileta pago asociado a una carpa (vinculo 'adicional').
     let asociadaA = null;
     if (isPool && req.body.incluidaEnReservaId) {
@@ -1408,8 +1419,8 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       );
 
       const groupRow = groupInsert.rows[0];
-      if (!reglasIncluidos.hayIncluidos(pedido)) return { groupRow };
-      const inc = await incluidos.crearIncluidos(q, est, groupRow, pedido);
+      if (!reglasIncluidos.hayIncluidos(pedido) && !personasPedido) return { groupRow };
+      const inc = await incluidos.completarAlta(q, est, groupRow, pedido, personasPedido);
       if (inc.error) return inc;
       return { groupRow, incluidos: inc };
     });

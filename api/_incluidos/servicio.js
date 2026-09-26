@@ -117,14 +117,14 @@ async function crearCocheras(query, est, carpa, cocheras) {
 }
 
 // El pase incluido va dentro del precio de la carpa: vale cero y no lleva pagos.
-async function crearPileta(query, est, carpa) {
+async function crearPileta(query, est, carpa, { asignarTitular = true } = {}) {
   const row = await insertarReserva(query, {
     ...datosDeCarpa(carpa), estId: est.id, serviceType: 'pileta', resourceNumber: 1,
     dailyPrice: 0, totalPrice: 0, vinculo: 'incluido'
   });
   let asignados = 0;
   // El titular ocupa un pase de entrada si su ficha tiene DNI y fecha de nacimiento.
-  if (carpa.client_id) {
+  if (asignarTitular && carpa.client_id) {
     const cli = await query(
       'SELECT id, full_name, document_number, birth_date FROM clients WHERE id = $1 AND establishment_id = $2',
       [carpa.client_id, est.id]
@@ -141,6 +141,63 @@ async function crearPileta(query, est, carpa) {
 async function crearIncluidos(query, est, carpa, pedido) {
   const resultado = { pileta: null, cocheras: [] };
   if (pedido.pileta) resultado.pileta = await crearPileta(query, est, carpa);
+  if (pedido.cocheras.length) {
+    const r = await crearCocheras(query, est, carpa, pedido.cocheras);
+    if (r.error) return r;
+    resultado.cocheras = r.cocheras;
+  }
+  return resultado;
+}
+
+// Todo lo que acompana al alta de una carpa o sombrilla, en su transaccion:
+// los datos del titular (van a su ficha), los acompanantes, la pileta con los
+// pases elegidos y las cocheras. `personasPedido` sale de
+// reglas.normalizarPersonas; si es null, la pileta asigna sola al titular.
+async function completarAlta(query, est, carpa, pedido, personasPedido) {
+  const titular = personasPedido?.titular || null;
+  if (titular && carpa.client_id && (titular.documentNumber || titular.birthDate)) {
+    await query(
+      'UPDATE clients SET document_number = COALESCE($1, document_number), birth_date = COALESCE($2, birth_date), updated_at = NOW() WHERE id = $3 AND establishment_id = $4',
+      [titular.documentNumber, titular.birthDate, carpa.client_id, est.id]
+    );
+  }
+
+  const guests = [];
+  for (const p of personasPedido?.personas || []) {
+    const r = await query(
+      'INSERT INTO reservation_guests (establishment_id, reservation_group_id, full_name, document_number, age, birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+      [est.id, carpa.id, p.fullName, p.documentNumber, p.age, p.birthDate]
+    );
+    guests.push({ ...p, id: r.rows[0].id });
+  }
+
+  const resultado = { pileta: null, cocheras: [] };
+
+  if (pedido.pileta && personasPedido) {
+    // Los pases van exactamente a quienes se eligieron en el alta.
+    const elegidos = [];
+    if (titular?.pileta && carpa.client_id) {
+      const t = (await query(
+        'SELECT id, full_name, document_number, birth_date FROM clients WHERE id = $1 AND establishment_id = $2',
+        [carpa.client_id, est.id]
+      )).rows[0];
+      if (t) elegidos.push({ clientId: t.id, fullName: t.full_name, documentNumber: t.document_number, birthDate: t.birth_date });
+    }
+    for (const g of guests) if (g.pileta) elegidos.push({ ...g, guestId: g.id });
+
+    const incompletas = elegidos.filter((p) => !reglas.personaCompleta(p)).map((p) => p.fullName);
+    if (incompletas.length) return { status: 400, error: 'persona_incompleta', personas: incompletas };
+    const max = reglas.pasesIncluidos(est, carpa.service_type);
+    if (elegidos.length > max) return { status: 400, error: 'demasiados_pases', max };
+
+    const pase = await crearPileta(query, est, carpa, { asignarTitular: false });
+    for (const p of elegidos) await insertarPersona(query, est.id, pase.id, { guestId: p.guestId ?? null, clientId: p.clientId ?? null });
+    const asignados = elegidos.length ? (await recalcularConteo(query, est.id, pase.id)).length : 0;
+    resultado.pileta = { id: pase.id, asignados };
+  } else if (pedido.pileta) {
+    resultado.pileta = await crearPileta(query, est, carpa);
+  }
+
   if (pedido.cocheras.length) {
     const r = await crearCocheras(query, est, carpa, pedido.cocheras);
     if (r.error) return r;
@@ -487,6 +544,7 @@ module.exports = {
   reservarUnidad,
   plazaLibre,
   crearIncluidos,
+  completarAlta,
   sincronizarIncluidos,
   modificarIncluidos,
   personasDePase,
