@@ -21,6 +21,8 @@ function EstablishmentConfigForm({
   setEstHasPileta,
   estPoolMaxOccupancy,
   setEstPoolMaxOccupancy,
+  estAjustes,
+  setEstAjustes,
   onSubmit,
   estSaving,
   error,
@@ -354,6 +356,15 @@ function EstablishmentConfigForm({
           </div>
         </div>
 
+        {estAjustes && setEstAjustes && (
+          <AjustesReservas
+            isDark={isDark}
+            estHasPileta={estHasPileta}
+            estAjustes={estAjustes}
+            setEstAjustes={setEstAjustes}
+          />
+        )}
+
         <button
           type="submit"
           disabled={estSaving}
@@ -375,6 +386,36 @@ function EstablishmentConfigForm({
         <p className="mt-2 text-center text-xs text-emerald-400">{success}</p>
       )}
     </>
+  );
+}
+
+// Reglas de las reservas de carpas y sombrillas: cuantos pases de pileta
+// incluye cada una y el tope de personas por unidad (el contrato dice 6).
+function AjustesReservas({ isDark, estHasPileta, estAjustes, setEstAjustes }) {
+  const cambiar = (campo) => (e) => {
+    const valor = e.target.value;
+    setEstAjustes((prev) => ({ ...prev, [campo]: valor }));
+  };
+  const etiqueta = isDark ? 'text-[11px] text-slate-300' : 'text-[11px] text-slate-700';
+  const input = isDark
+    ? 'mt-0.5 w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-50 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500'
+    : 'mt-0.5 w-full rounded-lg border border-cyan-200 bg-white px-2 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500';
+  const campo = (id, texto, clave) => (
+    <label htmlFor={id} className="flex flex-col gap-1">
+      <span className={etiqueta}>{texto}</span>
+      <input id={id} type="number" min="0" value={estAjustes[clave] ?? ''} onChange={cambiar(clave)} className={input} />
+    </label>
+  );
+
+  return (
+    <div className={isDark ? 'rounded-xl border border-slate-700 p-3' : 'rounded-xl border border-cyan-100 bg-white/70 p-3'}>
+      <p className={isDark ? 'text-xs font-medium text-slate-100' : 'text-xs font-medium text-slate-900'}>Reglas de las reservas</p>
+      <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        {estHasPileta && campo('ajuste-pases-carpa', 'Pases de pileta por carpa', 'pasesPiletaPorCarpa')}
+        {estHasPileta && campo('ajuste-pases-sombrilla', 'Pases de pileta por sombrilla', 'pasesPiletaPorSombrilla')}
+        {campo('ajuste-max-personas', 'Máximo de personas por unidad', 'maxPersonasPorUnidad')}
+      </div>
+    </div>
   );
 }
 

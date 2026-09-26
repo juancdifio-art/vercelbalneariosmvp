@@ -152,6 +152,8 @@ function App() {
     setEstSombrillasCapacity,
     estPoolMaxOccupancy,
     setEstPoolMaxOccupancy,
+    estAjustes,
+    setEstAjustes,
     estSaving,
     fetchEstablishment,
     handleSaveEstablishment
@@ -2386,6 +2388,8 @@ function App() {
               setEstHasPileta={setEstHasPileta}
               estPoolMaxOccupancy={estPoolMaxOccupancy}
               setEstPoolMaxOccupancy={setEstPoolMaxOccupancy}
+              estAjustes={estAjustes}
+              setEstAjustes={setEstAjustes}
               onSubmit={handleSaveEstablishment}
               estSaving={estSaving}
               error={error}
@@ -2456,6 +2460,8 @@ function App() {
       setEstHasPileta,
       estPoolMaxOccupancy,
       setEstPoolMaxOccupancy,
+      estAjustes,
+      setEstAjustes,
       onSubmit: handleSaveEstablishment,
       estSaving,
       error,

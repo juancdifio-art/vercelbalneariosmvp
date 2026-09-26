@@ -3,6 +3,10 @@ import { getApiBaseUrl } from '../apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
 
+// Pases de pileta por unidad y tope de personas (servicios incluidos).
+const AJUSTES_VACIOS = { pasesPiletaPorCarpa: '', pasesPiletaPorSombrilla: '', maxPersonasPorUnidad: '' };
+const texto = (v) => (v === null || v === undefined ? '' : String(v));
+
 function useEstablishment({
   authToken,
   isAuthenticated,
@@ -22,6 +26,7 @@ function useEstablishment({
   const [estCarpasCapacity, setEstCarpasCapacity] = useState('');
   const [estSombrillasCapacity, setEstSombrillasCapacity] = useState('');
   const [estPoolMaxOccupancy, setEstPoolMaxOccupancy] = useState('');
+  const [estAjustes, setEstAjustes] = useState(AJUSTES_VACIOS);
   const [estSaving, setEstSaving] = useState(false);
 
   const fetchEstablishment = useCallback(
@@ -82,6 +87,11 @@ function useEstablishment({
             ? ''
             : String(est.poolMaxOccupancy)
         );
+        setEstAjustes({
+          pasesPiletaPorCarpa: texto(est.pasesPiletaPorCarpa),
+          pasesPiletaPorSombrilla: texto(est.pasesPiletaPorSombrilla),
+          maxPersonasPorUnidad: texto(est.maxPersonasPorUnidad)
+        });
         setEstablishmentLoaded(true);
       } catch (err) {
         console.error('[useEstablishment] Error fetching establishment', err);
@@ -129,7 +139,8 @@ function useEstablishment({
             parkingCapacity: estParkingCapacity,
             carpasCapacity: estCarpasCapacity,
             sombrillasCapacity: estSombrillasCapacity,
-            poolMaxOccupancy: estPoolMaxOccupancy
+            poolMaxOccupancy: estPoolMaxOccupancy,
+            ...estAjustes
           })
         });
 
@@ -164,6 +175,7 @@ function useEstablishment({
       estCarpasCapacity,
       estSombrillasCapacity,
       estPoolMaxOccupancy,
+      estAjustes,
       setError,
       setSuccess,
       setIsAuthenticated,
@@ -184,6 +196,7 @@ function useEstablishment({
       setEstCarpasCapacity('');
       setEstSombrillasCapacity('');
       setEstPoolMaxOccupancy('');
+      setEstAjustes(AJUSTES_VACIOS);
       setEstSaving(false);
     }
   }, [isAuthenticated]);
@@ -209,6 +222,8 @@ function useEstablishment({
     setEstSombrillasCapacity,
     estPoolMaxOccupancy,
     setEstPoolMaxOccupancy,
+    estAjustes,
+    setEstAjustes,
     estSaving,
     fetchEstablishment,
     handleSaveEstablishment
