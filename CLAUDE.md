@@ -56,11 +56,19 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 118 tests del router serverless
-cd frontend && npm test   # 209 tests de componentes y utilidades
+cd api && npm test        # 188 tests del router serverless y de _incluidos / _tarifas
+cd frontend && npm test   # 261 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
+
+`api/incluidos-integracion.test.js` prueba el SQL de `_incluidos` contra la base local y **no corre con `npm test`** (queda en skipped). Hace todo en una transacción y la deshace:
+
+```bash
+cd api && DB_INTEGRACION=1 npx vitest run incluidos-integracion.test.js
+```
+
+**Transacciones en los tests de `api/`:** `test/pg-mock.js` hace que `BEGIN`, `COMMIT`, `ROLLBACK` y `pg_advisory_xact_lock` no consuman respuestas de `queryMock` (van a `txMock`). Al preparar un test se mockean solo las consultas de datos, en orden.
 
 ## Convenciones propias
 
@@ -72,6 +80,17 @@ cd frontend && npm test   # 209 tests de componentes y utilidades
 - **Calendarios de Carpas y Sombrillas:** los dos usan `CalendarioOcupacion.jsx`. Un cambio en la grilla se hace ahí, no en las secciones.
 - **`App.jsx` tiene ~2800 líneas.** Al agregar una sección, crear un componente aparte y pasarle las props agrupadas en un objeto en vez de sueltas.
 - **Tarifas:** el precio de carpas, sombrillas y estacionamiento lo calcula el servidor con `api/_tarifas/` (`calculo.js` y `validaciones.js` puros, `servicio.js` con las consultas). Es el único código compartido por las dos APIs: `backend/src/index.js` lo requiere desde `../../api/_tarifas/servicio`, así que **un cambio de tarifas se hace ahí y no en cada API**. Lo que manda el navegador solo cuenta como "cobrado"; si difiere del precio de tarifa hace falta `motivoAjuste`. La reserva guarda el snapshot (`precio_tarifa`, `desglose`, `motivo_ajuste`) y no se recalcula si cambia una tarifa, salvo que se editen sus fechas o su unidad. Pileta no pasa por tarifas. Migración: `backend/migrate-tarifas.sql`.
+
+## Servicios incluidos (pileta y cocheras de una carpa)
+
+Spec: `docs/superpowers/specs/2026-09-26-servicios-incluidos-design.md`.
+
+- **La lógica vive en `api/_incluidos/`**, compartida por las dos APIs igual que `_tarifas`: `reglas.js` (puro), `servicio.js` (recibe `query`) y `transaccion.js`. Un cambio de incluidos se hace ahí, no en cada API.
+- **Un incluido es una reserva más** con `incluida_en_reserva_id` (la carpa) y `vinculo`: `'incluido'` se mueve y se cancela con la carpa; `'adicional'` (pase de pileta pago) solo se muestra junto a ella y no se toca solo. Los pases con nombre están en `pase_pileta_personas`. Migración: `backend/migrate-servicios-incluidos.sql`.
+- **El alta y el PATCH de carpa, sombrilla y estacionamiento corren en una transacción** con `pg_advisory_xact_lock` por unidad (`bloquearUnidad`): el control de superposición sin bloqueo dejaba pasar dos altas simultáneas. En `api/index.js` la transacción usa `conTransaccion()` (cliente propio), nunca `db.query`, que abre un pool por consulta.
+- **El pase de pileta incluido y la cochera incluida no se editan por su cuenta**: la API responde 409 `servicio_incluido_no_editable` (la cochera acepta plaza y patente).
+- **Frontend:** `lib/incluidos.js` arma y valida lo que se manda; `ServiciosIncluidosFields` es el bloque de pileta y cocheras de los modales de carpa y sombrilla. Después de un cambio que toca varias reservas, `refrescarDatos()` en `App.jsx` vuelve a pedir grillas y listas.
+- **Tope de personas y pases por unidad** son ajustes del establecimiento (`pases_pileta_por_carpa` 4, `pases_pileta_por_sombrilla` 0, `max_personas_por_unidad` 6).
 
 ## Seguridad
 
