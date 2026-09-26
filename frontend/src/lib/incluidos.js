@@ -184,3 +184,28 @@ export function analizarCocheras({ cocheras, ocupadas, capacidad, verificando })
 
   return { efectivas, mensajes, conflicto, pagoExcede, pagoSinMetodo, faltaPatente, faltaMotivo, cotizando, sinPlaza, total, bloquea };
 }
+
+/**
+ * Lo que va en `incluidos` al editar una carpa o sombrilla: pileta
+ * agregada o quitada, cocheras canceladas y cocheras nuevas (con la plaza que
+ * se cotizo). undefined si no cambio nada.
+ */
+export function cambiosIncluidos(modal, plazasCocheras = []) {
+  if (!modal) return undefined;
+  const cambios = {};
+  const teniaPileta = Boolean(modal.incluidos?.pileta);
+  if (modal.tempIncluyePileta !== undefined && Boolean(modal.tempIncluyePileta) !== teniaPileta) {
+    cambios.pileta = Boolean(modal.tempIncluyePileta);
+  }
+  const canceladas = Array.isArray(modal.tempCocherasCanceladas) ? modal.tempCocherasCanceladas : [];
+  if (canceladas.length) cambios.cocherasCanceladas = canceladas;
+  const nuevas = Array.isArray(modal.cocheras) ? modal.cocheras : [];
+  if (nuevas.length) {
+    cambios.cocherasNuevas = armarIncluidos({ cocheras: nuevas }).cocheras.map((c, i) => ({
+      ...c,
+      plaza: plazasCocheras[i] ?? c.plaza,
+      vehiclePlate: normalizarPatente(c.vehiclePlate)
+    }));
+  }
+  return Object.keys(cambios).length ? cambios : undefined;
+}

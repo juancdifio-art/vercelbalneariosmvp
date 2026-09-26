@@ -24,7 +24,7 @@ import AuthenticatedShell from './components/AuthenticatedShell';
 import DailyViewSection from './components/DailyViewSection';
 import { normalizarPatente } from './lib/patente';
 import { precioDesdeReserva } from './lib/tarifas';
-import { armarIncluidos, mensajeErrorIncluidos } from './lib/incluidos';
+import { armarIncluidos, mensajeErrorIncluidos, cambiosIncluidos } from './lib/incluidos';
 import DashboardSection from './components/DashboardSection';
 import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
@@ -616,6 +616,12 @@ function App() {
     const dayNum = Number.parseInt(dayStr, 10);
     if (!year || !month || !dayNum) return null;
     return new Date(year, month - 1, dayNum);
+  };
+
+  // Los pases pagos asociados no se mueven ni se cancelan con la carpa: se avisa.
+  const avisarPasesPagos = (n, accion) => {
+    if (!n) return;
+    setSuccess(`La carpa ${accion}. Tiene ${n === 1 ? '1 pase de pileta pago asociado' : `${n} pases de pileta pagos asociados`}: revisalo.`);
   };
 
   // Pago inicial de una reserva recien creada. Si falla, la reserva queda igual
@@ -1543,11 +1549,16 @@ function App() {
       });
 
       if (!response.ok) {
-        console.error('Error cancelling reservation group');
+        const falla = await response.json().catch(() => null);
+        setError(mensajeErrorIncluidos(falla) || 'No se pudo cancelar la reserva.');
         return;
       }
 
       const data = await response.json();
+      avisarPasesPagos(data.adicionalesAsociados, 'se canceló');
+      if (['carpa', 'sombrilla'].includes(group.serviceType)) {
+        refrescarDatos();
+      }
 
       if (data.reservationGroup) {
         if (data.reservationGroup.serviceType === 'carpa') {
@@ -1684,7 +1695,35 @@ function App() {
       tempNotes: group.notes || '',
       tempVehiclePlate: group.vehiclePlate || '',
       tempPrecio: precioDesdeReserva(group),
+      tempIncluyePileta: undefined,
+      tempCocherasCanceladas: [],
+      cocheras: []
     });
+  };
+
+  // Desde un servicio incluido o un pase pago: abrir la reserva de su carpa.
+  // Puede no estar en la lista cargada (la seccion Pileta trae solo pases).
+  const abrirReservaVinculada = async (group) => {
+    const id = group?.incluidaEnReservaId;
+    if (!id) return;
+    let madre = reservationGroups.find((g) => Number(g.id) === Number(id));
+    if (!madre) {
+      const token = authToken || sessionStorage.getItem('authToken');
+      try {
+        const params = new URLSearchParams({ service: group.incluidaEnTipo || 'carpa', from: group.startDate, to: group.endDate });
+        const res = await fetch(`${API_BASE_URL}/api/reservation-groups?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        madre = (data.reservationGroups || []).find((g) => Number(g.id) === Number(id));
+      } catch (err) {
+        console.error('Error buscando la reserva de la carpa', err);
+      }
+    }
+    setReservationEditModal(null);
+    if (madre) {
+      handleViewReservationDetails(madre);
+    } else {
+      setError('No se encontró la reserva de la carpa.');
+    }
   };
 
   const handleViewReservationDetails = (group) => {
@@ -1986,7 +2025,7 @@ function App() {
     }
   };
 
-  const handleSaveReservationEdit = async () => {
+  const handleSaveReservationEdit = async ({ plazasCocheras = [] } = {}) => {
     if (!reservationEditModal) return;
 
     const token = authToken || sessionStorage.getItem('authToken');
@@ -2095,6 +2134,12 @@ function App() {
         updateBody.totalPrice = String(calculatedTotalPrice);
       }
 
+      // Carpa o sombrilla: pileta y cocheras que se agregan o se quitan.
+      const cambios = ['carpa', 'sombrilla'].includes(serviceType) ? cambiosIncluidos(reservationEditModal, plazasCocheras) : undefined;
+      if (cambios) {
+        updateBody.incluidos = cambios;
+      }
+
       // Agregar resourceNumber solo si cambió
       const resourceNumberChanged = tempResourceNumber !== undefined && tempResourceNumber !== resourceNumber;
       if (resourceNumberChanged) {
@@ -2122,10 +2167,9 @@ function App() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        if (data && data.error === 'motivo_ajuste_required') {
-          setReservationEditError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
-        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
-          setReservationEditError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        const mensaje = mensajeErrorIncluidos(data);
+        if (mensaje) {
+          setReservationEditError(mensaje);
         } else {
           console.error('Error updating reservation group');
         }
@@ -2133,6 +2177,18 @@ function App() {
       }
 
       setReservationEditError('');
+      const respuesta = await response.json().catch(() => null);
+
+      // Pago inicial de cada cochera agregada, con el id que devolvio el servidor.
+      const cocherasCreadas = respuesta?.incluidos?.cocheras || [];
+      const nuevasDelForm = reservationEditModal.cocheras || [];
+      for (let i = 0; i < cocherasCreadas.length; i += 1) {
+        await pagarAlCrear(token, cocherasCreadas[i].id, nuevasDelForm[i]?.pagoMonto, nuevasDelForm[i]?.pagoMetodo);
+      }
+      avisarPasesPagos(respuesta?.adicionalesAsociados, 'cambió de fechas');
+      if (cambios || ['carpa', 'sombrilla'].includes(serviceType)) {
+        refrescarDatos();
+      }
 
       // Si cambió el resourceNumber o las fechas, actualizar el mapa visual de reservas
       const datesChanged = startDateChanged || endDateChanged;
@@ -2520,6 +2576,7 @@ function App() {
               }}
               establishment={establishment}
               reservationGroups={reservationGroups}
+              onIrALaReserva={abrirReservaVinculada}
             />
           )}
 

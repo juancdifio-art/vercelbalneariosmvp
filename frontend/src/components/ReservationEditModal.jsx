@@ -4,8 +4,12 @@ import { normalizarPatente } from '../lib/patente';
 import PatenteField from './PatenteField';
 import PrecioReserva from './PrecioReserva';
 import { PRECIO_VACIO, faltaMotivoAjuste, precioDesdeReserva } from '../lib/tarifas';
+import { formatearPatente } from '../lib/patente';
+import { etiquetaVinculo } from '../lib/incluidos';
+import ServiciosIncluidosFields from './ServiciosIncluidosFields';
+import useCocherasIncluidas from '../hooks/useCocherasIncluidas';
 
-function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups, error }) {
+function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establishment, reservationGroups, error, onIrALaReserva }) {
   // El precio se recotiza solo si cambian las fechas o la unidad; si no, se
   // muestra el snapshot guardado.
   const cambioFechasOUnidad = Boolean(modal) && (
@@ -25,7 +29,68 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cambioFechasOUnidad]);
 
+  // Cocheras nuevas que se agregan a una carpa o sombrilla ya creada.
+  const esUnidadDeSombra = Boolean(modal) && ['carpa', 'sombrilla'].includes(modal.serviceType);
+  const cocherasNuevas = esUnidadDeSombra && Array.isArray(modal.cocheras) ? modal.cocheras : [];
+  const cocherasIncluidas = useCocherasIncluidas({
+    establishment,
+    cocheras: cocherasNuevas,
+    desde: modal ? modal.tempStartDate || modal.startDate : '',
+    hasta: modal ? modal.tempEndDate || modal.endDate : '',
+    activo: esUnidadDeSombra
+  });
+
   if (!modal) return null;
+
+  // Un servicio incluido se maneja desde su carpa.
+  const esIncluido = modal.vinculo === 'incluido';
+  const etiqueta = etiquetaVinculo(modal);
+  const irALaReserva = onIrALaReserva && modal.incluidaEnReservaId
+    ? (
+      <button
+        type="button"
+        className="inline-flex items-center rounded-lg bg-white px-3 py-1.5 text-[11px] font-semibold text-cyan-700 border border-cyan-200 hover:bg-cyan-50"
+        onClick={() => onIrALaReserva(modal)}
+      >
+        Ir a la reserva
+      </button>
+    )
+    : null;
+
+  if (esIncluido && modal.serviceType === 'pileta') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4 py-4">
+        <div className="w-full max-w-md rounded-2xl bg-white border border-slate-200 shadow-2xl p-5">
+          <p className="text-sm font-bold text-slate-900">🏊 {etiqueta}</p>
+          <p className="mt-2 text-xs text-slate-600">
+            Este pase va dentro del precio de la carpa. Las personas que tienen pase se eligen desde la reserva de la carpa,
+            y sus fechas son las de la carpa.
+          </p>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            {irALaReserva}
+            <button type="button" className="ml-auto inline-flex items-center rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800" onClick={onClose}>
+              Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const incluidos = modal.incluidos || null;
+  const canceladas = Array.isArray(modal.tempCocherasCanceladas) ? modal.tempCocherasCanceladas : [];
+  const incluyePileta = modal.tempIncluyePileta ?? Boolean(incluidos?.pileta);
+  const agregaIncluidos = (incluyePileta && !incluidos?.pileta) || cocherasNuevas.length > 0;
+  const faltaCliente = esUnidadDeSombra && agregaIncluidos && !modal.clientId;
+  const alternarCancelada = (id) =>
+    setModal((prev) => {
+      if (!prev) return prev;
+      const actuales = Array.isArray(prev.tempCocherasCanceladas) ? prev.tempCocherasCanceladas : [];
+      return {
+        ...prev,
+        tempCocherasCanceladas: actuales.includes(id) ? actuales.filter((x) => x !== id) : [...actuales, id]
+      };
+    });
 
   const serviceIcon = modal.serviceType === 'carpa' ? '🏖️' : modal.serviceType === 'sombrilla' ? '☂️' : modal.serviceType === 'parking' ? '🚗' : '🏊';
   const serviceLabel = modal.serviceType === 'carpa' ? 'Carpa' : modal.serviceType === 'sombrilla' ? 'Sombrilla' : modal.serviceType === 'parking' ? 'Estacionamiento' : 'Pileta';
@@ -96,6 +161,15 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
 
         <div className="px-5 py-4 overflow-y-auto flex-1">
 
+          {esIncluido && (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2">
+              <p className="text-[11px] text-cyan-900">
+                <span className="font-semibold">{etiqueta}.</span> Las fechas y la cancelación se cambian desde la carpa.
+              </p>
+              {irALaReserva}
+            </div>
+          )}
+
           {/* Selector de unidad (solo para carpas, sombrillas, estacionamiento) */}
           {capacity > 0 && modal.serviceType !== 'pileta' && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
@@ -156,6 +230,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                 <span className="text-[11px] font-semibold text-slate-700">📥 Fecha de entrada</span>
                 <input
                   type="date"
+                  disabled={esIncluido}
                   value={modal.tempStartDate ?? modal.startDate ?? ''}
                   onChange={(e) =>
                     setModal((prev) =>
@@ -174,6 +249,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
                 <span className="text-[11px] font-semibold text-slate-700">📤 Fecha de salida</span>
                 <input
                   type="date"
+                  disabled={esIncluido}
                   value={modal.tempEndDate ?? modal.endDate ?? ''}
                   onChange={(e) =>
                     setModal((prev) =>
@@ -403,6 +479,58 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
               />
             </div>
           )}
+          {esUnidadDeSombra && (incluidos?.cocheras?.length > 0) && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
+                <span>🚗</span>
+                <span>Cocheras incluidas</span>
+              </h3>
+              <ul className="space-y-2">
+                {incluidos.cocheras.map((c) => {
+                  const seCancela = canceladas.includes(c.id);
+                  return (
+                    <li key={c.id} className="flex items-center justify-between gap-2 text-xs">
+                      <span className={seCancela ? 'text-slate-400 line-through' : 'text-slate-800'}>
+                        Plaza {c.plaza}{c.vehiclePlate ? ` · ${formatearPatente(c.vehiclePlate)}` : ''}
+                      </span>
+                      {seCancela && <span className="text-[10px] text-red-600">Se cancela al guardar</span>}
+                      <button
+                        type="button"
+                        aria-label={seCancela ? `Deshacer quitar la plaza ${c.plaza}` : `Quitar cochera de la plaza ${c.plaza}`}
+                        className="text-[11px] font-semibold text-red-600 hover:underline"
+                        onClick={() => alternarCancelada(c.id)}
+                      >
+                        {seCancela ? 'Deshacer' : 'Quitar'}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {esUnidadDeSombra && (
+            <ServiciosIncluidosFields
+              establishment={establishment}
+              serviceType={modal.serviceType}
+              desde={modal.tempStartDate || modal.startDate}
+              hasta={modal.tempEndDate || modal.endDate}
+              incluyePileta={incluyePileta}
+              clavePileta="tempIncluyePileta"
+              cocheras={cocherasNuevas}
+              cocherasIncluidas={cocherasIncluidas}
+              patenteSugerida=""
+              tituloCocheras={incluidos?.cocheras?.length ? 'Agregar otra cochera incluida' : 'Agregar cochera incluida'}
+              onChangeForm={setModal}
+            />
+          )}
+
+          {faltaCliente && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Para incluir pileta o cochera, elegí un cliente o creá uno nuevo.
+            </div>
+          )}
+
           {/* Notas */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
@@ -441,8 +569,8 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
             <button
               type="button"
               className="inline-flex items-center rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-md hover:shadow-lg hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={onSave}
-              disabled={saving || faltaPatente || faltaMotivo || cotizando}
+              onClick={() => onSave({ plazasCocheras: cocherasIncluidas.analisis.efectivas })}
+              disabled={saving || faltaPatente || faltaMotivo || cotizando || faltaCliente || (cocherasNuevas.length > 0 && cocherasIncluidas.analisis.bloquea)}
             >
               {saving ? '⏳ Guardando...' : '✅ Guardar cambios'}
             </button>

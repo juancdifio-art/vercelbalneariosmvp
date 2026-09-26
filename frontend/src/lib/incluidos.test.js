@@ -9,7 +9,8 @@ import {
   maxPersonasPara,
   superaTope,
   cocheraVacia,
-  analizarCocheras
+  analizarCocheras,
+  cambiosIncluidos
 } from './incluidos';
 
 const HOY = new Date(2026, 8, 26);
@@ -133,5 +134,27 @@ describe('analizarCocheras', () => {
     expect(r.efectivas).toEqual([null]);
     expect(r.mensajes[0]).toBeNull();
     expect(r.bloquea).toBe(true);
+  });
+});
+
+describe('cambiosIncluidos', () => {
+  const carpa = { id: 60, incluidos: { pileta: { id: 501, asignados: 2 }, cocheras: [{ id: 502, plaza: 45 }], pasesPagos: [] } };
+
+  it('sin cambios no manda nada', () => {
+    expect(cambiosIncluidos(carpa, [])).toBeUndefined();
+    expect(cambiosIncluidos({ ...carpa, tempIncluyePileta: true }, [])).toBeUndefined();
+  });
+
+  it('quitar la pileta y una cochera', () => {
+    expect(cambiosIncluidos({ ...carpa, tempIncluyePileta: false, tempCocherasCanceladas: [502] }, []))
+      .toEqual({ pileta: false, cocherasCanceladas: [502] });
+  });
+
+  it('agregar cocheras nuevas con la plaza que se cotizo y la patente normalizada', () => {
+    const modal = { id: 60, incluidos: null, tempIncluyePileta: true, cocheras: [{ ...cocheraVacia(), vehiclePlate: 'ab 123 cd', precio: { cobrado: '700', motivo: '' } }] };
+    expect(cambiosIncluidos(modal, [7])).toEqual({
+      pileta: true,
+      cocherasNuevas: [{ plaza: 7, vehiclePlate: 'AB123CD', precio: { cobrado: '700', motivoAjuste: '' } }]
+    });
   });
 });

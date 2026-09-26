@@ -29,7 +29,10 @@ function ServiciosIncluidosFields({
   cocheras,
   cocherasIncluidas,
   patenteSugerida,
-  onChangeForm
+  onChangeForm,
+  // Al editar: el tilde de pileta vive en otra clave y las cocheras son "nuevas".
+  clavePileta = 'incluyePileta',
+  tituloCocheras = 'Incluir estacionamiento'
 }) {
   const lista = Array.isArray(cocheras) ? cocheras : [];
   const pases = pasesIncluidosPara(establishment, serviceType);
@@ -68,7 +71,7 @@ function ServiciosIncluidosFields({
               id={`${serviceType}-incluye-pileta`}
               className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-2 focus:ring-cyan-500"
               checked={Boolean(incluyePileta)}
-              onChange={(e) => cambiar({ incluyePileta: e.target.checked })}
+              onChange={(e) => cambiar({ [clavePileta]: e.target.checked })}
             />
             <label htmlFor={`${serviceType}-incluye-pileta`} className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1 cursor-pointer">
               <span>🏊</span>
@@ -95,7 +98,7 @@ function ServiciosIncluidosFields({
             />
             <label htmlFor="includeParking" className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1 cursor-pointer">
               <span>🚗</span>
-              <span>Incluir estacionamiento</span>
+              <span>{tituloCocheras}</span>
             </label>
           </div>
 
