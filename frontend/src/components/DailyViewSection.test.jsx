@@ -102,7 +102,9 @@ describe('Vista rapida con el plano', () => {
     await userEvent.click(screen.getByRole('button', { name: /Plano completo/ }));
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-  });
+    // El plano completo dibuja 337 unidades: aislado tarda ~1 s, pero con la
+    // suite entera en paralelo pasaba el limite de 5 s por defecto.
+  }, 15000);
 
   it('tocar una unidad en el plano completo lo cierra y abre la reserva', async () => {
     const { props } = renderVista();
@@ -111,7 +113,7 @@ describe('Vista rapida con el plano', () => {
     await userEvent.click(dialogo.querySelector('[data-unidad="sombrilla-209"]'));
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(props.onOpenNewSombrillaReservation).toHaveBeenCalledWith(209, expect.any(Date));
-  });
+  }, 15000);
 });
 
 describe('Vista rapida sin plano', () => {
