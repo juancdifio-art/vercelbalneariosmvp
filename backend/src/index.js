@@ -15,6 +15,41 @@ const pool = require('./db');
 const tarifas = require('../../api/_tarifas/servicio');
 const queryTarifas = (sql, params) => pool.query(sql, params);
 
+// Servicios incluidos (pileta y cocheras de una carpa): tambien compartido con produccion.
+const incluidos = require('../../api/_incluidos/servicio');
+const reglasIncluidos = require('../../api/_incluidos/reglas');
+const { enTransaccion } = require('../../api/_incluidos/transaccion');
+
+async function conTransaccion(fn) {
+  const client = await pool.connect();
+  try {
+    return await enTransaccion(client, fn);
+  } finally {
+    client.release();
+  }
+}
+
+// Un error de _incluidos ({ status, error, message }) como respuesta.
+function responderFalla(res, r) {
+  const body = { error: r.error };
+  if (r.message) body.message = r.message;
+  return res.status(r.status || 400).json(body);
+}
+
+function ajustesIncluidos(row) {
+  return {
+    pasesPiletaPorCarpa: reglasIncluidos.pasesIncluidos(row, 'carpa'),
+    pasesPiletaPorSombrilla: reglasIncluidos.pasesIncluidos(row, 'sombrilla'),
+    maxPersonasPorUnidad: reglasIncluidos.maxPersonas(row)
+  };
+}
+
+const enteroONull = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number.parseInt(v, 10);
+  return Number.isNaN(n) || n < 0 ? null : n;
+};
+
 const app = express();
 
 // Configurar CORS para soportar múltiples orígenes (desarrollo y producción)
@@ -265,7 +300,7 @@ app.get('/api/establishment/me', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     const result = await pool.query(
-      'SELECT id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE user_id = $1',
       [userId]
     );
 
@@ -286,7 +321,8 @@ app.get('/api/establishment/me', authenticateToken, async (req, res) => {
         parkingCapacity: row.parking_capacity,
         carpasCapacity: row.carpas_capacity,
         sombrillasCapacity: row.sombrillas_capacity,
-        poolMaxOccupancy: row.pool_max_occupancy
+        poolMaxOccupancy: row.pool_max_occupancy,
+        ...ajustesIncluidos(row)
       }
     });
   } catch (error) {
@@ -349,9 +385,14 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
           ? null
           : Number.parseInt(poolMaxOccupancy, 10);
 
+    // Ajustes de servicios incluidos: si no vienen, quedan como estaban.
+    const pasesCarpa = enteroONull(req.body.pasesPiletaPorCarpa);
+    const pasesSombrilla = enteroONull(req.body.pasesPiletaPorSombrilla);
+    const maxPersonas = enteroONull(req.body.maxPersonasPorUnidad);
+
     if (existing.rows.length === 0) {
       result = await pool.query(
-        'INSERT INTO establishments (user_id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy',
+        'INSERT INTO establishments (user_id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy, pases_pileta_por_carpa, pases_pileta_por_sombrilla, max_personas_por_unidad) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11, 4), COALESCE($12, 0), COALESCE($13, 6)) RETURNING *',
         [
           userId,
           name,
@@ -362,12 +403,15 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
           parkingCap,
           carpasCap,
           sombrillasCap,
-          poolCap
+          poolCap,
+          pasesCarpa,
+          pasesSombrilla,
+          maxPersonas
         ]
       );
     } else {
       result = await pool.query(
-        'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9 WHERE user_id = $10 RETURNING id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy',
+        'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9, pases_pileta_por_carpa = COALESCE($11, pases_pileta_por_carpa), pases_pileta_por_sombrilla = COALESCE($12, pases_pileta_por_sombrilla), max_personas_por_unidad = COALESCE($13, max_personas_por_unidad) WHERE user_id = $10 RETURNING *',
         [
           name,
           Boolean(hasParking),
@@ -378,7 +422,10 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
           carpasCap,
           sombrillasCap,
           poolCap,
-          userId
+          userId,
+          pasesCarpa,
+          pasesSombrilla,
+          maxPersonas
         ]
       );
     }
@@ -396,7 +443,8 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
         parkingCapacity: row.parking_capacity,
         carpasCapacity: row.carpas_capacity,
         sombrillasCapacity: row.sombrillas_capacity,
-        poolMaxOccupancy: row.pool_max_occupancy
+        poolMaxOccupancy: row.pool_max_occupancy,
+        ...ajustesIncluidos(row)
       }
     });
   } catch (error) {
@@ -960,12 +1008,12 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.vehicle_plate,
         rg.precio_tarifa,
         rg.desglose,
-        rg.motivo_ajuste,
+        rg.motivo_ajuste,${incluidos.SQL_COLUMNAS_VINCULO}
         c.document_number AS client_document_number,
         COALESCE(SUM(rp.amount), 0) AS paid_amount
       FROM reservation_groups rg
       LEFT JOIN clients c
-        ON c.id = rg.client_id
+        ON c.id = rg.client_id${incluidos.SQL_JOIN_PADRE}
       LEFT JOIN reservation_payments rp
         ON rp.establishment_id = rg.establishment_id
        AND rp.reservation_group_id = rg.id
@@ -1056,7 +1104,7 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         rg.vehicle_plate,
         rg.precio_tarifa,
         rg.desglose,
-        rg.motivo_ajuste,
+        rg.motivo_ajuste,${incluidos.SQL_GROUP_VINCULO}
         c.document_number
       ORDER BY rg.start_date ASC, rg.resource_number ASC`;
 
@@ -1089,7 +1137,8 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
         desglose: row.desglose ?? null,
         motivoAjuste: row.motivo_ajuste ?? null,
         clientDocumentNumber: row.client_document_number || null,
-        paidAmount: Number(row.paid_amount || 0)
+        paidAmount: Number(row.paid_amount || 0),
+        ...incluidos.mapVinculo(row)
       }))
     });
   } catch (error) {
@@ -1155,8 +1204,14 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'invalid_resource_number' });
     }
 
+    // Los servicios incluidos quedan a nombre de un cliente guardado.
+    const pideIncluidos = Boolean(req.body.incluidos && (req.body.incluidos.pileta || (Array.isArray(req.body.incluidos.cocheras) && req.body.incluidos.cocheras.length)));
+    if (pideIncluidos && !clientId) {
+      return res.status(400).json({ error: 'client_required' });
+    }
+
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE user_id = $1',
       [userId]
     );
 
@@ -1164,169 +1219,202 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: 'establishment_not_found' });
     }
 
-    const establishmentId = estResult.rows[0].id;
+    const est = estResult.rows[0];
+    const establishmentId = est.id;
 
     const isPool = serviceType === 'pileta';
 
-    // Para carpas/sombrillas/estacionamiento, no permitimos solapamientos por recurso
-    if (!isPool) {
-      const overlapResult = await pool.query(
-        `SELECT 1
-         FROM reservation_groups
-         WHERE establishment_id = $1
-           AND service_type = $2
-           AND resource_number = $3
-           AND status = 'active'
-           AND NOT (end_date < $4::date OR start_date > $5::date)
-         LIMIT 1`,
-        [establishmentId, serviceType, resourceNumParsed, fromStr, toStr]
+    if (reglasIncluidos.UNIDADES_DE_SOMBRA.includes(serviceType)) {
+      const tope = reglasIncluidos.validarTope(est, adultsCount, childrenCount);
+      if (tope) return res.status(400).json({ error: tope });
+    }
+
+    const pedido = reglasIncluidos.normalizarPedido(req.body.incluidos, est, serviceType);
+    if (pedido.error) return res.status(400).json({ error: pedido.error });
+
+    // Pase de pileta pago asociado a una carpa (vinculo 'adicional').
+    let asociadaA = null;
+    if (isPool && req.body.incluidaEnReservaId) {
+      const carpa = await incluidos.carpaParaAsociar(queryTarifas, establishmentId, Number.parseInt(req.body.incluidaEnReservaId, 10));
+      if (!carpa) return res.status(404).json({ error: 'carpa_not_found' });
+      asociadaA = carpa.id;
+    }
+
+    // Todo en una transaccion: la unidad queda bloqueada hasta el COMMIT, asi
+    // dos altas simultaneas no pasan las dos el control de superposicion, y si
+    // un servicio incluido falla no queda la carpa a medias.
+    const r = await conTransaccion(async (q) => {
+      if (!isPool) await incluidos.bloquearUnidad(q, establishmentId, serviceType, resourceNumParsed);
+      // Para carpas/sombrillas/estacionamiento, no permitimos solapamientos por recurso
+      if (!isPool) {
+        const overlapResult = await q(
+          `SELECT 1
+           FROM reservation_groups
+           WHERE establishment_id = $1
+             AND service_type = $2
+             AND resource_number = $3
+             AND status = 'active'
+             AND NOT (end_date < $4::date OR start_date > $5::date)
+           LIMIT 1`,
+          [establishmentId, serviceType, resourceNumParsed, fromStr, toStr]
+        );
+
+        if (overlapResult.rows.length > 0) {
+          return { status: 409, error: 'no_availability', message: 'La unidad seleccionada ya está ocupada en esas fechas.' };
+        }
+      }
+
+      let dailyPriceParsed =
+        dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
+          ? Number.parseFloat(dailyPrice)
+          : null;
+
+      let totalPriceParsed =
+        totalPrice !== undefined && totalPrice !== null && totalPrice !== ''
+          ? Number.parseFloat(totalPrice)
+          : null;
+
+      let precio = null;
+      if (!isPool) {
+        precio = await tarifas.precioAlCrear(q, establishmentId, {
+          serviceType, resourceNumber: resourceNumParsed, startDate: fromStr, endDate: toStr,
+          totalPrice, motivoAjuste: req.body.motivoAjuste
+        });
+        if (precio.error) {
+          return { status: 400, error: precio.error };
+        }
+        dailyPriceParsed = precio.dailyPrice;
+        totalPriceParsed = precio.totalPrice;
+      }
+
+      let poolAdultPricePerDayParsed = null;
+      let poolChildPricePerDayParsed = null;
+
+      // La cantidad de personas vale para los cuatro servicios, no solo pileta:
+      // antes esto vivia dentro del if (isPool) y una carpa se guardaba siempre
+      // con cero personas. Los precios por persona, en cambio, son solo de
+      // pileta y se siguen calculando adentro del bloque.
+      let adultsCountParsed =
+        adultsCount !== undefined && adultsCount !== null && adultsCount !== ''
+          ? Number.parseInt(adultsCount, 10)
+          : 0;
+      if (Number.isNaN(adultsCountParsed) || adultsCountParsed < 0) {
+        adultsCountParsed = 0;
+      }
+
+      let childrenCountParsed =
+        childrenCount !== undefined && childrenCount !== null && childrenCount !== ''
+          ? Number.parseInt(childrenCount, 10)
+          : 0;
+      if (Number.isNaN(childrenCountParsed) || childrenCountParsed < 0) {
+        childrenCountParsed = 0;
+      }
+
+      if (isPool) {
+        poolAdultPricePerDayParsed =
+          poolAdultPricePerDay !== undefined && poolAdultPricePerDay !== null && poolAdultPricePerDay !== ''
+            ? Number.parseFloat(poolAdultPricePerDay)
+            : 0;
+        if (Number.isNaN(poolAdultPricePerDayParsed) || poolAdultPricePerDayParsed < 0) {
+          poolAdultPricePerDayParsed = 0;
+        }
+
+        poolChildPricePerDayParsed =
+          poolChildPricePerDay !== undefined && poolChildPricePerDay !== null && poolChildPricePerDay !== ''
+            ? Number.parseFloat(poolChildPricePerDay)
+            : 0;
+        if (Number.isNaN(poolChildPricePerDayParsed) || poolChildPricePerDayParsed < 0) {
+          poolChildPricePerDayParsed = 0;
+        }
+
+        const msPerDay = 24 * 60 * 60 * 1000;
+        const startForDiff = new Date(fromStr);
+        const endForDiff = new Date(toStr);
+        let daysCount = Math.floor((endForDiff - startForDiff) / msPerDay) + 1;
+        if (!Number.isFinite(daysCount) || daysCount <= 0) {
+          daysCount = 1;
+        }
+
+        const computedDaily =
+          adultsCountParsed * poolAdultPricePerDayParsed +
+          childrenCountParsed * poolChildPricePerDayParsed;
+        const computedTotal = computedDaily * daysCount;
+
+        dailyPriceParsed = Number.isNaN(computedDaily) ? null : computedDaily;
+        totalPriceParsed = Number.isNaN(computedTotal) ? null : computedTotal;
+      }
+
+      let clientIdParsed = null;
+      if (clientId !== undefined && clientId !== null && clientId !== '') {
+        const parsed = Number.parseInt(clientId, 10);
+        if (!Number.isNaN(parsed) && parsed > 0) {
+          clientIdParsed = parsed;
+        }
+      }
+
+      // Para pases de pileta, siempre debe haber un cliente asociado
+      if (isPool && !clientIdParsed) {
+        return { status: 400, error: 'pool_client_required' };
+      }
+
+      const groupInsert = await q(
+        `INSERT INTO reservation_groups (
+          establishment_id,
+          service_type,
+          resource_number,
+          start_date,
+          end_date,
+          customer_name,
+          customer_phone,
+          daily_price,
+          total_price,
+          notes,
+          adults_count,
+          children_count,
+          pool_adult_price_per_day,
+          pool_child_price_per_day,
+          client_id,
+          vehicle_plate,
+          precio_tarifa,
+          desglose,
+          motivo_ajuste,
+          incluida_en_reserva_id,
+          vinculo
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+        RETURNING *`,
+        [
+          establishmentId,
+          serviceType,
+          resourceNumParsed,
+          fromStr,
+          toStr,
+          customerName || null,
+          customerPhone || null,
+          Number.isNaN(dailyPriceParsed) ? null : dailyPriceParsed,
+          Number.isNaN(totalPriceParsed) ? null : totalPriceParsed,
+          notes || null,
+          adultsCountParsed,
+          childrenCountParsed,
+          poolAdultPricePerDayParsed,
+          poolChildPricePerDayParsed,
+          clientIdParsed,
+          vehiclePlate || null,
+          precio ? precio.precioTarifa : null,
+          precio && precio.desglose != null ? JSON.stringify(precio.desglose) : null,
+          precio ? precio.motivoAjuste : null,
+          asociadaA,
+          asociadaA ? 'adicional' : null
+        ]
       );
 
-      if (overlapResult.rows.length > 0) {
-        return res.status(409).json({ error: 'no_availability' });
-      }
-    }
-
-    let dailyPriceParsed =
-      dailyPrice !== undefined && dailyPrice !== null && dailyPrice !== ''
-        ? Number.parseFloat(dailyPrice)
-        : null;
-
-    let totalPriceParsed =
-      totalPrice !== undefined && totalPrice !== null && totalPrice !== ''
-        ? Number.parseFloat(totalPrice)
-        : null;
-
-    let precio = null;
-    if (!isPool) {
-      precio = await tarifas.precioAlCrear(queryTarifas, establishmentId, {
-        serviceType, resourceNumber: resourceNumParsed, startDate: fromStr, endDate: toStr,
-        totalPrice, motivoAjuste: req.body.motivoAjuste
-      });
-      if (precio.error) {
-        return res.status(400).json({ error: precio.error });
-      }
-      dailyPriceParsed = precio.dailyPrice;
-      totalPriceParsed = precio.totalPrice;
-    }
-
-    let poolAdultPricePerDayParsed = null;
-    let poolChildPricePerDayParsed = null;
-
-    // La cantidad de personas vale para los cuatro servicios, no solo pileta:
-    // antes esto vivia dentro del if (isPool) y una carpa se guardaba siempre
-    // con cero personas. Los precios por persona, en cambio, son solo de
-    // pileta y se siguen calculando adentro del bloque.
-    let adultsCountParsed =
-      adultsCount !== undefined && adultsCount !== null && adultsCount !== ''
-        ? Number.parseInt(adultsCount, 10)
-        : 0;
-    if (Number.isNaN(adultsCountParsed) || adultsCountParsed < 0) {
-      adultsCountParsed = 0;
-    }
-
-    let childrenCountParsed =
-      childrenCount !== undefined && childrenCount !== null && childrenCount !== ''
-        ? Number.parseInt(childrenCount, 10)
-        : 0;
-    if (Number.isNaN(childrenCountParsed) || childrenCountParsed < 0) {
-      childrenCountParsed = 0;
-    }
-
-    if (isPool) {
-      poolAdultPricePerDayParsed =
-        poolAdultPricePerDay !== undefined && poolAdultPricePerDay !== null && poolAdultPricePerDay !== ''
-          ? Number.parseFloat(poolAdultPricePerDay)
-          : 0;
-      if (Number.isNaN(poolAdultPricePerDayParsed) || poolAdultPricePerDayParsed < 0) {
-        poolAdultPricePerDayParsed = 0;
-      }
-
-      poolChildPricePerDayParsed =
-        poolChildPricePerDay !== undefined && poolChildPricePerDay !== null && poolChildPricePerDay !== ''
-          ? Number.parseFloat(poolChildPricePerDay)
-          : 0;
-      if (Number.isNaN(poolChildPricePerDayParsed) || poolChildPricePerDayParsed < 0) {
-        poolChildPricePerDayParsed = 0;
-      }
-
-      const msPerDay = 24 * 60 * 60 * 1000;
-      const startForDiff = new Date(fromStr);
-      const endForDiff = new Date(toStr);
-      let daysCount = Math.floor((endForDiff - startForDiff) / msPerDay) + 1;
-      if (!Number.isFinite(daysCount) || daysCount <= 0) {
-        daysCount = 1;
-      }
-
-      const computedDaily =
-        adultsCountParsed * poolAdultPricePerDayParsed +
-        childrenCountParsed * poolChildPricePerDayParsed;
-      const computedTotal = computedDaily * daysCount;
-
-      dailyPriceParsed = Number.isNaN(computedDaily) ? null : computedDaily;
-      totalPriceParsed = Number.isNaN(computedTotal) ? null : computedTotal;
-    }
-
-    let clientIdParsed = null;
-    if (clientId !== undefined && clientId !== null && clientId !== '') {
-      const parsed = Number.parseInt(clientId, 10);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        clientIdParsed = parsed;
-      }
-    }
-
-    // Para pases de pileta, siempre debe haber un cliente asociado
-    if (isPool && !clientIdParsed) {
-      return res.status(400).json({ error: 'pool_client_required' });
-    }
-
-    const groupInsert = await pool.query(
-      `INSERT INTO reservation_groups (
-        establishment_id,
-        service_type,
-        resource_number,
-        start_date,
-        end_date,
-        customer_name,
-        customer_phone,
-        daily_price,
-        total_price,
-        notes,
-        adults_count,
-        children_count,
-        pool_adult_price_per_day,
-        pool_child_price_per_day,
-        client_id,
-        vehicle_plate,
-        precio_tarifa,
-        desglose,
-        motivo_ajuste
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-      RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate, precio_tarifa, desglose, motivo_ajuste`,
-      [
-        establishmentId,
-        serviceType,
-        resourceNumParsed,
-        fromStr,
-        toStr,
-        customerName || null,
-        customerPhone || null,
-        Number.isNaN(dailyPriceParsed) ? null : dailyPriceParsed,
-        Number.isNaN(totalPriceParsed) ? null : totalPriceParsed,
-        notes || null,
-        adultsCountParsed,
-        childrenCountParsed,
-        poolAdultPricePerDayParsed,
-        poolChildPricePerDayParsed,
-        clientIdParsed,
-        vehiclePlate || null,
-        precio ? precio.precioTarifa : null,
-        precio && precio.desglose != null ? JSON.stringify(precio.desglose) : null,
-        precio ? precio.motivoAjuste : null
-      ]
-    );
-
-    const groupRow = groupInsert.rows[0];
+      const groupRow = groupInsert.rows[0];
+      if (!reglasIncluidos.hayIncluidos(pedido)) return { groupRow };
+      const inc = await incluidos.crearIncluidos(q, est, groupRow, pedido);
+      if (inc.error) return inc;
+      return { groupRow, incluidos: inc };
+    });
+    if (r.error) return responderFalla(res, r);
+    const groupRow = r.groupRow;
 
     // Ya no insertamos en tabla reservations - trabajamos solo con reservation_groups
 
@@ -1357,8 +1445,11 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         precioTarifa: groupRow.precio_tarifa ?? null,
         desglose: groupRow.desglose ?? null,
         motivoAjuste: groupRow.motivo_ajuste ?? null,
+        incluidaEnReservaId: groupRow.incluida_en_reserva_id ?? null,
+        vinculo: groupRow.vinculo ?? null,
         paidAmount: 0
-      }
+      },
+      incluidos: r.incluidos || null
     });
   } catch (error) {
     console.error('Error creating reservation group', error);
@@ -1399,7 +1490,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE user_id = $1',
       [userId]
     );
 
@@ -1407,10 +1498,11 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
       return res.status(404).json({ error: 'establishment_not_found' });
     }
 
-    const establishmentId = estResult.rows[0].id;
+    const est = estResult.rows[0];
+    const establishmentId = est.id;
 
     const existingResult = await pool.query(
-      'SELECT id, establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate, precio_tarifa, desglose, motivo_ajuste FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
+      'SELECT id, establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate, precio_tarifa, desglose, motivo_ajuste, incluida_en_reserva_id, vinculo FROM reservation_groups WHERE id = $1 AND establishment_id = $2',
       [groupId, establishmentId]
     );
 
@@ -1419,6 +1511,13 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     }
 
     const current = existingResult.rows[0];
+    const esUnidadDeSombra = reglasIncluidos.UNIDADES_DE_SOMBRA.includes(current.service_type);
+
+    // Un servicio incluido se maneja desde su carpa.
+    const noEditable = reglasIncluidos.validarEdicionIncluido(current, req.body);
+    if (noEditable) {
+      return res.status(409).json({ error: noEditable, incluidaEnReservaId: current.incluida_en_reserva_id });
+    }
 
     // La patente solo se toca si viene en el body; en estacionamiento no se puede vaciar.
     const nextVehiclePlate = req.body.vehiclePlate !== undefined
@@ -1469,6 +1568,11 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
           : Number.parseFloat(poolChildPricePerDay))
         : current.pool_child_price_per_day;
 
+    if (esUnidadDeSombra && (adultsCount !== undefined || childrenCount !== undefined)) {
+      const tope = reglasIncluidos.validarTope(est, nextAdultsCount, nextChildrenCount);
+      if (tope) return res.status(400).json({ error: tope });
+    }
+
     let nextClientId;
     if (clientId !== undefined) {
       if (clientId === null || clientId === '') {
@@ -1486,98 +1590,120 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     let nextStartDate = startDate !== undefined ? startDate : current.start_date;
     let nextEndDate = endDate !== undefined ? endDate : current.end_date;
 
-    const resourceChanged = resourceNumber !== undefined && resourceNumber !== null && resourceNumber !== current.resource_number;
-    const startDateChanged = startDate !== undefined && startDate !== tarifas.fechaISO(current.start_date);
-    const endDateChanged = endDate !== undefined && endDate !== tarifas.fechaISO(current.end_date);
+    const r = await conTransaccion(async (q) => {
+      const resourceChanged = resourceNumber !== undefined && resourceNumber !== null && resourceNumber !== current.resource_number;
+      const startDateChanged = startDate !== undefined && startDate !== tarifas.fechaISO(current.start_date);
+      const endDateChanged = endDate !== undefined && endDate !== tarifas.fechaISO(current.end_date);
 
-    if (resourceChanged || startDateChanged || endDateChanged) {
-      const finalResourceNumber = resourceNumber !== undefined && resourceNumber !== null ? resourceNumber : current.resource_number;
-      const finalStartDate = startDate !== undefined ? startDate : current.start_date;
-      const finalEndDate = endDate !== undefined ? endDate : current.end_date;
+      if (resourceChanged || startDateChanged || endDateChanged) {
+        const finalResourceNumber = resourceNumber !== undefined && resourceNumber !== null ? resourceNumber : current.resource_number;
+        const finalStartDate = startDate !== undefined ? startDate : current.start_date;
+        const finalEndDate = endDate !== undefined ? endDate : current.end_date;
 
-      // Verificar que no haya conflicto con otra reserva
-      const conflictCheck = await pool.query(
-        `SELECT id FROM reservation_groups
-         WHERE establishment_id = $1
-         AND service_type = $2
-         AND resource_number = $3
-         AND status = 'active'
-         AND id != $4
-         AND start_date <= $5
-         AND end_date >= $6`,
+        // Bloquear la unidad destino hasta el COMMIT y verificar que siga libre.
+        if (current.service_type !== 'pileta') {
+          await incluidos.bloquearUnidad(q, establishmentId, current.service_type, finalResourceNumber);
+        }
+        const conflictCheck = await q(
+          `SELECT id FROM reservation_groups
+           WHERE establishment_id = $1
+           AND service_type = $2
+           AND resource_number = $3
+           AND status = 'active'
+           AND id != $4
+           AND start_date <= $5
+           AND end_date >= $6`,
+          [
+            establishmentId,
+            current.service_type,
+            finalResourceNumber,
+            groupId,
+            finalEndDate,
+            finalStartDate
+          ]
+        );
+
+        if (conflictCheck.rows.length > 0) {
+          return {
+            status: 409,
+            error: 'resource_conflict',
+            message: 'La unidad seleccionada ya está ocupada en ese rango de fechas'
+          };
+        }
+
+        nextResourceNumber = finalResourceNumber;
+        nextStartDate = finalStartDate;
+        nextEndDate = finalEndDate;
+      }
+
+      let nextPrecioTarifa = current.precio_tarifa ?? null;
+      let nextDesglose = current.desglose ?? null;
+      let nextMotivoAjuste = current.motivo_ajuste ?? null;
+      if (current.service_type !== 'pileta') {
+        const precio = await tarifas.precioAlEditar(q, establishmentId, current, req.body, {
+          recalcular: resourceChanged || startDateChanged || endDateChanged,
+          desde: tarifas.fechaISO(nextStartDate),
+          hasta: tarifas.fechaISO(nextEndDate),
+          resourceNumber: nextResourceNumber
+        });
+        if (precio.error) {
+          return { status: 400, error: precio.error };
+        }
+        nextDailyPrice = precio.dailyPrice;
+        nextTotalPrice = precio.totalPrice;
+        nextPrecioTarifa = precio.precioTarifa;
+        nextDesglose = precio.desglose;
+        nextMotivoAjuste = precio.motivoAjuste;
+      }
+
+      const updateResult = await q(
+        'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, adults_count = $8, children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, vehicle_plate = $16, precio_tarifa = $17, desglose = $18, motivo_ajuste = $19, updated_at = NOW() WHERE id = $15 RETURNING *',
         [
-          establishmentId,
-          current.service_type,
-          finalResourceNumber,
+          nextCustomerName || null,
+          nextCustomerPhone || null,
+          nextDailyPrice,
+          nextTotalPrice,
+          nextNotes || null,
+          nextStatus,
+          nextClientId,
+          nextAdultsCount,
+          nextChildrenCount,
+          nextPoolAdultPricePerDay,
+          nextPoolChildPricePerDay,
+          nextResourceNumber,
+          nextStartDate,
+          nextEndDate,
           groupId,
-          finalEndDate,
-          finalStartDate
+          nextVehiclePlate,
+          nextPrecioTarifa,
+          nextDesglose == null ? null : JSON.stringify(nextDesglose),
+          nextMotivoAjuste
         ]
       );
 
-      if (conflictCheck.rows.length > 0) {
-        return res.status(409).json({
-          error: 'resource_conflict',
-          message: 'La unidad seleccionada ya está ocupada en ese rango de fechas'
-        });
-      }
+      const updatedRow = updateResult.rows[0];
+      if (!esUnidadDeSombra) return { updatedRow, adicionalesAsociados: 0, incluidos: null };
 
-      nextResourceNumber = finalResourceNumber;
-      nextStartDate = finalStartDate;
-      nextEndDate = finalEndDate;
-    }
-
-    let nextPrecioTarifa = current.precio_tarifa ?? null;
-    let nextDesglose = current.desglose ?? null;
-    let nextMotivoAjuste = current.motivo_ajuste ?? null;
-    if (current.service_type !== 'pileta') {
-      const precio = await tarifas.precioAlEditar(queryTarifas, establishmentId, current, req.body, {
-        recalcular: resourceChanged || startDateChanged || endDateChanged,
-        desde: tarifas.fechaISO(nextStartDate),
-        hasta: tarifas.fechaISO(nextEndDate),
-        resourceNumber: nextResourceNumber
+      // Los incluidos acompanan a la carpa: se cancelan o se mueven con ella.
+      const cancelada = updatedRow.status === 'cancelled' && current.status !== 'cancelled';
+      const sync = await incluidos.sincronizarIncluidos(q, establishmentId, updatedRow, {
+        cancelada,
+        fechasCambiaron: !cancelada && (startDateChanged || endDateChanged)
       });
-      if (precio.error) {
-        return res.status(400).json({ error: precio.error });
+      if (sync.error) return sync;
+      let cambios = null;
+      if (req.body.incluidos && !cancelada) {
+        cambios = await incluidos.modificarIncluidos(q, est, updatedRow, req.body.incluidos);
+        if (cambios.error) return cambios;
       }
-      nextDailyPrice = precio.dailyPrice;
-      nextTotalPrice = precio.totalPrice;
-      nextPrecioTarifa = precio.precioTarifa;
-      nextDesglose = precio.desglose;
-      nextMotivoAjuste = precio.motivoAjuste;
-    }
-
-    const updateResult = await pool.query(
-      'UPDATE reservation_groups SET customer_name = $1, customer_phone = $2, daily_price = $3, total_price = $4, notes = $5, status = $6, client_id = $7, adults_count = $8, children_count = $9, pool_adult_price_per_day = $10, pool_child_price_per_day = $11, resource_number = $12, start_date = $13, end_date = $14, vehicle_plate = $16, precio_tarifa = $17, desglose = $18, motivo_ajuste = $19, updated_at = NOW() WHERE id = $15 RETURNING id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate, precio_tarifa, desglose, motivo_ajuste',
-      [
-        nextCustomerName || null,
-        nextCustomerPhone || null,
-        nextDailyPrice,
-        nextTotalPrice,
-        nextNotes || null,
-        nextStatus,
-        nextClientId,
-        nextAdultsCount,
-        nextChildrenCount,
-        nextPoolAdultPricePerDay,
-        nextPoolChildPricePerDay,
-        nextResourceNumber,
-        nextStartDate,
-        nextEndDate,
-        groupId,
-        nextVehiclePlate,
-        nextPrecioTarifa,
-        nextDesglose == null ? null : JSON.stringify(nextDesglose),
-        nextMotivoAjuste
-      ]
-    );
-
-    const updatedRow = updateResult.rows[0];
+      return { updatedRow, adicionalesAsociados: sync.adicionalesAsociados, incluidos: cambios };
+    });
+    if (r.error) return responderFalla(res, r);
+    const updatedRow = r.updatedRow;
 
     // Ya no eliminamos de tabla reservations - solo actualizamos status en reservation_groups
 
-    return res.json({
-      group: {
+    const group = {
         id: updatedRow.id,
         serviceType: updatedRow.service_type,
         resourceNumber: updatedRow.resource_number,
@@ -1601,8 +1727,17 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
         vehiclePlate: updatedRow.vehicle_plate || null,
         precioTarifa: updatedRow.precio_tarifa ?? null,
         desglose: updatedRow.desglose ?? null,
-        motivoAjuste: updatedRow.motivo_ajuste ?? null
-      }
+        motivoAjuste: updatedRow.motivo_ajuste ?? null,
+        incluidaEnReservaId: updatedRow.incluida_en_reserva_id ?? null,
+        vinculo: updatedRow.vinculo ?? null
+    };
+
+    // `reservationGroup` es el nombre que usa produccion: se devuelven los dos.
+    return res.json({
+      group,
+      reservationGroup: group,
+      adicionalesAsociados: r.adicionalesAsociados,
+      incluidos: r.incluidos
     });
   } catch (error) {
     console.error('Error updating reservation group', error);
@@ -1921,6 +2056,25 @@ app.post('/api/reservation-groups/:id/guests', authenticateToken, async (req, re
       return res.status(400).json({ error: 'missing_fields' });
     }
 
+    // Junto con la reserva: cuantas personas tiene y su pase incluido, si hay.
+    const est = (await pool.query('SELECT * FROM establishments WHERE id = $1', [establishmentId])).rows[0];
+    const reserva = (await pool.query(
+      `SELECT rg.id, rg.service_type,
+              (SELECT COUNT(*)::int FROM reservation_guests g WHERE g.reservation_group_id = rg.id) AS personas,
+              (SELECT p.id FROM reservation_groups p
+               WHERE p.incluida_en_reserva_id = rg.id AND p.vinculo = 'incluido' AND p.service_type = 'pileta' AND p.status = 'active'
+               LIMIT 1) AS pase_incluido_id
+       FROM reservation_groups rg WHERE rg.id = $1`,
+      [groupId]
+    )).rows[0];
+
+    if (
+      reglasIncluidos.UNIDADES_DE_SOMBRA.includes(reserva.service_type) &&
+      Number(reserva.personas || 0) >= reglasIncluidos.maxPersonas(est)
+    ) {
+      return res.status(400).json({ error: 'too_many_people', max: reglasIncluidos.maxPersonas(est) });
+    }
+
     const result = await pool.query(
       'INSERT INTO reservation_guests (establishment_id, reservation_group_id, full_name, document_number, age, birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, full_name, document_number, age, birth_date, created_at',
       [
@@ -1932,6 +2086,11 @@ app.post('/api/reservation-groups/:id/guests', authenticateToken, async (req, re
         birthDate || null
       ]
     );
+
+    // Si la carpa tiene pileta incluida con lugar y la persona esta completa, se le da pase.
+    if (reserva.pase_incluido_id) {
+      await conTransaccion((q) => incluidos.autoAsignar(q, est, groupId, result.rows[0].id));
+    }
 
     return res.status(201).json({ guest: mapGuest(result.rows[0]) });
   } catch (error) {
@@ -1949,7 +2108,7 @@ app.patch('/api/reservation-guests/:guestId', authenticateToken, async (req, res
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE user_id = $1',
       [req.user.id]
     );
 
@@ -1957,10 +2116,13 @@ app.patch('/api/reservation-guests/:guestId', authenticateToken, async (req, res
       return res.status(404).json({ error: 'not_found' });
     }
 
-    const establishmentId = estResult.rows[0].id;
+    const est = estResult.rows[0];
+    const establishmentId = est.id;
 
     const actual = await pool.query(
-      'SELECT id, full_name, document_number, age, birth_date FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+      `SELECT g.id, g.full_name, g.document_number, g.age, g.birth_date, g.reservation_group_id,
+              (SELECT COALESCE(array_agg(pp.pase_id), '{}') FROM pase_pileta_personas pp WHERE pp.guest_id = g.id) AS pases
+       FROM reservation_guests g WHERE g.id = $1 AND g.establishment_id = $2`,
       [guestId, establishmentId]
     );
 
@@ -1987,6 +2149,13 @@ app.patch('/api/reservation-guests/:guestId', authenticateToken, async (req, res
         guestId
       ]
     );
+
+    // La edad puede haber cambiado (adulto o menor) o la persona puede
+    // haber quedado completa para tener pase.
+    await conTransaccion(async (q) => {
+      await incluidos.recalcularPases(q, establishmentId, previo.pases || []);
+      await incluidos.autoAsignar(q, est, previo.reservation_group_id, guestId);
+    });
 
     return res.json({ guest: mapGuest(result.rows[0]) });
   } catch (error) {
@@ -2015,7 +2184,8 @@ app.delete('/api/reservation-guests/:guestId', authenticateToken, async (req, re
     const establishmentId = estResult.rows[0].id;
 
     const existe = await pool.query(
-      'SELECT id FROM reservation_guests WHERE id = $1 AND establishment_id = $2',
+      `SELECT g.id, (SELECT COALESCE(array_agg(pp.pase_id), '{}') FROM pase_pileta_personas pp WHERE pp.guest_id = g.id) AS pases
+       FROM reservation_guests g WHERE g.id = $1 AND g.establishment_id = $2`,
       [guestId, establishmentId]
     );
 
@@ -2028,12 +2198,40 @@ app.delete('/api/reservation-guests/:guestId', authenticateToken, async (req, re
       establishmentId
     ]);
 
+    // Su lugar en el pase se libero solo (ON DELETE CASCADE): recalcular el conteo.
+    const pases = existe.rows[0].pases || [];
+    if (pases.length) {
+      await conTransaccion((q) => incluidos.recalcularPases(q, establishmentId, pases));
+    }
+
     return res.json({ success: true });
   } catch (error) {
     console.error('Error deleting reservation guest', error);
     res.status(500).json({ error: 'server_error' });
   }
 });
+
+// Personas con pase de pileta. La logica vive en api/_incluidos/servicio.js.
+const pasePersonas = async (req, res) => {
+  try {
+    const paseId = Number.parseInt(req.params.id, 10);
+    if (!paseId || Number.isNaN(paseId) || paseId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+    const estResult = await pool.query('SELECT * FROM establishments WHERE user_id = $1', [req.user.id]);
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'establishment_not_found' });
+    }
+    const r = await conTransaccion((q) => incluidos.rutearPasePersonas(q, estResult.rows[0], paseId, req.method, req.body || {}));
+    return res.status(r.status).json(r.body);
+  } catch (error) {
+    console.error('Error con las personas del pase', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+};
+
+app.get('/api/reservation-groups/:id/pase-personas', authenticateToken, pasePersonas);
+app.put('/api/reservation-groups/:id/pase-personas', authenticateToken, pasePersonas);
 
 app.all(/^\/api\/tarifas(\/.*)?$/, authenticateToken, async (req, res) => {
   try {
