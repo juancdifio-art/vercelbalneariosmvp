@@ -19,9 +19,23 @@ import { vi } from 'vitest';
  */
 export const queryMock = vi.fn();
 
+// Las sentencias de control de una transaccion (BEGIN, COMMIT, ROLLBACK y el
+// bloqueo de una unidad) no consumen respuestas de queryMock: van a txMock.
+// Asi los tests preparan solo las consultas de datos, en el mismo orden de
+// siempre, aunque el endpoint corra dentro de una transaccion.
+export const txMock = vi.fn(async () => ({ rows: [] }));
+const esControl = (sql) => /^(BEGIN|COMMIT|ROLLBACK)$/.test(String(sql).trim()) || /pg_advisory_xact_lock/.test(String(sql));
+
 export class Pool {
   query(...args) {
     return queryMock(...args);
+  }
+
+  connect() {
+    return Promise.resolve({
+      query: (sql, params) => (esControl(sql) ? txMock(sql, params) : queryMock(sql, params)),
+      release() {}
+    });
   }
 
   end() {
