@@ -8,6 +8,7 @@ import { ServiceIcon, COLOR_SERVICIO } from './icons';
 import PersonasReserva from './PersonasReserva';
 import { formatearPatente } from '../lib/patente';
 import { lineasDesglose, formatearPesos } from '../lib/tarifas';
+import { etiquetaVinculo, pasesIncluidosPara } from '../lib/incluidos';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -27,7 +28,11 @@ function ReservationDetailsModal({
   onCancel,
   onAddPayment,
   onViewReservation,
-  onViewClient
+  onViewClient,
+  titular = null,
+  onVenderPase,
+  onIrALaReserva,
+  onCambioPases
 }) {
   if (!reservation) return null;
 
@@ -44,8 +49,6 @@ function ReservationDetailsModal({
     paidAmount,
     notes,
     status,
-    linkedParkingResourceNumber,
-    linkedParkingData,
     vehiclePlate,
     adultsCount,
     childrenCount,
@@ -130,6 +133,19 @@ function ReservationDetailsModal({
   };
 
   const daysCount = getDaysCount();
+
+  // Servicios incluidos y pases pagos de esta carpa. Van a nombre del mismo
+  // cliente, asi que salen de la lista de reservas del cliente.
+  const esUnidadDeSombra = serviceType === 'carpa' || serviceType === 'sombrilla';
+  const vinculadas = esUnidadDeSombra
+    ? reservasCliente.filter((g) => Number(g.incluidaEnReservaId) === Number(id) && g.status !== 'cancelled')
+    : [];
+  const pasesMax = pasesIncluidosPara(establishment, serviceType);
+  const paseIncluido = reservation.incluidos?.pileta
+    ? { id: reservation.incluidos.pileta.id, max: pasesMax }
+    : null;
+  const pasesPagosIds = (reservation.incluidos?.pasesPagos || []).map((p) => p.id);
+  const etiqueta = etiquetaVinculo(reservation);
 
   const balance =
     totalPrice !== null && totalPrice !== undefined && paidAmount !== null && paidAmount !== undefined
@@ -280,15 +296,25 @@ function ReservationDetailsModal({
                   </div>
                 </div>
               )}
-              {serviceType !== 'parking' && linkedParkingResourceNumber && (
+              {etiqueta && (
                 <div className="flex items-start gap-2">
-                  <span className="text-base">🚗</span>
+                  <span className="text-base">🔗</span>
                   <div className="flex-1">
-                    <p className="text-[10px] text-slate-500 font-medium">Estacionamiento</p>
-                    <p className="text-xs font-semibold text-slate-900">
-                      Plaza {linkedParkingResourceNumber}
-                      {linkedParkingData?.vehiclePlate ? ` · Patente ${formatearPatente(linkedParkingData.vehiclePlate)}` : ''}
-                    </p>
+                    <p className="text-xs font-semibold text-slate-900">{etiqueta}</p>
+                    {serviceType === 'pileta' && (
+                      <p className="text-[11px] text-slate-600">
+                        {reservation.paseNombres?.length ? `Con pase: ${reservation.paseNombres.join(', ')}` : 'Todavía no hay personas con este pase.'}
+                      </p>
+                    )}
+                    {onIrALaReserva && (
+                      <button
+                        type="button"
+                        className="mt-1 text-[11px] font-semibold text-cyan-700 hover:underline"
+                        onClick={() => onIrALaReserva(reservation)}
+                      >
+                        Ir a la reserva
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -380,7 +406,9 @@ function ReservationDetailsModal({
           {(() => {
             // otrasReservasVigentes vuelve a filtrar por clientId: si algun backend
             // ignorara el parametro, igual no se mezclan clientes.
-            const otras = otrasReservasVigentes(reservasCliente, reservation, hoyISO());
+            const idsVinculadas = new Set(vinculadas.map((g) => g.id));
+            const otras = otrasReservasVigentes(reservasCliente, reservation, hoyISO())
+              .filter((g) => !idsVinculadas.has(g.id) && Number(g.id) !== Number(reservation.incluidaEnReservaId));
             if (otras.length === 0) return null;
             return (
               <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -425,11 +453,67 @@ function ReservationDetailsModal({
             );
           })()}
 
-          <PersonasReserva
-            reservationGroupId={id}
-            adultsCount={adultsCount}
-            childrenCount={childrenCount}
-          />
+          {esUnidadDeSombra && (paseIncluido || vinculadas.length > 0 || (establishment?.hasPileta && status !== 'cancelled' && onVenderPase)) && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">Servicios incluidos</h3>
+                {establishment?.hasPileta && status !== 'cancelled' && onVenderPase && (
+                  <button
+                    type="button"
+                    onClick={() => onVenderPase(reservation)}
+                    className="inline-flex items-center rounded-lg bg-cyan-50 px-3 py-1.5 text-[11px] font-semibold text-cyan-700 border border-cyan-200 hover:bg-cyan-100"
+                  >
+                    🏊 Vender pase de pileta
+                  </button>
+                )}
+              </div>
+              <div className="space-y-1.5">
+                {paseIncluido && (
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800">
+                    🏊 Pileta incluida: {pasesMax} pases, {reservation.incluidos.pileta.asignados} asignados
+                  </p>
+                )}
+                {vinculadas.filter((g) => g.vinculo === 'incluido' && g.serviceType === 'parking').map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => onViewReservation && onViewReservation(g)}
+                    className="w-full flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs hover:border-cyan-300"
+                  >
+                    <span>🚗 Plaza {g.resourceNumber}{g.vehiclePlate ? ` · ${formatearPatente(g.vehiclePlate)}` : ''}</span>
+                    <span className={saldoDe(g) > 0 ? 'text-rose-700 font-semibold' : 'text-emerald-700 font-semibold'}>
+                      {saldoDe(g) > 0 ? `Debe ${formatPesos(saldoDe(g), 0)}` : 'Pagada'}
+                    </span>
+                  </button>
+                ))}
+                {vinculadas.filter((g) => g.vinculo === 'adicional').map((g) => (
+                  <button
+                    key={g.id}
+                    type="button"
+                    onClick={() => onViewReservation && onViewReservation(g)}
+                    className="w-full flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-left text-xs hover:border-amber-300"
+                  >
+                    <span>🏊 Pase pago{g.paseNombres?.length ? `: ${g.paseNombres.join(', ')}` : ''}</span>
+                    <span className={saldoDe(g) > 0 ? 'text-rose-700 font-semibold' : 'text-emerald-700 font-semibold'}>
+                      {saldoDe(g) > 0 ? `Debe ${formatPesos(saldoDe(g), 0)}` : 'Pagado'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {serviceType === 'pileta' && reservation.vinculo ? null : (
+            <PersonasReserva
+              reservationGroupId={id}
+              adultsCount={adultsCount}
+              childrenCount={childrenCount}
+              titular={esUnidadDeSombra ? titular : null}
+              paseIncluido={status !== 'cancelled' ? paseIncluido : null}
+              pasesPagos={pasesPagosIds}
+              onCambioPases={onCambioPases}
+            />
+          )}
 
           {/* Payments section */}
           <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -518,7 +602,7 @@ function ReservationDetailsModal({
           {/* Actions */}
           <div className="mt-4 flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
             <div className="flex gap-2 flex-wrap">
-              {status !== 'cancelled' && (
+              {status !== 'cancelled' && !(reservation.vinculo === 'incluido' && serviceType === 'pileta') && (
                 <>
                   <button
                     type="button"
@@ -527,13 +611,15 @@ function ReservationDetailsModal({
                   >
                     ✏️ Editar
                   </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center rounded-lg border border-red-300 px-4 py-2 text-xs font-semibold text-red-700 bg-white hover:bg-red-50 transition shadow-sm"
-                    onClick={() => onCancel(reservation)}
-                  >
-                    ❌ Cancelar reserva
-                  </button>
+                  {reservation.vinculo !== 'incluido' && (
+                    <button
+                      type="button"
+                      className="inline-flex items-center rounded-lg border border-red-300 px-4 py-2 text-xs font-semibold text-red-700 bg-white hover:bg-red-50 transition shadow-sm"
+                      onClick={() => onCancel(reservation)}
+                    >
+                      ❌ Cancelar reserva
+                    </button>
+                  )}
                 </>
               )}
               <button
@@ -541,7 +627,7 @@ function ReservationDetailsModal({
                 className="inline-flex items-center rounded-lg border border-blue-300 px-4 py-2 text-xs font-semibold text-blue-700 bg-white hover:bg-blue-50 transition shadow-sm"
                 // La reserva de la lista no trae el array de pagos: sin esto el
                 // comprobante salia sin fecha ni metodo de pago y sin historial.
-                onClick={() => generateReceipt({ ...reservation, payments }, establishment)}
+                onClick={() => generateReceipt({ ...reservation, payments, vinculadas }, establishment)}
               >
                 📄 Descargar comprobante
               </button>

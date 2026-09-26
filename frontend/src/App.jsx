@@ -834,6 +834,64 @@ function App() {
     }
   };
 
+  // Pase de pileta pago para personas de la carpa que no tienen pase.
+  const handleVenderPase = async (carpa) => {
+    const token = authToken || sessionStorage.getItem('authToken');
+    if (!token || !carpa) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const leer = async (url, clave) => {
+      try {
+        const res = await fetch(`${API_BASE_URL}${url}`, { headers });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data[clave] || [];
+      } catch (err) {
+        console.error('Error leyendo personas de la carpa', err);
+        return [];
+      }
+    };
+
+    const idsPases = [
+      carpa.incluidos?.pileta?.id,
+      ...(carpa.incluidos?.pasesPagos || []).map((p) => p.id)
+    ].filter(Boolean);
+    const [guests, ...conPase] = await Promise.all([
+      leer(`/api/reservation-groups/${carpa.id}/guests`, 'guests'),
+      ...idsPases.map((id) => leer(`/api/reservation-groups/${id}/pase-personas`, 'personas'))
+    ]);
+    const tienen = conPase.flat();
+    const titular = (clients || []).find((c) => Number(c.id) === Number(carpa.clientId));
+
+    const disponibles = [
+      ...(titular && !tienen.some((p) => Number(p.clientId) === Number(titular.id))
+        ? [{ key: `c-${titular.id}`, clientId: titular.id, fullName: titular.fullName, documentNumber: titular.documentNumber, birthDate: titular.birthDate }]
+        : []),
+      ...guests
+        .filter((g) => !tienen.some((p) => Number(p.guestId) === Number(g.id)))
+        .map((g) => ({ key: `g-${g.id}`, guestId: g.id, fullName: g.fullName, documentNumber: g.documentNumber, age: g.age, birthDate: g.birthDate }))
+    ];
+
+    setPoolPassError('');
+    setReservationDetailsModal(null);
+    setPoolPassForm({
+      startDate: carpa.startDate,
+      endDate: carpa.endDate,
+      clientId: carpa.clientId ?? null,
+      customerName: carpa.customerName || '',
+      customerPhone: carpa.customerPhone || '',
+      poolAdultsCount: '0',
+      poolChildrenCount: '0',
+      poolAdultPricePerDay: '',
+      poolChildPricePerDay: '',
+      initialPaymentAmount: '',
+      initialPaymentMethod: '',
+      incluidaEnReservaId: carpa.id,
+      carpaEtiqueta: `${carpa.serviceType === 'sombrilla' ? 'Sombrilla' : 'Carpa'} ${carpa.resourceNumber}`,
+      personasDisponibles: disponibles,
+      personasElegidas: []
+    });
+  };
+
   const handleOpenNewPoolPass = () => {
     const token = authToken || sessionStorage.getItem('authToken');
     if (token) {
@@ -943,7 +1001,9 @@ function App() {
           adultsCount: String(adults),
           childrenCount: String(children),
           poolAdultPricePerDay: poolAdultPricePerDay ? String(poolAdultPricePerDay) : '',
-          poolChildPricePerDay: poolChildPricePerDay ? String(poolChildPricePerDay) : ''
+          poolChildPricePerDay: poolChildPricePerDay ? String(poolChildPricePerDay) : '',
+          // Pase pago vendido desde una carpa: queda asociado a ella.
+          incluidaEnReservaId: form.incluidaEnReservaId || undefined
         })
       });
 
@@ -965,7 +1025,8 @@ function App() {
         return false;
       }
 
-      if (data && data.reservationGroup) {
+      const paseCreado = data && (data.group || data.reservationGroup);
+      if (paseCreado) {
         const method = (initialPaymentMethod || '').trim();
         const rawAmount = initialPaymentAmount;
 
@@ -981,7 +1042,7 @@ function App() {
               const todayStr = `${yyyy}-${mm}-${dd}`;
 
               const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.reservationGroup.id}/payments`,
+                `${API_BASE_URL}/api/reservation-groups/${paseCreado.id}/payments`,
                 {
                   method: 'POST',
                   headers: {
@@ -1007,8 +1068,26 @@ function App() {
         }
       }
 
+      // Las personas elegidas de la carpa quedan con este pase.
+      const elegidas = (form.personasDisponibles || []).filter((p) => (form.personasElegidas || []).includes(p.key));
+      if (paseCreado && form.incluidaEnReservaId && elegidas.length) {
+        const res = await fetch(`${API_BASE_URL}/api/reservation-groups/${paseCreado.id}/pase-personas`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            guestIds: elegidas.filter((p) => p.guestId).map((p) => p.guestId),
+            incluyeTitular: elegidas.some((p) => p.clientId)
+          })
+        });
+        if (!res.ok) {
+          const falla = await res.json().catch(() => null);
+          setError(`Se creó el pase, pero no se pudieron asignar las personas: ${mensajeErrorIncluidos(falla) || 'error del servidor'}.`);
+        }
+      }
+
       // Refresh the list from server
       await fetchReservationGroups(token);
+      if (form.incluidaEnReservaId) refrescarDatos();
 
       return true;
     } catch (err) {
@@ -1736,130 +1815,19 @@ function App() {
       return;
     }
 
-    let linkedParkingResourceNumber = null;
-    let linkedParkingData = null;
-
-    if (group.serviceType === 'carpa' || group.serviceType === 'sombrilla') {
-      const maybeParking = reservationGroups.find((g) => {
-        if (!g) return false;
-        if (g.serviceType !== 'parking') return false;
-        if (g.status === 'cancelled') return false;
-        if (g.startDate !== group.startDate || g.endDate !== group.endDate) return false;
-
-        if (
-          group.clientId &&
-          g.clientId &&
-          String(g.clientId) === String(group.clientId)
-        ) {
-          return true;
-        }
-
-        if (
-          group.customerName &&
-          g.customerName &&
-          g.customerName === group.customerName
-        ) {
-          return true;
-        }
-
-        return false;
-      });
-
-      if (maybeParking) {
-        linkedParkingResourceNumber = maybeParking.resourceNumber;
-        linkedParkingData = {
-          totalPrice: maybeParking.totalPrice,
-          paidAmount: maybeParking.paidAmount,
-          vehiclePlate: maybeParking.vehiclePlate || null
-        };
-      }
+    // El titular (datos de su ficha) puede ocupar un pase de pileta: hace
+    // falta la lista de clientes aunque la seccion no la haya cargado.
+    if (group.clientId && !(clients || []).some((c) => Number(c.id) === Number(group.clientId))) {
+      fetchClients(token);
     }
 
+    // Los servicios incluidos vienen con el vinculo real (incluidos /
+    // incluidaEnReservaId): ya no se busca una cochera "parecida".
     setReservationDetailsModal({
       ...group,
-      linkedParkingResourceNumber,
-      linkedParkingData,
       payments: [],
       paymentsLoading: true
     });
-
-    if (
-      linkedParkingResourceNumber === null &&
-      (group.serviceType === 'carpa' || group.serviceType === 'sombrilla') &&
-      group.startDate &&
-      group.endDate
-    ) {
-      (async () => {
-        try {
-          const params = new URLSearchParams();
-          params.set('service', 'parking');
-          params.set('status', 'active');
-          params.set('from', group.startDate);
-          params.set('to', group.endDate);
-
-          const url = `${API_BASE_URL}/api/reservation-groups?${params.toString()}`;
-
-          const response = await fetch(url, {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          });
-
-          if (!response.ok) {
-            return;
-          }
-
-          const data = await response.json();
-
-          if (!data || !Array.isArray(data.reservationGroups)) {
-            return;
-          }
-
-          const maybeParking = data.reservationGroups.find((g) => {
-            if (!g) return false;
-            if (g.serviceType !== 'parking') return false;
-            if (g.status === 'cancelled') return false;
-            if (g.startDate !== group.startDate || g.endDate !== group.endDate) return false;
-
-            if (
-              group.clientId &&
-              g.clientId &&
-              String(g.clientId) === String(group.clientId)
-            ) {
-              return true;
-            }
-
-            if (
-              group.customerName &&
-              g.customerName &&
-              g.customerName === group.customerName
-            ) {
-              return true;
-            }
-
-            return false;
-          });
-
-          if (maybeParking) {
-            setReservationDetailsModal((prev) =>
-              prev && prev.id === group.id
-                ? {
-                  ...prev,
-                  linkedParkingResourceNumber: maybeParking.resourceNumber,
-                  linkedParkingData: {
-                    totalPrice: maybeParking.totalPrice,
-                    paidAmount: maybeParking.paidAmount,
-                    vehiclePlate: maybeParking.vehiclePlate || null
-                  }
-                }
-                : prev
-            );
-          }
-        } catch (fetchErr) {
-          console.error('Error fetching linked parking reservation for details', fetchErr);
-        }
-      })();
-    }
 
     (async () => {
       try {
@@ -2603,6 +2571,13 @@ function App() {
                 setReservationDetailsModal(null);
               }}
               onViewReservation={(group) => setReservationDetailsModal(group)}
+              titular={(() => {
+                const c = (clients || []).find((x) => Number(x.id) === Number(reservationDetailsModal.clientId));
+                return c ? { id: c.id, fullName: c.fullName, documentNumber: c.documentNumber, birthDate: c.birthDate } : null;
+              })()}
+              onVenderPase={handleVenderPase}
+              onIrALaReserva={abrirReservaVinculada}
+              onCambioPases={refrescarDatos}
               onViewClient={(clientId) => {
                 // No se apilan los modales: se cierra la reserva y se abre la
                 // ficha. Desde la ficha, tocar una reserva hace el camino inverso.

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { getApiBaseUrl } from '../apiConfig';
 import { edadDe, avisoCantidad } from '../lib/personas';
+import { personaCompletaParaPase, mensajeErrorIncluidos } from '../lib/incluidos';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -9,8 +10,22 @@ const FORM_VACIO = { fullName: '', documentNumber: '', age: '', birthDate: '' };
 // La lista de personas de una reserva, con alta, edicion y borrado.
 // Solo el nombre es obligatorio: si el operador tiene el nombre y nada mas, lo
 // carga igual.
+//
+// Si la carpa incluye pileta (`paseIncluido`), cada persona tiene un tilde
+// "Pileta": los pases son con nombre y hay `max` (4 por carpa). Para tener pase
+// hacen falta nombre, DNI y edad. El titular (`titular`, de la ficha del
+// cliente) aparece primero y tambien puede ocupar un pase. Quien tiene un pase
+// pago asociado a la carpa (`pasesPagos`) lo muestra en vez del tilde.
 
-function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
+function PersonasReserva({
+  reservationGroupId,
+  adultsCount,
+  childrenCount,
+  titular = null,
+  paseIncluido = null,
+  pasesPagos = [],
+  onCambioPases
+}) {
   const [personas, setPersonas] = useState([]);
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState('');
@@ -19,6 +34,12 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
   // null = no hay formulario abierto. 'nuevo' = alta. Un numero = editando esa persona.
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState(FORM_VACIO);
+
+  // Personas del pase incluido y de los pases pagos asociados.
+  const [conPase, setConPase] = useState([]);
+  const [conPasePago, setConPasePago] = useState([]);
+  const paseId = paseIncluido?.id ?? null;
+  const pagosClave = (pasesPagos || []).join(',');
 
   const token = () => sessionStorage.getItem('authToken');
 
@@ -51,6 +72,31 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
   useEffect(() => {
     cargar();
   }, [cargar]);
+
+  const cargarPases = useCallback(async () => {
+    const t = token();
+    if (!t) return;
+    const personasDe = async (id) => {
+      const response = await fetch(`${API_BASE_URL}/api/reservation-groups/${id}/pase-personas`, {
+        headers: { Authorization: `Bearer ${t}` }
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.personas || [];
+    };
+    try {
+      setConPase(paseId ? await personasDe(paseId) : []);
+      const pagos = pagosClave ? pagosClave.split(',') : [];
+      const listas = await Promise.all(pagos.map((id) => personasDe(id)));
+      setConPasePago(listas.flat());
+    } catch (err) {
+      console.error('Error cargando pases de pileta', err);
+    }
+  }, [paseId, pagosClave]);
+
+  useEffect(() => {
+    cargarPases();
+  }, [cargarPases]);
 
   const abrirNueva = () => {
     setForm(FORM_VACIO);
@@ -102,12 +148,16 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
       });
 
       if (!response.ok) {
-        setError('No se pudo guardar la persona.');
+        const data = await response.json().catch(() => null);
+        setError(mensajeErrorIncluidos(data) || 'No se pudo guardar la persona.');
         return;
       }
 
       cerrarForm();
       await cargar();
+      // El servidor le da pase solo a una persona completa si queda lugar.
+      await cargarPases();
+      if (onCambioPases) onCambioPases();
     } catch (err) {
       console.error('Error guardando persona', err);
       setError('No se pudo conectar con el servidor.');
@@ -133,6 +183,8 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
       }
 
       await cargar();
+      await cargarPases();
+      if (onCambioPases) onCambioPases();
     } catch (err) {
       console.error('Error borrando persona', err);
       setError('No se pudo conectar con el servidor.');
@@ -142,6 +194,54 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
   };
 
   const aviso = avisoCantidad(adultsCount, childrenCount, personas);
+
+  const max = paseIncluido?.max ?? 0;
+  const asignados = conPase.length;
+  const esLaMisma = (fila) => (p) => (fila.esTitular ? p.clientId === fila.id : p.guestId === fila.id);
+  const tienePase = (fila) => conPase.some(esLaMisma(fila));
+  const tienePasePago = (fila) => conPasePago.some(esLaMisma(fila));
+
+  const alternarPase = async (fila) => {
+    const t = token();
+    if (!t || !paseId) return;
+    const guestIds = conPase.filter((p) => p.guestId).map((p) => p.guestId);
+    let incluyeTitular = conPase.some((p) => p.clientId);
+    if (fila.esTitular) {
+      incluyeTitular = !incluyeTitular;
+    } else if (guestIds.includes(fila.id)) {
+      guestIds.splice(guestIds.indexOf(fila.id), 1);
+    } else {
+      guestIds.push(fila.id);
+    }
+
+    setGuardando(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/reservation-groups/${paseId}/pase-personas`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+        body: JSON.stringify({ guestIds, incluyeTitular })
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) {
+        setError(mensajeErrorIncluidos(data) || 'No se pudo cambiar el pase de pileta.');
+        return;
+      }
+      setConPase(data?.personas || []);
+      setError('');
+      if (onCambioPases) onCambioPases();
+    } catch (err) {
+      console.error('Error cambiando el pase de pileta', err);
+      setError('No se pudo conectar con el servidor.');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // El titular va primero, con los datos de su ficha; despues los acompanantes.
+  const filas = [
+    ...(titular ? [{ ...titular, esTitular: true }] : []),
+    ...personas.map((p) => ({ ...p, esTitular: false }))
+  ];
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
@@ -168,6 +268,12 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
         </p>
       )}
 
+      {paseIncluido && (
+        <p className="mb-3 rounded-lg bg-cyan-50 border border-cyan-200 px-3 py-2 text-[11px] text-cyan-900">
+          {asignados} de {max} pases asignados
+        </p>
+      )}
+
       {error && (
         <p className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-[11px] text-red-700">
           {error}
@@ -180,17 +286,26 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
         <p className="text-[11px] text-slate-500">Todavía no hay personas cargadas en esta reserva.</p>
       )}
 
-      {personas.length > 0 && (
+      {filas.length > 0 && (
         <ul className="flex flex-col gap-2 mb-3">
-          {personas.map((persona) => {
+          {filas.map((persona) => {
             const edad = edadDe(persona);
+            const conPaseIncluido = paseIncluido ? tienePase(persona) : false;
+            const conPago = tienePasePago(persona);
+            const completa = personaCompletaParaPase(persona);
+            const sinLugar = !conPaseIncluido && asignados >= max;
             return (
               <li
-                key={persona.id}
+                key={persona.esTitular ? `titular-${persona.id}` : persona.id}
                 className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-slate-900 truncate">{persona.fullName}</p>
+                  <p className="text-xs font-semibold text-slate-900 truncate">
+                    <span>{persona.fullName}</span>
+                    {persona.esTitular && (
+                      <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">Titular</span>
+                    )}
+                  </p>
                   <p className="text-[10px] text-slate-500">
                     {[
                       edad !== null ? `${edad} años` : null,
@@ -199,25 +314,52 @@ function PersonasReserva({ reservationGroupId, adultsCount, childrenCount }) {
                       .filter(Boolean)
                       .join(' · ') || 'Sin más datos'}
                   </p>
+                  {paseIncluido && !conPago && !completa && (
+                    <p className="text-[10px] text-amber-700">
+                      {persona.esTitular
+                        ? 'Completá DNI y fecha de nacimiento en la ficha del cliente para darle pase.'
+                        : 'Completá DNI y edad para darle pase.'}
+                    </p>
+                  )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
-                  <button
-                    type="button"
-                    aria-label={`Editar ${persona.fullName}`}
-                    onClick={() => abrirEdicion(persona)}
-                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    ✏️
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Borrar ${persona.fullName}`}
-                    disabled={guardando}
-                    onClick={() => borrar(persona)}
-                    className="rounded-lg px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
-                  >
-                    ❌
-                  </button>
+                  {conPago && (
+                    <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">Pase pago</span>
+                  )}
+                  {paseIncluido && !conPago && (
+                    <label className="flex items-center gap-1 text-[11px] text-slate-700">
+                      <input
+                        type="checkbox"
+                        aria-label={`Pase de pileta para ${persona.fullName}`}
+                        checked={conPaseIncluido}
+                        disabled={guardando || (!conPaseIncluido && (!completa || sinLugar))}
+                        onChange={() => alternarPase(persona)}
+                        className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-2 focus:ring-cyan-500"
+                      />
+                      <span>Pileta</span>
+                    </label>
+                  )}
+                  {!persona.esTitular && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`Editar ${persona.fullName}`}
+                        onClick={() => abrirEdicion(persona)}
+                        className="rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
+                      >
+                        ✏️
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Borrar ${persona.fullName}`}
+                        disabled={guardando}
+                        onClick={() => borrar(persona)}
+                        className="rounded-lg px-2 py-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                      >
+                        ❌
+                      </button>
+                    </>
+                  )}
                 </div>
               </li>
             );
