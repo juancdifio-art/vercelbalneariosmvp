@@ -138,6 +138,9 @@ function App() {
   const refrescarDatos = () => setDatosVersion((v) => v + 1);
   // A que reserva abierta va el cliente que se esta creando desde un modal.
   const [clienteNuevoPara, setClienteNuevoPara] = useState(null);
+  // La carpa desde la que se abrio "Vender pase de pileta": al guardar o
+  // cerrar ese modal se vuelve a su detalle.
+  const [volverACarpa, setVolverACarpa] = useState(null);
 
   const {
     establishment,
@@ -812,6 +815,9 @@ function App() {
     ];
 
     setPoolPassError('');
+    // El detalle se cierra para no apilar modales; al guardar o cerrar el
+    // pase se vuelve a esta carpa.
+    setVolverACarpa(carpa);
     setReservationDetailsModal(null);
     setPoolPassForm({
       startDate: carpa.startDate,
@@ -1717,6 +1723,26 @@ function App() {
     }
   };
 
+  // Vuelve a abrir el detalle de una reserva con sus datos al dia (por ejemplo,
+  // con el pase pago que se le acaba de vender). Si no se puede traer del
+  // servidor, se abre con lo que ya se tenia.
+  const reabrirReserva = async (reserva) => {
+    if (!reserva) return;
+    const token = authToken || sessionStorage.getItem('authToken');
+    let fresca = null;
+    try {
+      const params = new URLSearchParams({ service: reserva.serviceType, from: reserva.startDate, to: reserva.endDate });
+      const res = await fetch(`${API_BASE_URL}/api/reservation-groups?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        fresca = (data.reservationGroups || []).find((g) => Number(g.id) === Number(reserva.id)) || null;
+      }
+    } catch (err) {
+      console.error('Error actualizando la reserva', err);
+    }
+    handleViewReservationDetails(fresca || reserva);
+  };
+
   const handleViewReservationDetails = (group) => {
     if (!group) return;
     const token = authToken || sessionStorage.getItem('authToken');
@@ -2558,7 +2584,14 @@ function App() {
               parseLocalDateFromInput={parseLocalDateFromInput}
               onChangeForm={setPoolPassForm}
               onSave={handleSavePoolPass}
-              onClose={() => setPoolPassForm(null)}
+              onClose={() => {
+                setPoolPassForm(null);
+                // Abierto desde una carpa: se vuelve a su detalle.
+                if (volverACarpa) {
+                  reabrirReserva(volverACarpa);
+                  setVolverACarpa(null);
+                }
+              }}
             />
           )}
 
