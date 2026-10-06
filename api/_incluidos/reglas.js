@@ -114,15 +114,62 @@ function normalizarPersonas(personas, titular) {
         documentNumber: textoONull(p.documentNumber),
         age: edad !== null && edad >= 0 ? edad : null,
         birthDate: textoONull(p.birthDate),
-        pileta: Boolean(p.pileta)
+        pileta: Boolean(p.pileta),
+        // Un pase incluido o uno pago, nunca los dos: gana el incluido.
+        pasePago: Boolean(p.pasePago) && !p.pileta
       };
     });
   return {
     personas: lista,
     titular: titular
-      ? { documentNumber: textoONull(titular.documentNumber), birthDate: textoONull(titular.birthDate), pileta: Boolean(titular.pileta) }
+      ? {
+        documentNumber: textoONull(titular.documentNumber),
+        birthDate: textoONull(titular.birthDate),
+        pileta: Boolean(titular.pileta),
+        pasePago: Boolean(titular.pasePago) && !titular.pileta
+      }
       : null
   };
+}
+
+// Precio por dia del pase de pileta pago que se vende en el alta.
+function normalizarPasePago(pasePago) {
+  if (!pasePago) return null;
+  const precioAdulto = numero(pasePago.precioAdultoPorDia) ?? 0;
+  const precioMenor = numero(pasePago.precioMenorPorDia) ?? 0;
+  if (![precioAdulto, precioMenor].every((n) => Number.isFinite(n) && n >= 0)) return { error: 'precio_invalido' };
+  return { precioAdulto, precioMenor };
+}
+
+// El pago de la cuenta: un monto y un medio. Sin monto no hay pago.
+function normalizarPago(pago) {
+  if (!pago || pago.monto === undefined || pago.monto === null || pago.monto === '') return null;
+  const monto = Number(String(pago.monto).replace(',', '.'));
+  if (!Number.isFinite(monto) || monto < 0) return { error: 'pago_invalido' };
+  if (monto === 0) return null;
+  const metodo = texto(pago.metodo);
+  if (!metodo) return { error: 'payment_method_required' };
+  return { monto, metodo };
+}
+
+const centavos = (n) => Math.round(Number(n) * 100);
+
+// Un pago de la cuenta se imputa en orden (la carpa, las cocheras, la pileta
+// paga) hasta cubrir el saldo de cada reserva. No se puede pagar de mas.
+function repartirPago(monto, items) {
+  let resto = centavos(monto);
+  const totalSaldo = items.reduce((suma, it) => suma + Math.max(0, centavos(it.saldo)), 0);
+  if (resto > totalSaldo) return { error: 'pago_excede_total' };
+  const partes = [];
+  for (const it of items) {
+    if (resto <= 0) break;
+    const saldo = Math.max(0, centavos(it.saldo));
+    if (saldo === 0) continue;
+    const parte = Math.min(saldo, resto);
+    partes.push({ id: it.id, monto: parte / 100 });
+    resto -= parte;
+  }
+  return partes;
 }
 
 const hayIncluidos = (pedido) => Boolean(pedido && (pedido.pileta || pedido.cocheras.length));
@@ -160,6 +207,9 @@ module.exports = {
   validarTope,
   normalizarPedido,
   normalizarPersonas,
+  normalizarPasePago,
+  normalizarPago,
+  repartirPago,
   hayIncluidos,
   validarEdicionIncluido
 };

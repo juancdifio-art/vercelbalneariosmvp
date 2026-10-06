@@ -66,7 +66,8 @@ describe('POST reservation-groups con incluidos', () => {
     expect(res.body.group.id).toBe(60);
     expect(res.body.incluidos).toEqual({
       pileta: { id: 501, asignados: 0 },
-      cocheras: [{ id: 502, plaza: 5, vehiclePlate: 'AB123CD', totalPrice: '700000' }]
+      cocheras: [{ id: 502, plaza: 5, vehiclePlate: 'AB123CD', totalPrice: '700000' }],
+      pasePago: null
     });
     expect(txSql()).toEqual(['BEGIN', 'COMMIT']);
   });
@@ -318,5 +319,82 @@ describe('POST de carpa con personas cargadas en el alta', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('too_many_people');
+  });
+});
+
+describe('cuenta unica', () => {
+  const cuenta = (filas) => {
+    queryMock.mockResolvedValueOnce({ rows: [] }); // FOR UPDATE de la carpa
+    queryMock.mockResolvedValueOnce({ rows: filas }); // saldos
+  };
+
+  it('el alta registra un solo pago repartido entre la carpa y la cochera', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    queryMock.mockResolvedValueOnce({ rows: [] }); // sin solapamiento
+    sinTarifas();
+    queryMock.mockResolvedValueOnce({ rows: [{ ...CARPA, total_price: '150000' }] }); // INSERT carpa
+    queryMock.mockResolvedValueOnce({ rows: [] }); // plaza 5 libre
+    sinTarifas();
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 502, service_type: 'parking', resource_number: 5, total_price: '70000' }] });
+    cuenta([
+      { id: 60, service_type: 'carpa', client_id: 7, total: '150000', pagado: '0' },
+      { id: 502, service_type: 'parking', client_id: 7, total: '70000', pagado: '0' }
+    ]);
+    queryMock.mockResolvedValueOnce({ rows: [] }); // pago de la carpa
+    queryMock.mockResolvedValueOnce({ rows: [] }); // pago de la cochera
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', token).send({
+      ...alta, totalPrice: 150000,
+      incluidos: { cocheras: [{ plaza: 5, vehiclePlate: 'AB123CD', precio: { cobrado: 70000 } }] },
+      pagoInicial: { monto: 200000, metodo: 'transfer' }
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.pago).toEqual({ pagos: [{ reservationGroupId: 60, amount: 150000 }, { reservationGroupId: 502, amount: 50000 }], saldoTotal: 20000 });
+    expect(res.body.group.paidAmount).toBe(150000);
+    const pagos = queryMock.mock.calls.filter(([sql]) => /INSERT INTO reservation_payments/.test(sql));
+    expect(pagos.map(([, p]) => [p[1], p[2], p[4]])).toEqual([[60, 150000, 'transfer'], [502, 50000, 'transfer']]);
+    expect(txSql()).toEqual(['BEGIN', 'COMMIT']);
+  });
+
+  it('un pago mayor al total no guarda nada', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    sinTarifas();
+    queryMock.mockResolvedValueOnce({ rows: [{ ...CARPA, total_price: '150000' }] });
+    cuenta([{ id: 60, service_type: 'carpa', client_id: 7, total: '150000', pagado: '0' }]);
+
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', token)
+      .send({ ...alta, totalPrice: 150000, pagoInicial: { monto: 150001, metodo: 'cash' } });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ error: 'pago_excede_total', saldo: 150000 });
+    expect(txSql()).toEqual(['BEGIN', 'ROLLBACK']);
+  });
+
+  it('un pago sin medio de pago se rechaza antes de tocar la base', async () => {
+    const res = await request(handler).post('/?route=reservation-groups').set('Authorization', token)
+      .send({ ...alta, pagoInicial: { monto: 1000, metodo: '' } });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('payment_method_required');
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
+  it('pago-cuenta cobra contra el saldo total de la carpa', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    cuenta([
+      { id: 60, service_type: 'carpa', client_id: 7, total: '150000', pagado: '150000' },
+      { id: 503, service_type: 'pileta', client_id: 7, total: '24000', pagado: '0' }
+    ]);
+    queryMock.mockResolvedValueOnce({ rows: [] }); // pago del pase
+
+    const res = await request(handler).post('/?route=reservation-groups/60/pago-cuenta').set('Authorization', token)
+      .send({ amount: 24000, paymentDate: '2026-10-06', method: 'cash', notes: 'resto' });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ pagos: [{ reservationGroupId: 503, amount: 24000 }], saldoTotal: 0 });
+    const pago = queryMock.mock.calls.find(([sql]) => /INSERT INTO reservation_payments/.test(sql));
+    expect(pago[1]).toEqual([1, 503, 24000, '2026-10-06', 'cash', 'resto']);
   });
 });

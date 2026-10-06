@@ -7,6 +7,7 @@
 
 const tarifas = require('../_tarifas/servicio');
 const reglas = require('./reglas');
+const { diasInclusivos } = require('../_tarifas/calculo');
 
 const { fechaISO } = tarifas;
 const falla = (status, error, message) => (message ? { status, error, message } : { status, error });
@@ -69,7 +70,7 @@ async function insertarReserva(query, d) {
     [
       d.estId, d.serviceType, d.resourceNumber, d.desde, d.hasta, d.customerName ?? null, d.customerPhone ?? null,
       d.dailyPrice ?? null, d.totalPrice ?? null, null, 'active', d.clientId ?? null, d.adults ?? 0, d.children ?? 0,
-      null, null, d.vehiclePlate ?? null, d.precioTarifa ?? null, d.desglose == null ? null : JSON.stringify(d.desglose),
+      d.poolAdultPrice ?? null, d.poolChildPrice ?? null, d.vehiclePlate ?? null, d.precioTarifa ?? null, d.desglose == null ? null : JSON.stringify(d.desglose),
       d.motivoAjuste ?? null, d.carpaId, d.vinculo
     ]
   );
@@ -151,9 +152,10 @@ async function crearIncluidos(query, est, carpa, pedido) {
 
 // Todo lo que acompana al alta de una carpa o sombrilla, en su transaccion:
 // los datos del titular (van a su ficha), los acompanantes, la pileta con los
-// pases elegidos y las cocheras. `personasPedido` sale de
-// reglas.normalizarPersonas; si es null, la pileta asigna sola al titular.
-async function completarAlta(query, est, carpa, pedido, personasPedido) {
+// pases elegidos, las cocheras y el pase de pileta pago. `personasPedido` sale
+// de reglas.normalizarPersonas (si es null, la pileta asigna sola al titular)
+// y `preciosPase` de reglas.normalizarPasePago.
+async function completarAlta(query, est, carpa, pedido, personasPedido, preciosPase = null) {
   const titular = personasPedido?.titular || null;
   if (titular && carpa.client_id && (titular.documentNumber || titular.birthDate)) {
     await query(
@@ -168,24 +170,30 @@ async function completarAlta(query, est, carpa, pedido, personasPedido) {
       'INSERT INTO reservation_guests (establishment_id, reservation_group_id, full_name, document_number, age, birth_date) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
       [est.id, carpa.id, p.fullName, p.documentNumber, p.age, p.birthDate]
     );
-    guests.push({ ...p, id: r.rows[0].id });
+    guests.push({ ...p, id: r.rows[0].id, guestId: r.rows[0].id });
   }
 
-  const resultado = { pileta: null, cocheras: [] };
+  // El titular como persona de un pase: sus datos salen de la ficha ya actualizada.
+  let titularPersona = null;
+  if ((titular?.pileta || titular?.pasePago) && carpa.client_id) {
+    const t = (await query(
+      'SELECT id, full_name, document_number, birth_date FROM clients WHERE id = $1 AND establishment_id = $2',
+      [carpa.client_id, est.id]
+    )).rows[0];
+    if (t) titularPersona = { clientId: t.id, fullName: t.full_name, documentNumber: t.document_number, birthDate: t.birth_date };
+  }
+  const elegidosPara = (clave) => [
+    ...(titularPersona && titular[clave] ? [titularPersona] : []),
+    ...guests.filter((g) => g[clave])
+  ];
+  const incompletasDe = (lista) => lista.filter((p) => !reglas.personaCompleta(p)).map((p) => p.fullName);
+
+  const resultado = { pileta: null, cocheras: [], pasePago: null };
 
   if (pedido.pileta && personasPedido) {
     // Los pases van exactamente a quienes se eligieron en el alta.
-    const elegidos = [];
-    if (titular?.pileta && carpa.client_id) {
-      const t = (await query(
-        'SELECT id, full_name, document_number, birth_date FROM clients WHERE id = $1 AND establishment_id = $2',
-        [carpa.client_id, est.id]
-      )).rows[0];
-      if (t) elegidos.push({ clientId: t.id, fullName: t.full_name, documentNumber: t.document_number, birthDate: t.birth_date });
-    }
-    for (const g of guests) if (g.pileta) elegidos.push({ ...g, guestId: g.id });
-
-    const incompletas = elegidos.filter((p) => !reglas.personaCompleta(p)).map((p) => p.fullName);
+    const elegidos = elegidosPara('pileta');
+    const incompletas = incompletasDe(elegidos);
     if (incompletas.length) return { status: 400, error: 'persona_incompleta', personas: incompletas };
     const max = reglas.pasesIncluidos(est, carpa.service_type);
     if (elegidos.length > max) return { status: 400, error: 'demasiados_pases', max };
@@ -203,7 +211,62 @@ async function completarAlta(query, est, carpa, pedido, personasPedido) {
     if (r.error) return r;
     resultado.cocheras = r.cocheras;
   }
+
+  // Pase de pileta pago para quienes quedaron fuera de los incluidos: precio
+  // por dia de adulto y de menor, por los dias de la carpa.
+  const conPasePago = personasPedido ? elegidosPara('pasePago') : [];
+  if (conPasePago.length) {
+    if (!est.has_pileta) return { status: 400, error: 'pileta_no_incluible' };
+    if (!preciosPase) return { status: 400, error: 'precio_pase_requerido' };
+    const incompletas = incompletasDe(conPasePago);
+    if (incompletas.length) return { status: 400, error: 'persona_incompleta', personas: incompletas };
+
+    const base = datosDeCarpa(carpa);
+    const { adults, children } = reglas.contarPorEdad(conPasePago);
+    const porDia = adults * preciosPase.precioAdulto + children * preciosPase.precioMenor;
+    const total = porDia * diasInclusivos(base.desde, base.hasta);
+    const pase = await insertarReserva(query, {
+      ...base, estId: est.id, serviceType: 'pileta', resourceNumber: 1, adults, children,
+      dailyPrice: porDia, totalPrice: total, poolAdultPrice: preciosPase.precioAdulto, poolChildPrice: preciosPase.precioMenor,
+      vinculo: 'adicional'
+    });
+    for (const p of conPasePago) await insertarPersona(query, est.id, pase.id, { guestId: p.guestId ?? null, clientId: p.clientId ?? null });
+    resultado.pasePago = { id: pase.id, personas: conPasePago.length, totalPrice: total };
+  }
   return resultado;
+}
+
+// Un pago contra la cuenta de una carpa: la carpa y todo lo suyo (cocheras y
+// pases). Se imputa en orden -la carpa, las cocheras, la pileta paga- y cada
+// parte queda como un pago de su reserva, asi los reportes por rubro no
+// cambian. `insertarPago(query, datos)` lo da cada API: local y produccion
+// guardan el medio de pago en columnas distintas.
+async function cobrarCuenta(query, estId, carpaId, pago, insertarPago) {
+  // Serializa dos cobros simultaneos de la misma cuenta.
+  await query('SELECT id FROM reservation_groups WHERE id = $1 AND establishment_id = $2 FOR UPDATE', [carpaId, estId]);
+  const filas = (await query(
+    `SELECT rg.id, rg.service_type, rg.client_id, COALESCE(rg.total_price, 0) AS total,
+            COALESCE((SELECT SUM(p.amount) FROM reservation_payments p WHERE p.reservation_group_id = rg.id), 0) AS pagado
+     FROM reservation_groups rg
+     WHERE rg.establishment_id = $1 AND rg.status = 'active' AND (rg.id = $2 OR rg.incluida_en_reserva_id = $2)
+     ORDER BY (rg.id = $2) DESC, (rg.service_type = 'parking') DESC, rg.id`,
+    [estId, carpaId]
+  )).rows;
+  if (!filas.some((f) => Number(f.id) === Number(carpaId))) return { status: 404, error: 'not_found' };
+
+  const items = filas.map((f) => ({ id: f.id, clientId: f.client_id, saldo: Number(f.total) - Number(f.pagado) }));
+  const saldoAntes = items.reduce((suma, it) => suma + Math.max(0, it.saldo), 0);
+  const partes = reglas.repartirPago(pago.monto, items);
+  if (partes.error) return { status: 400, error: partes.error, saldo: saldoAntes };
+
+  for (const parte of partes) {
+    const item = items.find((it) => it.id === parte.id);
+    await insertarPago(query, {
+      estId, reservationGroupId: parte.id, clientId: item.clientId ?? null,
+      amount: parte.monto, paymentDate: pago.fecha, method: pago.metodo, notes: pago.notas || null
+    });
+  }
+  return { pagos: partes.map((p) => ({ reservationGroupId: p.id, amount: p.monto })), saldoTotal: Math.round((saldoAntes - pago.monto) * 100) / 100 };
 }
 
 // ---------- Sincronizacion con la carpa ----------
@@ -545,6 +608,7 @@ module.exports = {
   plazaLibre,
   crearIncluidos,
   completarAlta,
+  cobrarCuenta,
   sincronizarIncluidos,
   modificarIncluidos,
   personasDePase,

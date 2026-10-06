@@ -35,7 +35,22 @@ function responderFalla(res, r) {
   if (r.message) body.message = r.message;
   if (r.personas) body.personas = r.personas;
   if (r.max !== undefined) body.max = r.max;
+  if (r.saldo !== undefined) body.saldo = r.saldo;
   return res.status(r.status || 400).json(body);
+}
+
+// Un pago de reserva. La base local guarda el medio en `method` (produccion,
+// en `payment_method`). Por eso _incluidos recibe esta funcion.
+function insertarPago(query, d) {
+  return query(
+    'INSERT INTO reservation_payments (establishment_id, reservation_group_id, client_id, amount, payment_date, method, notes) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+    [d.estId, d.reservationGroupId, d.clientId ?? null, d.amount, d.paymentDate, d.method, d.notes || null]
+  );
+}
+
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function ajustesIncluidos(row) {
@@ -1206,6 +1221,12 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: 'invalid_resource_number' });
     }
 
+    // Pase de pileta pago y pago de la cuenta: se validan antes de tocar la base.
+    const preciosPase = reglasIncluidos.normalizarPasePago(req.body.pasePago);
+    if (preciosPase && preciosPase.error) return res.status(400).json({ error: preciosPase.error });
+    const pagoInicial = reglasIncluidos.normalizarPago(req.body.pagoInicial);
+    if (pagoInicial && pagoInicial.error) return res.status(400).json({ error: pagoInicial.error });
+
     // Los servicios incluidos quedan a nombre de un cliente guardado.
     const pideIncluidos = Boolean(req.body.incluidos && (req.body.incluidos.pileta || (Array.isArray(req.body.incluidos.cocheras) && req.body.incluidos.cocheras.length)));
     if (pideIncluidos && !clientId) {
@@ -1419,10 +1440,18 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
       );
 
       const groupRow = groupInsert.rows[0];
-      if (!reglasIncluidos.hayIncluidos(pedido) && !personasPedido) return { groupRow };
-      const inc = await incluidos.completarAlta(q, est, groupRow, pedido, personasPedido);
-      if (inc.error) return inc;
-      return { groupRow, incluidos: inc };
+      let inc = null;
+      if (reglasIncluidos.hayIncluidos(pedido) || personasPedido) {
+        inc = await incluidos.completarAlta(q, est, groupRow, pedido, personasPedido, preciosPase);
+        if (inc.error) return inc;
+      }
+      // Un solo pago por toda la cuenta, repartido en orden.
+      let pago = null;
+      if (pagoInicial) {
+        pago = await incluidos.cobrarCuenta(q, establishmentId, groupRow.id, { ...pagoInicial, fecha: hoyISO() }, insertarPago);
+        if (pago.error) return pago;
+      }
+      return { groupRow, incluidos: inc, pago };
     });
     if (r.error) return responderFalla(res, r);
     const groupRow = r.groupRow;
@@ -1458,9 +1487,10 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
         motivoAjuste: groupRow.motivo_ajuste ?? null,
         incluidaEnReservaId: groupRow.incluida_en_reserva_id ?? null,
         vinculo: groupRow.vinculo ?? null,
-        paidAmount: 0
+        paidAmount: (r.pago?.pagos || []).filter((x) => x.reservationGroupId === groupRow.id).reduce((t, x) => t + x.amount, 0)
       },
-      incluidos: r.incluidos || null
+      incluidos: r.incluidos || null,
+      pago: r.pago || null
     });
   } catch (error) {
     console.error('Error creating reservation group', error);
@@ -2219,6 +2249,36 @@ app.delete('/api/reservation-guests/:guestId', authenticateToken, async (req, re
   } catch (error) {
     console.error('Error deleting reservation guest', error);
     res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Un pago contra el saldo total de una carpa con todo lo suyo, repartido en
+// orden: la carpa, las cocheras, la pileta paga.
+app.post('/api/reservation-groups/:id/pago-cuenta', authenticateToken, async (req, res) => {
+  try {
+    const carpaId = Number.parseInt(req.params.id, 10);
+    if (!carpaId || Number.isNaN(carpaId) || carpaId <= 0) {
+      return res.status(400).json({ error: 'invalid_id' });
+    }
+    const body = req.body || {};
+    const pago = reglasIncluidos.normalizarPago({ monto: body.amount, metodo: body.method });
+    if (!pago) return res.status(400).json({ error: 'missing_required_fields' });
+    if (pago.error) return res.status(400).json({ error: pago.error });
+
+    const estResult = await pool.query('SELECT * FROM establishments WHERE user_id = $1', [req.user.id]);
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'establishment_not_found' });
+    }
+    const r = await conTransaccion((q) => incluidos.cobrarCuenta(
+      q, estResult.rows[0].id, carpaId,
+      { ...pago, fecha: body.paymentDate || hoyISO(), notas: body.notes },
+      insertarPago
+    ));
+    if (r.error) return responderFalla(res, r);
+    return res.status(201).json(r);
+  } catch (error) {
+    console.error('Error cobrando la cuenta', error);
+    return res.status(500).json({ error: 'server_error' });
   }
 });
 

@@ -295,3 +295,24 @@ Cada etapa se puede mergear y probar por separado.
 11. Una sombrilla no muestra el tilde de pileta (ajuste en 0), pero sí el de cochera.
 12. El reporte de ocupación de la pileta cuenta las personas asignadas.
 13. Todo lo anterior en local (puerto 9000) y en Vercel.
+
+---
+
+## 10. Ampliaciones posteriores a la aprobación
+
+### 10.1 Personas en el alta (30/09)
+
+El modal de alta de carpa y sombrilla muestra una fila por persona (adultos + menores, sin pasar el tope). El titular va primero con los datos de su ficha; el DNI y la fecha de nacimiento que se completen ahí **se guardan en la ficha del cliente**. Los acompañantes (nombre, DNI, edad) son **de esa reserva**, no del cliente. Con "Incluye pileta", cada fila tiene un botón para darle o sacarle el pase; por defecto lo tienen los primeros con datos completos, hasta la cantidad de pases. Todo viaja en el POST de la carpa (`personas`, `titular`) y se guarda en su transacción (`completarAlta`).
+
+### 10.2 Cuenta única (06/10)
+
+Reemplaza la decisión G2 ("cada servicio se cobra por su lado").
+
+- **Pases pagos desde el alta.** Cada fila de persona tiene dos botones excluyentes: "Incluido" (hasta la cantidad de pases) y "Pase pago". Los dos piden DNI y edad. El pase pago no depende de que la carpa incluya pileta, solo de que el balneario tenga pileta.
+- **Precio del pase pago:** por día, uno para adulto y otro para menor (menor = menos de 18, por la edad de la fila). Total = (adultos × precio adulto + menores × precio menor) × días de la carpa. Cuando la pileta entre en tarifas, esos precios se cargan solos.
+- **Resumen de la cuenta** al final del modal: subtotal de la carpa, de la pileta paga y de cada cochera, y el total.
+- **Un solo pago**, parcial o total, por toda la cuenta. No puede superar el total.
+- **Reparto:** el pago se imputa en orden: la carpa, después las cocheras (por orden de alta) y al final la pileta paga. Cada parte queda como un pago de su reserva (`reservation_payments`), así los reportes por rubro no cambian.
+- **En el servidor:** el POST acepta `pasePago: { precioAdultoPorDia, precioMenorPorDia }`, `personas[].pasePago`, `titular.pasePago` y `pagoInicial: { monto, metodo }`. La carpa, sus servicios, el pase pago con sus personas y el pago van en la misma transacción.
+- **Pagos posteriores:** `POST /reservation-groups/:id/pago-cuenta` cobra contra el saldo total de la carpa con todo lo suyo y lo reparte en el mismo orden. El detalle de la carpa muestra ese saldo total. Las cocheras y los pases se siguen pudiendo pagar por separado.
+- **Columna del medio de pago:** local guarda `method` y producción `payment_method`. El reparto vive en `_incluidos` y cada API le pasa su propia función para insertar el pago.

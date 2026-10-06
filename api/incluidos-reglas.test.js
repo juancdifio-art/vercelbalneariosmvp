@@ -162,15 +162,51 @@ describe('normalizarPersonas', () => {
     ], { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true });
     expect(r).toEqual({
       personas: [
-        { fullName: 'Ana', documentNumber: '1', age: 40, birthDate: null, pileta: true },
-        { fullName: 'Beto', documentNumber: null, age: null, birthDate: null, pileta: false }
+        { fullName: 'Ana', documentNumber: '1', age: 40, birthDate: null, pileta: true, pasePago: false },
+        { fullName: 'Beto', documentNumber: null, age: null, birthDate: null, pileta: false, pasePago: false }
       ],
-      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true }
+      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true, pasePago: false }
     });
   });
 
   it('un titular sin datos no pide pase', () => {
     expect(normalizarPersonas([], { documentNumber: '', birthDate: '' }).titular)
-      .toEqual({ documentNumber: null, birthDate: null, pileta: false });
+      .toEqual({ documentNumber: null, birthDate: null, pileta: false, pasePago: false });
+  });
+});
+
+describe('cuenta unica', () => {
+  const { normalizarPasePago, normalizarPago, repartirPago, normalizarPersonas } = reglas;
+
+  it('una persona tiene pase incluido o pase pago, no los dos', () => {
+    const r = normalizarPersonas([{ fullName: 'Ana', pileta: true, pasePago: true }, { fullName: 'Beto', pasePago: true }], { pasePago: true });
+    expect(r.personas.map((p) => [p.pileta, p.pasePago])).toEqual([[true, false], [false, true]]);
+    expect(r.titular).toMatchObject({ pileta: false, pasePago: true });
+  });
+
+  it('precios del pase pago por dia', () => {
+    expect(normalizarPasePago({ precioAdultoPorDia: '5000', precioMenorPorDia: '' })).toEqual({ precioAdulto: 5000, precioMenor: 0 });
+    expect(normalizarPasePago(undefined)).toBeNull();
+    expect(normalizarPasePago({ precioAdultoPorDia: -1 })).toEqual({ error: 'precio_invalido' });
+  });
+
+  it('pago inicial: sin monto no hay pago; con monto hace falta el medio', () => {
+    expect(normalizarPago(undefined)).toBeNull();
+    expect(normalizarPago({ monto: '', metodo: 'cash' })).toBeNull();
+    expect(normalizarPago({ monto: '15000', metodo: 'cash' })).toEqual({ monto: 15000, metodo: 'cash' });
+    expect(normalizarPago({ monto: '15000', metodo: '' })).toEqual({ error: 'payment_method_required' });
+    expect(normalizarPago({ monto: 'abc', metodo: 'cash' })).toEqual({ error: 'pago_invalido' });
+  });
+
+  it('reparte el pago en orden hasta cubrir cada saldo', () => {
+    const items = [{ id: 60, saldo: 150000 }, { id: 502, saldo: 70000 }, { id: 503, saldo: 24000 }];
+    expect(repartirPago(200000, items)).toEqual([{ id: 60, monto: 150000 }, { id: 502, monto: 50000 }]);
+    expect(repartirPago(244000, items)).toEqual([{ id: 60, monto: 150000 }, { id: 502, monto: 70000 }, { id: 503, monto: 24000 }]);
+  });
+
+  it('saltea lo que ya esta pago y no deja pagar de mas', () => {
+    const items = [{ id: 60, saldo: 0 }, { id: 502, saldo: 70000 }];
+    expect(repartirPago(1000, items)).toEqual([{ id: 502, monto: 1000 }]);
+    expect(repartirPago(70001, items)).toEqual({ error: 'pago_excede_total' });
   });
 });

@@ -400,3 +400,94 @@ describe('completarAlta: personas cargadas en el alta', () => {
     expect(llamadas(query, /INSERT INTO pase_pileta_personas/)).toHaveLength(1);
   });
 });
+
+describe('completarAlta: pase de pileta pago', () => {
+  const { completarAlta } = servicio;
+  let proximoGuest;
+  const base = () => {
+    proximoGuest = 900;
+    return [
+      [/INSERT INTO reservation_groups/, (p) => [{ id: siguienteId++, service_type: p[1], total_price: p[8], vinculo: p[21] }]],
+      [/INSERT INTO reservation_guests/, () => [{ id: proximoGuest++ }]],
+      [/SELECT id, full_name, document_number, birth_date FROM clients/, [{ id: 7, full_name: 'Lucia', document_number: '30111222', birth_date: '1990-05-01' }]]
+    ];
+  };
+  const personas = {
+    personas: [
+      { fullName: 'Ana', documentNumber: '1', age: 40, birthDate: null, pileta: false, pasePago: true },
+      { fullName: 'Beto', documentNumber: '2', age: 10, birthDate: null, pileta: false, pasePago: true }
+    ],
+    titular: { documentNumber: null, birthDate: null, pileta: false, pasePago: false }
+  };
+  const SIN_INCLUIDOS = { pileta: false, cocheras: [] };
+
+  it('crea el pase pago asociado con sus personas y su total por dia', async () => {
+    const query = fakeDb(base());
+    const r = await completarAlta(query, EST, CARPA, SIN_INCLUIDOS, personas, { precioAdulto: 5000, precioMenor: 3000 });
+
+    expect(r.error).toBeUndefined();
+    // La carpa va del 10 al 20 de enero: 11 dias. (1 adulto x 5000 + 1 menor x 3000) x 11.
+    expect(r.pasePago).toMatchObject({ personas: 2, totalPrice: 88000 });
+    const insert = llamadas(query, /INSERT INTO reservation_groups/)[0][1];
+    expect(insert).toEqual(expect.arrayContaining(['pileta', 'adicional', 88000, 8000, 5000, 3000]));
+    expect(insert[12]).toBe(1); // adultos
+    expect(insert[13]).toBe(1); // menores
+    expect(llamadas(query, /INSERT INTO pase_pileta_personas/)).toHaveLength(2);
+  });
+
+  it('sin los precios por dia no se puede vender el pase', async () => {
+    const r = await completarAlta(fakeDb(base()), EST, CARPA, SIN_INCLUIDOS, personas, null);
+    expect(r).toMatchObject({ status: 400, error: 'precio_pase_requerido' });
+  });
+
+  it('sin pileta en el balneario no se vende', async () => {
+    const r = await completarAlta(fakeDb(base()), { ...EST, has_pileta: false }, CARPA, SIN_INCLUIDOS, personas, { precioAdulto: 1, precioMenor: 1 });
+    expect(r).toMatchObject({ status: 400, error: 'pileta_no_incluible' });
+  });
+
+  it('una persona sin DNI o edad no puede tener pase pago', async () => {
+    const incompletas = { ...personas, personas: [{ fullName: 'Beto', documentNumber: null, age: 10, birthDate: null, pileta: false, pasePago: true }] };
+    const r = await completarAlta(fakeDb(base()), EST, CARPA, SIN_INCLUIDOS, incompletas, { precioAdulto: 1, precioMenor: 1 });
+    expect(r).toMatchObject({ status: 400, error: 'persona_incompleta', personas: ['Beto'] });
+  });
+});
+
+describe('cobrarCuenta: un pago repartido entre la carpa y lo suyo', () => {
+  const { cobrarCuenta } = servicio;
+  const CUENTA = [
+    { id: 60, service_type: 'carpa', client_id: 7, total: '150000', pagado: '0' },
+    { id: 502, service_type: 'parking', client_id: 7, total: '70000', pagado: '0' },
+    { id: 501, service_type: 'pileta', client_id: 7, total: '0', pagado: '0' },
+    { id: 503, service_type: 'pileta', client_id: 7, total: '24000', pagado: '0' }
+  ];
+  const db = (filas = CUENTA) => fakeDb([[/AS pagado/, filas]]);
+  const PAGO = { monto: 200000, metodo: 'cash', fecha: '2026-10-06', notas: '' };
+
+  it('cubre primero la carpa, despues la cochera y al final la pileta paga', async () => {
+    const insertarPago = vi.fn();
+    const r = await cobrarCuenta(db(), 1, 60, PAGO, insertarPago);
+
+    expect(r.error).toBeUndefined();
+    expect(insertarPago.mock.calls.map(([, p]) => [p.reservationGroupId, p.amount])).toEqual([[60, 150000], [502, 50000]]);
+    expect(insertarPago.mock.calls[0][1]).toMatchObject({ estId: 1, clientId: 7, paymentDate: '2026-10-06', method: 'cash' });
+    expect(r.saldoTotal).toBe(44000);
+  });
+
+  it('no deja pagar mas que el saldo de la cuenta', async () => {
+    const insertarPago = vi.fn();
+    const r = await cobrarCuenta(db(), 1, 60, { ...PAGO, monto: 300000 }, insertarPago);
+    expect(r).toMatchObject({ status: 400, error: 'pago_excede_total', saldo: 244000 });
+    expect(insertarPago).not.toHaveBeenCalled();
+  });
+
+  it('descuenta lo que ya se habia pagado', async () => {
+    const insertarPago = vi.fn();
+    const filas = [{ ...CUENTA[0], pagado: '150000' }, CUENTA[1]];
+    await cobrarCuenta(db(filas), 1, 60, { ...PAGO, monto: 1000 }, insertarPago);
+    expect(insertarPago.mock.calls.map(([, p]) => [p.reservationGroupId, p.amount])).toEqual([[502, 1000]]);
+  });
+
+  it('una carpa que no existe es 404', async () => {
+    expect(await cobrarCuenta(db([]), 1, 60, PAGO, vi.fn())).toMatchObject({ status: 404, error: 'not_found' });
+  });
+});
