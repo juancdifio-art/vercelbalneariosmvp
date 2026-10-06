@@ -624,22 +624,6 @@ function App() {
     setSuccess(`La carpa ${accion}. Tiene ${n === 1 ? '1 pase de pileta pago asociado' : `${n} pases de pileta pagos asociados`}: revisalo.`);
   };
 
-  // Pago inicial de una reserva recien creada. Si falla, la reserva queda igual
-  // y el pago se carga despues desde el detalle.
-  const pagarAlCrear = async (token, groupId, monto, metodo) => {
-    const amountNum = Number.parseFloat(String(monto ?? '').replace(',', '.'));
-    if (!metodo || !groupId || Number.isNaN(amountNum) || amountNum <= 0) return;
-    try {
-      await fetch(`${API_BASE_URL}/api/reservation-groups/${groupId}/payments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ amount: String(monto), paymentDate: format(new Date(), 'yyyy-MM-dd'), method: metodo, notes: '' })
-      });
-    } catch (err) {
-      console.error('Error creating initial payment for included parking', err);
-    }
-  };
-
   const handleSaveCarpaReservationRange = async (
     carpaNumero,
     startDateStr,
@@ -691,8 +675,8 @@ function App() {
       cocheras,
       personas,
       titular,
-      initialPaymentAmount,
-      initialPaymentMethod
+      pasePago,
+      pagoInicial
     } = extra;
 
     try {
@@ -719,7 +703,11 @@ function App() {
           incluidos: armarIncluidos({ incluyePileta, cocheras }),
           // Acompanantes de esta reserva y datos del titular (van a su ficha).
           personas,
-          titular
+          titular,
+          // Pases de pileta pagos (precio por dia) y un solo pago por toda la
+          // cuenta: el servidor lo reparte y lo guarda en la misma transaccion.
+          pasePago,
+          pagoInicial
         })
       });
 
@@ -751,59 +739,6 @@ function App() {
           }
           return [...prev, data.group];
         });
-
-        const method = (initialPaymentMethod || '').trim();
-        const rawAmount = initialPaymentAmount;
-
-        if (method && rawAmount !== undefined && rawAmount !== null && rawAmount !== '') {
-          const amountNum = Number.parseFloat(String(rawAmount).replace(',', '.'));
-
-          if (!Number.isNaN(amountNum) && amountNum > 0) {
-            try {
-              const today = new Date();
-              const yyyy = today.getFullYear();
-              const mm = String(today.getMonth() + 1).padStart(2, '0');
-              const dd = String(today.getDate()).padStart(2, '0');
-              const todayStr = `${yyyy}-${mm}-${dd}`;
-
-              const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.group.id}/payments`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                  },
-                  body: JSON.stringify({
-                    amount: String(rawAmount),
-                    paymentDate: todayStr,
-                    method,
-                    notes: ''
-                  })
-                }
-              );
-
-              if (paymentResponse.ok) {
-                const paymentData = await paymentResponse.json();
-                if (paymentData.payment) {
-                  setReservationGroups((prev) =>
-                    prev.map((g) =>
-                      g.id === data.group.id
-                        ? {
-                          ...g,
-                          paidAmount:
-                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                        }
-                        : g
-                    )
-                  );
-                }
-              }
-            } catch (paymentErr) {
-              console.error('Error creating initial payment for carpa reservation', paymentErr);
-            }
-          }
-        }
       }
 
       // Actualizamos el mapa local para que el rango quede pintado sin esperar a un refetch
@@ -818,16 +753,12 @@ function App() {
       });
       setCarpaReservationError('');
 
-      // Pago inicial de cada cochera incluida, con el id que devolvio el servidor.
       const cocherasCreadas = data?.incluidos?.cocheras || [];
-      for (let i = 0; i < cocherasCreadas.length; i += 1) {
-        await pagarAlCrear(token, cocherasCreadas[i].id, cocheras?.[i]?.pagoMonto, cocheras?.[i]?.pagoMetodo);
-      }
       if (cocherasCreadas.length) {
         const plazas = cocherasCreadas.map((c) => c.plaza).join(', ');
         setSuccess(`Reserva guardada. ${cocherasCreadas.length === 1 ? 'Cochera en la plaza' : 'Cocheras en las plazas'} ${plazas}.`);
       }
-      if (cocherasCreadas.length || data?.incluidos?.pileta) {
+      if (cocherasCreadas.length || data?.incluidos?.pileta || data?.incluidos?.pasePago || data?.pago) {
         refrescarDatos();
       }
       // La ficha del titular pudo haberse completado con DNI y fecha de nacimiento.
@@ -1157,8 +1088,8 @@ function App() {
       cocheras,
       personas,
       titular,
-      initialPaymentAmount,
-      initialPaymentMethod
+      pasePago,
+      pagoInicial
     } = extra;
 
     try {
@@ -1185,7 +1116,11 @@ function App() {
           incluidos: armarIncluidos({ incluyePileta, cocheras }),
           // Acompanantes de esta reserva y datos del titular (van a su ficha).
           personas,
-          titular
+          titular,
+          // Pases de pileta pagos (precio por dia) y un solo pago por toda la
+          // cuenta: el servidor lo reparte y lo guarda en la misma transaccion.
+          pasePago,
+          pagoInicial
         })
       });
 
@@ -1217,59 +1152,6 @@ function App() {
           }
           return [...prev, data.group];
         });
-
-        const method = (initialPaymentMethod || '').trim();
-        const rawAmount = initialPaymentAmount;
-
-        if (method && rawAmount !== undefined && rawAmount !== null && rawAmount !== '') {
-          const amountNum = Number.parseFloat(String(rawAmount).replace(',', '.'));
-
-          if (!Number.isNaN(amountNum) && amountNum > 0) {
-            try {
-              const today = new Date();
-              const yyyy = today.getFullYear();
-              const mm = String(today.getMonth() + 1).padStart(2, '0');
-              const dd = String(today.getDate()).padStart(2, '0');
-              const todayStr = `${yyyy}-${mm}-${dd}`;
-
-              const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.group.id}/payments`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                  },
-                  body: JSON.stringify({
-                    amount: String(rawAmount),
-                    paymentDate: todayStr,
-                    method,
-                    notes: ''
-                  })
-                }
-              );
-
-              if (paymentResponse.ok) {
-                const paymentData = await paymentResponse.json();
-                if (paymentData.payment) {
-                  setReservationGroups((prev) =>
-                    prev.map((g) =>
-                      g.id === data.group.id
-                        ? {
-                          ...g,
-                          paidAmount:
-                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                        }
-                        : g
-                    )
-                  );
-                }
-              }
-            } catch (paymentErr) {
-              console.error('Error creating initial payment for sombrilla reservation', paymentErr);
-            }
-          }
-        }
       }
 
       setSombrillasReservations((prev) => {
@@ -1283,16 +1165,12 @@ function App() {
       });
       setSombrillaReservationError('');
 
-      // Pago inicial de cada cochera incluida, con el id que devolvio el servidor.
       const cocherasCreadas = data?.incluidos?.cocheras || [];
-      for (let i = 0; i < cocherasCreadas.length; i += 1) {
-        await pagarAlCrear(token, cocherasCreadas[i].id, cocheras?.[i]?.pagoMonto, cocheras?.[i]?.pagoMetodo);
-      }
       if (cocherasCreadas.length) {
         const plazas = cocherasCreadas.map((c) => c.plaza).join(', ');
         setSuccess(`Reserva guardada. ${cocherasCreadas.length === 1 ? 'Cochera en la plaza' : 'Cocheras en las plazas'} ${plazas}.`);
       }
-      if (cocherasCreadas.length || data?.incluidos?.pileta) {
+      if (cocherasCreadas.length || data?.incluidos?.pileta || data?.incluidos?.pasePago || data?.pago) {
         refrescarDatos();
       }
       // La ficha del titular pudo haberse completado con DNI y fecha de nacimiento.
@@ -1744,8 +1622,24 @@ function App() {
     }
   };
 
-  const handleAddPaymentForReservationGroup = (group) => {
+  // `cuenta` ({ total, pagado }) viene del detalle de una carpa con servicios
+  // asociados: el pago se cobra contra el saldo de toda la cuenta.
+  const handleAddPaymentForReservationGroup = (group, cuenta = null) => {
     if (!group) return;
+    if (cuenta) {
+      const saldo = cuenta.total - cuenta.pagado;
+      setReservationPaymentModal({
+        ...group,
+        esCuenta: true,
+        totalPrice: cuenta.total,
+        paidAmount: cuenta.pagado,
+        tempAmount: saldo > 0 ? saldo.toFixed(2) : '',
+        tempPaymentDate: format(new Date(), 'yyyy-MM-dd'),
+        tempMethod: '',
+        tempNotes: ''
+      });
+      return;
+    }
 
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -1954,6 +1848,38 @@ function App() {
         );
         return;
       }
+    }
+
+    // Pago de la cuenta de una carpa: el servidor lo reparte en orden entre
+    // la carpa, las cocheras y la pileta paga.
+    if (reservationPaymentModal.esCuenta) {
+      try {
+        setReservationPaymentSaving(true);
+        const response = await fetch(`${API_BASE_URL}/api/reservation-groups/${id}/pago-cuenta`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ amount: String(tempAmount ?? ''), paymentDate: tempPaymentDate, method: tempMethod, notes: tempNotes || '' })
+        });
+        if (!response.ok) {
+          const falla = await response.json().catch(() => null);
+          // eslint-disable-next-line no-alert
+          window.alert(mensajeErrorIncluidos(falla) || 'No se pudo registrar el pago.');
+          return;
+        }
+        setReservationPaymentModal(null);
+        refrescarDatos();
+        await fetchReservationGroups(token, {
+          service: reservationFilterService,
+          status: reservationFilterStatus,
+          from: reservationFilterFrom,
+          to: reservationFilterTo
+        });
+      } catch (err) {
+        console.error('Error registrando el pago de la cuenta', err);
+      } finally {
+        setReservationPaymentSaving(false);
+      }
+      return;
     }
 
     try {
@@ -2165,12 +2091,6 @@ function App() {
       setReservationEditError('');
       const respuesta = await response.json().catch(() => null);
 
-      // Pago inicial de cada cochera agregada, con el id que devolvio el servidor.
-      const cocherasCreadas = respuesta?.incluidos?.cocheras || [];
-      const nuevasDelForm = reservationEditModal.cocheras || [];
-      for (let i = 0; i < cocherasCreadas.length; i += 1) {
-        await pagarAlCrear(token, cocherasCreadas[i].id, nuevasDelForm[i]?.pagoMonto, nuevasDelForm[i]?.pagoMetodo);
-      }
       avisarPasesPagos(respuesta?.adicionalesAsociados, 'cambió de fechas');
       if (cambios || ['carpa', 'sombrilla'].includes(serviceType)) {
         refrescarDatos();
@@ -2584,8 +2504,8 @@ function App() {
                 handleCancelReservationGroup(group);
                 setReservationDetailsModal(null);
               }}
-              onAddPayment={(group) => {
-                handleAddPaymentForReservationGroup(group);
+              onAddPayment={(group, cuenta) => {
+                handleAddPaymentForReservationGroup(group, cuenta);
                 setReservationDetailsModal(null);
               }}
               onViewReservation={(group) => setReservationDetailsModal(group)}

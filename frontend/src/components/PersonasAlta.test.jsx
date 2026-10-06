@@ -89,7 +89,7 @@ describe('personas en el alta de la carpa', () => {
     await userEvent.click(guardar);
 
     const extra = onSaveRange.mock.calls[0][3];
-    expect(extra.titular).toEqual({ documentNumber: '30111222', birthDate: '1990-05-01', pileta: true });
-    expect(extra.personas).toEqual([{ fullName: 'Ana', documentNumber: '1', age: '40', pileta: true }]);
+    expect(extra.titular).toEqual({ documentNumber: '30111222', birthDate: '1990-05-01', pileta: true, pasePago: false });
+    expect(extra.personas).toEqual([{ fullName: 'Ana', documentNumber: '1', age: '40', pileta: true, pasePago: false }]);
   });
 });

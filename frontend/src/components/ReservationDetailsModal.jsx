@@ -147,6 +147,16 @@ function ReservationDetailsModal({
   const pasesPagosIds = (reservation.incluidos?.pasesPagos || []).map((p) => p.id);
   const etiqueta = etiquetaVinculo(reservation);
 
+  // La cuenta de la carpa: ella y todo lo suyo. Un pago se cobra contra este
+  // saldo y el servidor lo reparte (la carpa, las cocheras, la pileta paga).
+  const monto = (v) => Number.parseFloat(v || 0) || 0;
+  const cuenta = vinculadas.length > 0
+    ? {
+      total: monto(totalPrice) + vinculadas.reduce((suma, g) => suma + monto(g.totalPrice), 0),
+      pagado: monto(paidAmount) + vinculadas.reduce((suma, g) => suma + monto(g.paidAmount), 0)
+    }
+    : null;
+
   const balance =
     totalPrice !== null && totalPrice !== undefined && paidAmount !== null && paidAmount !== undefined
       ? Number(totalPrice) - Number(paidAmount)
@@ -467,6 +477,12 @@ function ReservationDetailsModal({
                   </button>
                 )}
               </div>
+              {cuenta && (
+                <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900">
+                  Saldo de la cuenta: {formatPesos(cuenta.total - cuenta.pagado, 0)}
+                  <span className="font-normal text-emerald-800"> (total {formatPesos(cuenta.total, 0)}, pagado {formatPesos(cuenta.pagado, 0)})</span>
+                </p>
+              )}
               <div className="space-y-1.5">
                 {paseIncluido && (
                   <p className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800">
@@ -523,7 +539,7 @@ function ReservationDetailsModal({
                 <button
                   type="button"
                   className="inline-flex items-center rounded-full bg-gradient-to-r from-emerald-500 to-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white shadow-md hover:shadow-lg hover:from-emerald-600 hover:to-emerald-700 transition-all"
-                  onClick={() => onAddPayment(reservation)}
+                  onClick={() => onAddPayment(reservation, cuenta)}
                 >
                   <span className="mr-1">+</span>
                   Agendar pago

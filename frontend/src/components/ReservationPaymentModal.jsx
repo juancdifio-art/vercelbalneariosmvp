@@ -85,7 +85,7 @@ function ReservationPaymentModal({
               <span className="text-[11px] font-semibold text-emerald-600">${paidAmountNum.toFixed(2)}</span>
             </div>
             <div className="border-t border-slate-300 pt-1.5 flex justify-between items-center">
-              <span className="text-[11px] font-semibold text-slate-700">Saldo pendiente:</span>
+              <span className="text-[11px] font-semibold text-slate-700">{paymentModal.esCuenta ? 'Saldo de la cuenta:' : 'Saldo pendiente:'}</span>
               <span className={`text-sm font-bold ${balance > 0.01 ? 'text-red-600' : 'text-emerald-600'}`}>
                 ${balance.toFixed(2)}
               </span>

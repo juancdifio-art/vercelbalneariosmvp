@@ -82,3 +82,24 @@ describe('detalle de un servicio incluido', () => {
     expect(onIrALaReserva).toHaveBeenCalledWith(expect.objectContaining({ id: 501 }));
   });
 });
+
+describe('cuenta de la carpa en el detalle', () => {
+  it('muestra el saldo de toda la cuenta y cobra contra ese saldo', async () => {
+    const onAddPayment = vi.fn();
+    render(<ReservationDetailsModal reservation={CARPA} {...props({ onAddPayment })} />);
+
+    // Carpa 100.000 + cochera 700.000 + pase pago 5.000, sin pagos.
+    expect(await screen.findByText(/Saldo de la cuenta: \$805\.000/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Agendar pago/ }));
+    expect(onAddPayment).toHaveBeenCalledWith(expect.objectContaining({ id: 60 }), { total: 805000, pagado: 0 });
+  });
+
+  it('una reserva sin nada asociado se cobra como siempre', async () => {
+    const onAddPayment = vi.fn();
+    const suelta = { ...DEL_CLIENTE[2], vinculo: null, incluidaEnReservaId: null };
+    render(<ReservationDetailsModal reservation={suelta} {...props({ onAddPayment })} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Agendar pago/ }));
+    expect(onAddPayment).toHaveBeenCalledWith(expect.objectContaining({ id: 502 }), null);
+  });
+});

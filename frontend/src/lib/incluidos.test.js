@@ -198,8 +198,8 @@ describe('filas de personas en el alta', () => {
       acompanantes: [{ fullName: 'Ana', documentNumber: '1', age: '40' }, { fullName: '' }]
     });
     expect(armarPersonasAlta(filas)).toEqual({
-      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true },
-      personas: [{ fullName: 'Ana', documentNumber: '1', age: '40', pileta: true }]
+      titular: { documentNumber: '30111222', birthDate: '1990-05-01', pileta: true, pasePago: false },
+      personas: [{ fullName: 'Ana', documentNumber: '1', age: '40', pileta: true, pasePago: false }]
     });
   });
 
@@ -207,5 +207,68 @@ describe('filas de personas en el alta', () => {
     const filas = filasDePersonas({ adultsCount: '2', childrenCount: '0', cliente: null, customerName: 'Juan', acompanantes: [{ fullName: 'Ana' }], max: 6 });
     expect(filas[0]).toMatchObject({ esTitular: true, fullName: 'Juan', sinFicha: true });
     expect(armarPersonasAlta(filas).titular).toBeUndefined();
+  });
+});
+
+describe('cuenta unica en el alta', () => {
+  const { filasDePersonas, armarPersonasAlta, cuentaDelAlta, mensajeErrorIncluidos: mensaje } = incluidosLib;
+  const cliente = { id: 7, fullName: 'Lucia', documentNumber: '30111222', birthDate: '1990-05-01' };
+  const acompanantes = [
+    { fullName: 'Ana', documentNumber: '1', age: '40' },
+    { fullName: 'Dani', documentNumber: '4', age: '30', pasePago: true, pileta: false },
+    { fullName: 'Eli', documentNumber: '5', age: '10', pasePago: true, pileta: false },
+    { fullName: 'Beto', documentNumber: '', age: '10', pasePago: true }
+  ];
+  const filas = () => filasDePersonas({
+    adultsCount: '3', childrenCount: '2', cliente, acompanantes, max: 6, pases: 4, incluyePileta: true, ventaPases: true
+  });
+
+  it('una fila tiene pase incluido o pase pago, y el pago pide datos completos', () => {
+    const f = filas();
+    expect(f.map((x) => [x.pileta, x.pasePago])).toEqual([[true, false], [true, false], [false, true], [false, true], [false, false]]);
+  });
+
+  it('sin pileta en el balneario no hay pase pago', () => {
+    const f = filasDePersonas({ adultsCount: '2', childrenCount: '0', cliente, acompanantes: [acompanantes[1]], max: 6, ventaPases: false });
+    expect(f[1].pasePago).toBe(false);
+  });
+
+  it('manda el pase pago de cada persona', () => {
+    const r = armarPersonasAlta(filas());
+    expect(r.titular).toEqual({ documentNumber: '30111222', birthDate: '1990-05-01', pileta: true, pasePago: false });
+    expect(r.personas[1]).toEqual({ fullName: 'Dani', documentNumber: '4', age: '30', pileta: false, pasePago: true });
+  });
+
+  it('arma la cuenta: cada item con su subtotal y el total', () => {
+    const cuenta = cuentaDelAlta({
+      etiquetaUnidad: 'Carpa 12', totalUnidad: 150000, filas: filas(), pasesIncluidos: 4,
+      precios: { adulto: '5000', menor: '3000' }, dias: 3,
+      cocheras: [{ plaza: 45, total: 70000 }]
+    });
+    expect(cuenta.lineas).toEqual([
+      { clave: 'unidad', etiqueta: 'Carpa 12', monto: 150000 },
+      { clave: 'pileta-incluida', etiqueta: 'Pileta incluida (2 de 4 pases)', monto: null },
+      { clave: 'pileta-paga', etiqueta: 'Pileta paga (2 pases)', monto: 24000 },
+      { clave: 'cochera-0', etiqueta: 'Cochera plaza 45', monto: 70000 }
+    ]);
+    expect(cuenta.total).toBe(244000);
+    expect(cuenta.pasePago).toEqual({ cantidad: 2, adultos: 1, menores: 1, total: 24000, faltaPrecio: false });
+  });
+
+  it('avisa si falta el precio de los pases pagos', () => {
+    const cuenta = cuentaDelAlta({ etiquetaUnidad: 'Carpa 12', totalUnidad: 1000, filas: filas(), pasesIncluidos: 4, precios: { adulto: '5000', menor: '' }, dias: 3, cocheras: [] });
+    expect(cuenta.pasePago.faltaPrecio).toBe(true);
+  });
+
+  it('sin pileta ni cocheras la cuenta es solo la unidad', () => {
+    const cuenta = cuentaDelAlta({ etiquetaUnidad: 'Sombrilla 3', totalUnidad: 500, filas: [], pasesIncluidos: 0, precios: {}, dias: 1, cocheras: [] });
+    expect(cuenta.lineas).toEqual([{ clave: 'unidad', etiqueta: 'Sombrilla 3', monto: 500 }]);
+    expect(cuenta.total).toBe(500);
+  });
+
+  it('traduce los errores del cobro', () => {
+    expect(mensaje({ error: 'pago_excede_total', saldo: 244000 })).toBe('El pago no puede superar el saldo de la cuenta ($244.000).');
+    expect(mensaje({ error: 'payment_method_required' })).toMatch(/medio de pago/);
+    expect(mensaje({ error: 'precio_pase_requerido' })).toMatch(/precio por día/);
   });
 });

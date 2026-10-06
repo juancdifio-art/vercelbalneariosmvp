@@ -7,38 +7,11 @@ import { numerosDeUnidades } from '../lib/unidades';
 import PrecioReserva from './PrecioReserva';
 import ServiciosIncluidosFields from './ServiciosIncluidosFields';
 import useCocherasIncluidas from '../hooks/useCocherasIncluidas';
-import { PRECIO_VACIO, aNumero, faltaMotivoAjuste } from '../lib/tarifas';
-import { maxPersonasPara, superaTope, filasDePersonas, armarPersonasAlta, pasesIncluidosPara } from '../lib/incluidos';
-import PersonasAltaFields from './PersonasAltaFields';
+import { PRECIO_VACIO, faltaMotivoAjuste } from '../lib/tarifas';
+import { maxPersonasPara, superaTope, armarPersonasAlta, pasesIncluidosPara, cuentaDelAlta } from '../lib/incluidos';
+import PersonasAltaFields, { filasDelAlta } from './PersonasAltaFields';
+import CuentaReserva, { montoDelPago } from './CuentaReserva';
 import { normalizarPatente } from '../lib/patente';
-
-// Función para formatear montos con separadores de miles (formato argentino)
-const formatCurrency = (value) => {
-  if (value === null || value === undefined || Number.isNaN(value)) return '0,00';
-  return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
-// Función para formatear el valor del input con separadores de miles (versión optimizada)
-const formatInputValue = (value) => {
-  if (!value && value !== 0) return '';
-  const numStr = String(value).replace(/\D/g, '');
-  if (!numStr) return '';
-  // Agregar puntos como separadores de miles manualmente (más rápido que toLocaleString)
-  let result = '';
-  for (let i = numStr.length - 1, count = 0; i >= 0; i--, count++) {
-    if (count > 0 && count % 3 === 0) {
-      result = '.' + result;
-    }
-    result = numStr[i] + result;
-  }
-  return result;
-};
-
-// Función para parsear el valor formateado a número
-const parseInputValue = (formattedValue) => {
-  if (!formattedValue) return '';
-  return formattedValue.replace(/\./g, '');
-};
 
 function SombrillaReservationModal({
   form,
@@ -104,29 +77,23 @@ function SombrillaReservationModal({
     daysCount = Math.floor(diffMs / msPerDay) + 1;
   }
 
-  // El total sale del recuadro de precio: la tarifa, o lo que cargo el encargado.
-  const totalPreview = aNumero(precio.cobrado);
   const hayCocheras = cocheras.length > 0;
-  const parkingTotalPreview = hayCocheras ? cocherasAnalisis.total : null;
 
-  const combinedTotalPreview = (() => {
-    const base = totalPreview !== null ? totalPreview : 0;
-    const parking = hayCocheras && parkingTotalPreview !== null ? parkingTotalPreview : 0;
-    const sum = base + parking;
-    return Number.isFinite(sum) && sum > 0 ? sum : null;
-  })();
-
-  // Validación de pagos que no excedan el total
-  const paymentExceedsTotal = initialPaymentAmount && totalPreview !== null &&
-    Number.parseFloat(initialPaymentAmount) > totalPreview;
-
-
-  // Validación de método de pago faltante
-  const paymentAmountNum = initialPaymentAmount ? Number.parseFloat(String(initialPaymentAmount).replace(',', '.')) : 0;
-  const paymentMissingMethod = paymentAmountNum > 0 && !initialPaymentMethod;
-
-
-  const hasPaymentError = paymentExceedsTotal || paymentMissingMethod;
+  // La cuenta de la reserva: la unidad, la pileta paga y cada cochera. Se
+  // cobra con un solo pago, que el servidor reparte en orden.
+  const filasPersonas = isReserved ? [] : filasDelAlta({ form, cliente: clienteElegido, establishment, serviceType: 'sombrilla' });
+  const pasesDeLaUnidad = pasesIncluidosPara(establishment, 'sombrilla');
+  const cuenta = cuentaDelAlta({
+    etiquetaUnidad: `Sombrilla ${sombrillaNumero}`,
+    totalUnidad: precio.cobrado,
+    filas: filasPersonas,
+    pasesIncluidos: incluyePileta ? pasesDeLaUnidad : 0,
+    precios: form.pasePagoPrecios || {},
+    dias: daysCount,
+    cocheras: cocheras.map((c, i) => ({ plaza: cocherasAnalisis.efectivas[i], total: c.precio?.cobrado }))
+  });
+  const pagoAhora = montoDelPago(initialPaymentAmount);
+  const hasPaymentError = pagoAhora > cuenta.total || (pagoAhora > 0 && !initialPaymentMethod);
 
   // Una unidad ya elegida que choca con otra reserva en algun dia del periodo
   // no se guarda: antes, con estacionamiento, App la cambiaba por otra plaza
@@ -139,6 +106,7 @@ function SombrillaReservationModal({
   const faltaCliente = !isReserved && (Boolean(incluyePileta) || hayCocheras) && !clientId;
   const bloqueaGuardar = hasPaymentError || conflictoPrincipal || verificandoDisponibilidad ||
     cocherasAnalisis.bloquea || excedeTope || faltaCliente || faltaMotivoAjuste(precio) ||
+    cuenta.pasePago.faltaPrecio ||
     // Sin la cotizacion de las fechas actuales se guardaria el precio de las anteriores.
     Boolean(precio.cotizando);
 
@@ -388,7 +356,7 @@ function SombrillaReservationModal({
             <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
                 <span>💰</span>
-                <span>Precio y pago de sombrilla</span>
+                <span>Precio de la sombrilla</span>
               </h3>
               <div className="space-y-3">
                 <PrecioReserva
@@ -400,64 +368,6 @@ function SombrillaReservationModal({
                   onChange={cambiarPrecio('precio')}
                   titulo="Precio de la sombrilla"
                 />
-                <div className="border-t border-slate-200 pt-3 space-y-3">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora por sombrilla (ARS)</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formatInputValue(initialPaymentAmount)}
-                      onChange={(e) => {
-                        const rawValue = parseInputValue(e.target.value);
-                        onChangeForm((prev) =>
-                          prev
-                            ? {
-                              ...prev,
-                              initialPaymentAmount: rawValue
-                            }
-                            : prev
-                        );
-                      }}
-                      className={`rounded-lg border bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${paymentExceedsTotal ? 'border-red-500 bg-red-50' : 'border-slate-300'
-                        }`}
-                      placeholder="0"
-                    />
-                    {paymentExceedsTotal && (
-                      <p className="text-[10px] text-red-600 bg-red-50 rounded px-2 py-1">
-                        ⚠️ El pago no puede exceder el total de ${formatCurrency(totalPreview)}
-                      </p>
-                    )}
-                    {initialPaymentAmount && totalPreview !== null && !paymentExceedsTotal && Number.parseFloat(initialPaymentAmount) > 0 && (
-                      <p className="text-[10px] text-emerald-600 bg-emerald-50 rounded px-2 py-1">
-                        ✅ Pendiente: ${formatCurrency(totalPreview - Number.parseFloat(initialPaymentAmount || 0))}
-                      </p>
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Método de pago sombrilla</span>
-                    <select
-                      value={initialPaymentMethod || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onChangeForm((prev) =>
-                          prev
-                            ? {
-                              ...prev,
-                              initialPaymentMethod: value
-                            }
-                            : prev
-                        );
-                      }}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    >
-                      <option value="">Sin pago ahora</option>
-                      <option value="cash">Efectivo</option>
-                      <option value="transfer">Transferencia</option>
-                      <option value="card">Tarjeta de crédito</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </label>
-                </div>
               </div>
             </div>
           )}
@@ -476,19 +386,13 @@ function SombrillaReservationModal({
             />
           )}
 
-          {daysCount > 0 && combinedTotalPreview !== null && (
-            <div className="bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-xl border-2 border-emerald-200 p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">💰 Monto total</span>
-                <span className="text-2xl font-bold text-emerald-700">${formatCurrency(combinedTotalPreview)}</span>
-              </div>
-              {hayCocheras && (
-                <div className="mt-2 pt-2 border-t border-emerald-200 text-[10px] text-slate-600 space-y-0.5">
-                  <p>☂️ Sombrilla: ${totalPreview !== null ? formatCurrency(totalPreview) : '0,00'}</p>
-                  <p>🚗 Estacionamiento{cocheras.length > 1 ? ` (${cocheras.length} cocheras)` : ''}: ${parkingTotalPreview !== null ? formatCurrency(parkingTotalPreview) : '0,00'}</p>
-                </div>
-              )}
-            </div>
+          {!isReserved && (
+            <CuentaReserva
+              cuenta={cuenta}
+              monto={initialPaymentAmount}
+              metodo={initialPaymentMethod}
+              onChangeForm={onChangeForm}
+            />
           )}
 
           {/* Disponibilidad */}
@@ -503,10 +407,9 @@ function SombrillaReservationModal({
             </div>
           )}
 
-          {/* Mensajes de error de pago */}
-          {paymentMissingMethod && (
+          {cuenta.pasePago.faltaPrecio && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
-              ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para la sombrilla.
+              ⚠️ Cargá el precio por día de los pases de pileta pagos.
             </div>
           )}
           {excedeTope && (
@@ -547,20 +450,14 @@ function SombrillaReservationModal({
                     incluyePileta: Boolean(incluyePileta),
                     // Cada cochera con la plaza que se cotizo: lo cotizado es lo que se guarda.
                     cocheras: cocheras.map((c, i) => ({ ...c, plaza: cocherasAnalisis.efectivas[i], vehiclePlate: normalizarPatente(c.vehiclePlate) })),
-                    initialPaymentAmount,
-                    initialPaymentMethod,
+                    // Un solo pago por toda la cuenta.
+                    pagoInicial: pagoAhora > 0 ? { monto: initialPaymentAmount, metodo: initialPaymentMethod } : undefined,
+                    // Precio por dia de los pases de pileta pagos, si se vendio alguno.
+                    pasePago: cuenta.pasePago.cantidad > 0
+                      ? { precioAdultoPorDia: form.pasePagoPrecios?.adulto || '', precioMenorPorDia: form.pasePagoPrecios?.menor || '' }
+                      : undefined,
                     // Personas de esta reserva y datos del titular (van a su ficha).
-                    ...armarPersonasAlta(filasDePersonas({
-                      adultsCount,
-                      childrenCount,
-                      cliente: clienteElegido,
-                      customerName,
-                      titularDatos: form.titularDatos,
-                      acompanantes: form.acompanantes || [],
-                      max: maxPersonasPara(establishment),
-                      pases: pasesIncluidosPara(establishment, 'sombrilla'),
-                      incluyePileta: Boolean(incluyePileta)
-                    }))
+                    ...armarPersonasAlta(filasPersonas)
                   });
 
                   if (ok) {

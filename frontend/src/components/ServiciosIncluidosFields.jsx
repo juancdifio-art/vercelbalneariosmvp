@@ -6,13 +6,6 @@ import { cocheraVacia, pasesIncluidosPara } from '../lib/incluidos';
 
 const INPUT = 'rounded-lg border bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent';
 
-// Miles con puntos mientras se tipea; el estado guarda solo los digitos.
-const conPuntos = (valor) => {
-  const digitos = String(valor ?? '').replace(/\D/g, '');
-  return digitos ? Number(digitos).toLocaleString('es-AR') : '';
-};
-const soloDigitos = (texto) => String(texto ?? '').replace(/\D/g, '');
-
 /**
  * Pileta y cocheras incluidas en una carpa o sombrilla nueva.
  *
@@ -151,41 +144,6 @@ function ServiciosIncluidosFields({
                   onChange={(patch) => cambiarCochera(i, (c) => ({ precio: { ...(c.precio ?? PRECIO_VACIO), ...patch } }))}
                   titulo="Precio del estacionamiento"
                 />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora por estacionamiento (ARS)</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={conPuntos(cochera.pagoMonto)}
-                      onChange={(e) => cambiarCochera(i, { pagoMonto: soloDigitos(e.target.value) })}
-                      className={`${INPUT} ${analisis.pagoExcede[i] ? 'border-red-500 bg-red-50' : 'border-slate-300'}`}
-                      placeholder="0"
-                    />
-                    {analisis.pagoExcede[i] && (
-                      <p className="text-[10px] text-red-600 bg-red-50 rounded px-2 py-1">⚠️ El pago no puede exceder el total de la cochera.</p>
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Método de pago estacionamiento</span>
-                    <select
-                      value={cochera.pagoMetodo || ''}
-                      onChange={(e) => cambiarCochera(i, { pagoMetodo: e.target.value })}
-                      className={`${INPUT} border-slate-300`}
-                    >
-                      <option value="">Sin pago ahora</option>
-                      <option value="cash">Efectivo</option>
-                      <option value="transfer">Transferencia</option>
-                      <option value="card">Tarjeta de crédito</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </label>
-                </div>
-                {analisis.pagoSinMetodo[i] && (
-                  <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200">
-                    ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para el estacionamiento.
-                  </div>
-                )}
               </div>
             );
           })}

@@ -74,6 +74,17 @@ export function mensajeErrorIncluidos(data) {
       return `La reserva incluye ${data.max} pases de pileta.`;
     case 'persona_con_pase':
       return 'Esa persona ya tiene otro pase de pileta.';
+    case 'pago_excede_total':
+      return data.saldo !== undefined
+        ? `El pago no puede superar el saldo de la cuenta ($${Number(data.saldo).toLocaleString('es-AR')}).`
+        : 'El pago no puede superar el saldo de la cuenta.';
+    case 'payment_method_required':
+      return 'Elegí el medio de pago.';
+    case 'pago_invalido':
+      return 'El monto del pago no es válido.';
+    case 'precio_pase_requerido':
+    case 'precio_invalido':
+      return 'Cargá el precio por día de los pases de pileta pagos.';
     case 'motivo_ajuste_required':
       return 'El total es distinto al de la tarifa: falta el motivo del ajuste.';
     case 'rango_invalido':
@@ -221,7 +232,7 @@ export function cambiosIncluidos(modal, plazasCocheras = []) {
  */
 export function filasDePersonas({
   adultsCount, childrenCount, cliente, customerName = '', titularDatos, acompanantes = [],
-  max = MAX_PERSONAS_POR_DEFECTO, pases = 0, incluyePileta = false
+  max = MAX_PERSONAS_POR_DEFECTO, pases = 0, incluyePileta = false, ventaPases = false
 }) {
   const total = Math.min((entero(adultsCount) || 0) + (entero(childrenCount) || 0), max);
   if (total <= 0) return [];
@@ -233,9 +244,10 @@ export function filasDePersonas({
       fullName: cliente.fullName || '',
       documentNumber: t.documentNumber ?? cliente.documentNumber ?? '',
       birthDate: t.birthDate ?? (cliente.birthDate ? String(cliente.birthDate).slice(0, 10) : ''),
-      piletaElegida: t.pileta
+      piletaElegida: t.pileta,
+      pasePagoElegido: Boolean(t.pasePago)
     }
-    : { esTitular: true, fullName: customerName || '', documentNumber: '', birthDate: '', sinFicha: true, piletaElegida: false };
+    : { esTitular: true, fullName: customerName || '', documentNumber: '', birthDate: '', sinFicha: true, piletaElegida: false, pasePagoElegido: false };
 
   const filas = [titular];
   for (let i = 0; i < total - 1; i += 1) {
@@ -246,7 +258,8 @@ export function filasDePersonas({
       fullName: a.fullName || '',
       documentNumber: a.documentNumber || '',
       age: a.age ?? '',
-      piletaElegida: a.pileta
+      piletaElegida: a.pileta,
+      pasePagoElegido: Boolean(a.pasePago)
     });
   }
 
@@ -255,13 +268,16 @@ export function filasDePersonas({
     const completa = !f.sinFicha && personaCompletaParaPase(f);
     let pileta = false;
     if (incluyePileta && completa) {
-      const quiere = f.piletaElegida === undefined ? true : Boolean(f.piletaElegida);
+      // Quien tiene pase pago no toma un incluido salvo que se lo marque a mano.
+      const quiere = f.piletaElegida === undefined ? !f.pasePagoElegido : Boolean(f.piletaElegida);
       if (quiere && usados < pases) {
         pileta = true;
         usados += 1;
       }
     }
-    return { ...f, completa, pileta };
+    // Un pase incluido o uno pago, nunca los dos.
+    const pasePago = Boolean(ventaPases && completa && f.pasePagoElegido && !pileta);
+    return { ...f, completa, pileta, pasePago };
   });
 }
 
@@ -271,9 +287,51 @@ export function armarPersonasAlta(filas) {
   const out = {
     personas: lista
       .filter((f) => !f.esTitular && String(f.fullName ?? '').trim() !== '')
-      .map((f) => ({ fullName: f.fullName, documentNumber: f.documentNumber, age: f.age, pileta: f.pileta }))
+      .map((f) => ({ fullName: f.fullName, documentNumber: f.documentNumber, age: f.age, pileta: f.pileta, pasePago: Boolean(f.pasePago) }))
   };
   const titular = lista.find((f) => f.esTitular && !f.sinFicha);
-  if (titular) out.titular = { documentNumber: titular.documentNumber, birthDate: titular.birthDate, pileta: titular.pileta };
+  if (titular) {
+    out.titular = { documentNumber: titular.documentNumber, birthDate: titular.birthDate, pileta: titular.pileta, pasePago: Boolean(titular.pasePago) };
+  }
   return out;
+}
+
+/**
+ * La cuenta del alta: una linea por item con su subtotal y el total. Se cobra
+ * con un solo pago, que el servidor reparte en orden (la unidad, las cocheras,
+ * la pileta paga).
+ *
+ * El pase pago vale (adultos x precio adulto + menores x precio menor) x dias;
+ * quien es adulto o menor sale de la edad de cada fila.
+ */
+export function cuentaDelAlta({ etiquetaUnidad, totalUnidad, filas = [], pasesIncluidos = 0, precios = {}, dias = 0, cocheras = [] }) {
+  const lineas = [{ clave: 'unidad', etiqueta: etiquetaUnidad, monto: aNumero(totalUnidad) ?? 0 }];
+
+  if (pasesIncluidos > 0) {
+    const asignados = filas.filter((f) => f.pileta).length;
+    lineas.push({ clave: 'pileta-incluida', etiqueta: `Pileta incluida (${asignados} de ${pasesIncluidos} pases)`, monto: null });
+  }
+
+  const conPasePago = filas.filter((f) => f.pasePago);
+  const { adults, children } = contarPorEdad(conPasePago);
+  const precioAdulto = aNumero(precios.adulto) ?? 0;
+  const precioMenor = aNumero(precios.menor) ?? 0;
+  const totalPase = (adults * precioAdulto + children * precioMenor) * Math.max(0, dias);
+  const pasePago = {
+    cantidad: conPasePago.length,
+    adultos: adults,
+    menores: children,
+    total: totalPase,
+    faltaPrecio: (adults > 0 && !(precioAdulto > 0)) || (children > 0 && !(precioMenor > 0))
+  };
+  if (pasePago.cantidad > 0) {
+    lineas.push({ clave: 'pileta-paga', etiqueta: `Pileta paga (${pasePago.cantidad} ${pasePago.cantidad === 1 ? 'pase' : 'pases'})`, monto: totalPase });
+  }
+
+  cocheras.forEach((c, i) => {
+    lineas.push({ clave: `cochera-${i}`, etiqueta: c.plaza ? `Cochera plaza ${c.plaza}` : 'Cochera (plaza a asignar)', monto: aNumero(c.total) ?? 0 });
+  });
+
+  const total = lineas.reduce((suma, l) => suma + (l.monto ?? 0), 0);
+  return { lineas, total, pasePago };
 }
