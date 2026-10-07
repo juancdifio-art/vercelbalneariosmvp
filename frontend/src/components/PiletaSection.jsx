@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { format } from '../lib/dates';
 import { etiquetaVinculo } from '../lib/incluidos';
+import { formatPesos } from '../lib/money';
 function PiletaSection({
   establishment,
   reservationGroups,
@@ -540,15 +541,13 @@ function PiletaSection({
                           <div className="flex items-baseline gap-1.5">
                             <span className="text-xs text-slate-500">Pagado:</span>
                             <span className={paidClassName.replace('text-xs', 'text-sm')}>
-                              {paidAmountNum !== null && !Number.isNaN(paidAmountNum)
-                                ? `$${paidAmountNum.toFixed(2)}`
-                                : '$0.00'}
+                              {formatPesos(paidAmountNum, 0)}
                             </span>
                           </div>
                           {totalPriceNum !== null && !Number.isNaN(totalPriceNum) && (
                             <div className="flex items-baseline gap-1.5">
                               <span className="text-xs text-slate-500">Total:</span>
-                              <span className="text-sm font-medium text-slate-700">${totalPriceNum.toFixed(2)}</span>
+                              <span className="text-sm font-medium text-slate-700">{formatPesos(totalPriceNum, 0)}</span>
                             </div>
                           )}
                         </div>

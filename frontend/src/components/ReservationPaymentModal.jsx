@@ -1,4 +1,6 @@
 import React, { useEffect } from 'react';
+import { formatPesos } from '../lib/money';
+import { fechaCorta } from '../lib/formato';
 
 function ReservationPaymentModal({
   paymentModal,
@@ -65,11 +67,11 @@ function ReservationPaymentModal({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-3">
           <div>
             <p className="text-[11px] text-slate-700 mb-0.5">Entrada</p>
-            <p className="text-[11px] text-slate-900 font-medium">{startDate}</p>
+            <p className="text-[11px] text-slate-900 font-medium">{fechaCorta(startDate)}</p>
           </div>
           <div>
             <p className="text-[11px] text-slate-700 mb-0.5">Salida</p>
-            <p className="text-[11px] text-slate-900 font-medium">{endDate}</p>
+            <p className="text-[11px] text-slate-900 font-medium">{fechaCorta(endDate)}</p>
           </div>
         </div>
 
@@ -78,16 +80,16 @@ function ReservationPaymentModal({
           <div className="space-y-1.5">
             <div className="flex justify-between items-center">
               <span className="text-[11px] text-slate-600">Precio total:</span>
-              <span className="text-[11px] font-semibold text-slate-900">${totalPriceNum.toFixed(2)}</span>
+              <span className="text-[11px] font-semibold text-slate-900">{formatPesos(totalPriceNum)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[11px] text-slate-600">Ya pagado:</span>
-              <span className="text-[11px] font-semibold text-emerald-600">${paidAmountNum.toFixed(2)}</span>
+              <span className="text-[11px] font-semibold text-emerald-600">{formatPesos(paidAmountNum)}</span>
             </div>
             <div className="border-t border-slate-300 pt-1.5 flex justify-between items-center">
               <span className="text-[11px] font-semibold text-slate-700">{paymentModal.esCuenta ? 'Saldo de la cuenta:' : 'Saldo pendiente:'}</span>
               <span className={`text-sm font-bold ${balance > 0.01 ? 'text-red-600' : 'text-emerald-600'}`}>
-                ${balance.toFixed(2)}
+                {formatPesos(balance)}
               </span>
             </div>
           </div>
@@ -115,7 +117,7 @@ function ReservationPaymentModal({
             />
             {parseFloat(tempAmount || 0) - balance > 0.01 && balance > 0.01 && (
               <span className="text-[10px] text-amber-600">
-                ⚠️ El monto supera el saldo pendiente (${balance.toFixed(2)})
+                ⚠️ El monto supera el saldo pendiente ({formatPesos(balance)})
               </span>
             )}
           </label>
