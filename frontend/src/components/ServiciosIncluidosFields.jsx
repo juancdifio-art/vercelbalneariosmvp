@@ -73,7 +73,7 @@ function ServiciosIncluidosFields({
           </div>
           {incluyePileta && (
             <p className="mt-2 pl-6 text-[11px] text-slate-600">
-              {pases} pases de pileta incluidos en el precio. Elegí a quién le toca en Datos de las personas.
+              {pases} pases de pileta incluidos en el precio. Elegí a quién le toca en la lista de personas.
             </p>
           )}
         </div>

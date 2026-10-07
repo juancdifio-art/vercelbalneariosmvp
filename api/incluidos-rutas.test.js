@@ -398,3 +398,25 @@ describe('cuenta unica', () => {
     expect(pago[1]).toEqual([1, 503, 24000, '2026-10-06', 'cash', 'resto']);
   });
 });
+
+describe('tope de personas contando al titular', () => {
+  it('con cliente titular, el sexto acompanante ya no entra', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 60, service_type: 'carpa', client_id: 7, personas: 5 }] });
+
+    const res = await request(handler).post('/?route=reservation-groups/60/guests').set('Authorization', token).send({ fullName: 'Septima' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('too_many_people');
+  });
+
+  it('sin cliente titular entran hasta seis acompanantes', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [EST] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 60, service_type: 'carpa', client_id: null, personas: 5 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 12, full_name: 'Sexta' }] });
+
+    const res = await request(handler).post('/?route=reservation-groups/60/guests').set('Authorization', token).send({ fullName: 'Sexta' });
+
+    expect(res.status).toBe(201);
+  });
+});

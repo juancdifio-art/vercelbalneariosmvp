@@ -322,7 +322,7 @@ function ReservationEditModal({ modal, saving, setModal, onSave, onClose, establ
           </div>
 
           {modal.serviceType !== 'pileta' && (
-            <div className="mt-4">
+            <div className="mt-4 mb-4">
               <PrecioReserva
                 serviceType={modal.serviceType}
                 resourceNumber={currentResourceNumber}

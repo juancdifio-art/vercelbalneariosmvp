@@ -1897,7 +1897,7 @@ app.get('/api/reservation-groups/:id/payments', authenticateToken, async (req, r
     }
 
     const paymentsResult = await pool.query(
-      'SELECT id, amount, payment_date, method, notes, client_id FROM reservation_payments WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY payment_date ASC, id ASC',
+      'SELECT id, amount, payment_date, method, notes, client_id, created_at FROM reservation_payments WHERE establishment_id = $1 AND reservation_group_id = $2 ORDER BY payment_date ASC, id ASC',
       [establishmentId, groupId]
     );
 
@@ -1910,7 +1910,9 @@ app.get('/api/reservation-groups/:id/payments', authenticateToken, async (req, r
           : row.payment_date,
         method: row.method,
         notes: row.notes,
-        clientId: row.client_id
+        clientId: row.client_id,
+        // El comprobante lo usa para volver a unir un pago repartido entre varias reservas.
+        createdAt: row.created_at
       }))
     });
   } catch (error) {
@@ -2100,7 +2102,7 @@ app.post('/api/reservation-groups/:id/guests', authenticateToken, async (req, re
     // Junto con la reserva: cuantas personas tiene y su pase incluido, si hay.
     const est = (await pool.query('SELECT * FROM establishments WHERE id = $1', [establishmentId])).rows[0];
     const reserva = (await pool.query(
-      `SELECT rg.id, rg.service_type,
+      `SELECT rg.id, rg.service_type, rg.client_id,
               (SELECT COUNT(*)::int FROM reservation_guests g WHERE g.reservation_group_id = rg.id) AS personas,
               (SELECT p.id FROM reservation_groups p
                WHERE p.incluida_en_reserva_id = rg.id AND p.vinculo = 'incluido' AND p.service_type = 'pileta' AND p.status = 'active'
@@ -2109,9 +2111,11 @@ app.post('/api/reservation-groups/:id/guests', authenticateToken, async (req, re
       [groupId]
     )).rows[0];
 
+    // El titular (el cliente de la reserva) es una de las personas: cuenta para el tope.
+    const yaCargadas = Number(reserva.personas || 0) + (reserva.client_id ? 1 : 0);
     if (
       reglasIncluidos.UNIDADES_DE_SOMBRA.includes(reserva.service_type) &&
-      Number(reserva.personas || 0) >= reglasIncluidos.maxPersonas(est)
+      yaCargadas >= reglasIncluidos.maxPersonas(est)
     ) {
       return res.status(400).json({ error: 'too_many_people', max: reglasIncluidos.maxPersonas(est) });
     }

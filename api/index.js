@@ -1734,7 +1734,7 @@ module.exports = async (req, res) => {
 
         // Junto con la reserva: cuantas personas tiene y su pase incluido, si hay.
         const rgCheck = await db.query(
-          `SELECT rg.id, rg.service_type,
+          `SELECT rg.id, rg.service_type, rg.client_id,
                   (SELECT COUNT(*)::int FROM reservation_guests g WHERE g.reservation_group_id = rg.id) AS personas,
                   (SELECT p.id FROM reservation_groups p
                    WHERE p.incluida_en_reserva_id = rg.id AND p.vinculo = 'incluido' AND p.service_type = 'pileta' AND p.status = 'active'
@@ -1771,9 +1771,11 @@ module.exports = async (req, res) => {
           }
 
           const reserva = rgCheck.rows[0];
+          // El titular (el cliente de la reserva) es una de las personas: cuenta para el tope.
+          const yaCargadas = Number(reserva.personas || 0) + (reserva.client_id ? 1 : 0);
           if (
             reglasIncluidos.UNIDADES_DE_SOMBRA.includes(reserva.service_type) &&
-            Number(reserva.personas || 0) >= reglasIncluidos.maxPersonas(est)
+            yaCargadas >= reglasIncluidos.maxPersonas(est)
           ) {
             return responder(res, 400, { error: 'too_many_people', max: reglasIncluidos.maxPersonas(est) });
           }
