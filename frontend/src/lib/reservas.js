@@ -195,6 +195,13 @@ export function proximaReserva(reservas, serviceType, resourceNumber, fecha) {
  */
 export function estacionamientoVinculado(reservas, reserva) {
   if (!reserva) return null;
+  // La cochera incluida en la reserva se reconoce por su vinculo real; el
+  // criterio de cliente y fechas queda para las cargadas antes de que existiera.
+  const incluida = (reservas || []).find(
+    (g) => g && g.serviceType === 'parking' && g.status !== 'cancelled' &&
+      g.vinculo === 'incluido' && Number(g.incluidaEnReservaId) === Number(reserva.id)
+  );
+  if (incluida) return incluida;
   const nombre = (reserva.customerName || '').trim().toLowerCase();
   return (
     (reservas || []).find((g) => {
@@ -204,4 +211,19 @@ export function estacionamientoVinculado(reservas, reserva) {
       return Boolean(nombre) && (g.customerName || '').trim().toLowerCase() === nombre;
     }) || null
   );
+}
+
+/**
+ * La cuenta de una carpa o sombrilla: ella y todo lo asociado (cocheras
+ * incluidas y pases de pileta pagos). Es contra este saldo que se cobra.
+ */
+export function cuentaDe(reservas, reserva) {
+  if (!reserva) return { total: 0, pagado: 0, saldo: 0, asociadas: 0 };
+  const asociadas = (reservas || []).filter(
+    (g) => g && g.status !== 'cancelled' && Number(g.incluidaEnReservaId) === Number(reserva.id)
+  );
+  const todas = [reserva, ...asociadas];
+  const total = todas.reduce((suma, g) => suma + numero(g.totalPrice), 0);
+  const pagado = todas.reduce((suma, g) => suma + numero(g.paidAmount), 0);
+  return { total, pagado, saldo: Math.max(0, total - pagado), asociadas: asociadas.length };
 }

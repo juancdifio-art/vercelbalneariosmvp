@@ -184,3 +184,17 @@ describe('tarjeta al pasar el mouse', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('Valentina Rios');
   });
 });
+
+describe('tarjeta de una carpa con servicios asociados', () => {
+  it('muestra la deuda de toda la cuenta, no solo la de la carpa', async () => {
+    const cochera = {
+      id: 9, serviceType: 'parking', resourceNumber: 12, clientId: 3, startDate: HOY, endDate: HOY, status: 'active',
+      totalPrice: '20000', paidAmount: 0, incluidaEnReservaId: RESERVA_CARPA_134.id, vinculo: 'incluido'
+    };
+    const { container } = renderVista({ reservationGroups: [RESERVA_CARPA_134, cochera] });
+    await userEvent.hover(unidad(container, 'carpa-134'));
+    const tarjeta = screen.getByRole('tooltip');
+    expect(tarjeta).toHaveTextContent('Debe $50.000');
+    expect(tarjeta).toHaveTextContent('Toda la cuenta');
+  });
+});

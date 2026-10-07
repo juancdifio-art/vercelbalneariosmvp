@@ -21,6 +21,7 @@ import EstablishmentConfigForm from './components/EstablishmentConfigForm';
 import PanelUsuarioSection from './components/PanelUsuarioSection';
 import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
+import AvisoGlobal from './components/AvisoGlobal';
 import DailyViewSection from './components/DailyViewSection';
 import { normalizarPatente } from './lib/patente';
 import { precioDesdeReserva } from './lib/tarifas';
@@ -2436,6 +2437,13 @@ function App() {
         navItems={navItems}
       >
         <>
+          <AvisoGlobal
+            error={error}
+            success={success}
+            onCerrarError={() => setError('')}
+            onCerrarSuccess={() => setSuccess('')}
+          />
+
           {/* Modal de reserva de carpa */}
           {carpaReservationForm && (
             <CarpaReservationModal

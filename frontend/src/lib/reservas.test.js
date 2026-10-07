@@ -11,7 +11,8 @@ import {
   diasOcupadaDesde,
   deudasPorCliente,
   hoyISO,
-  unidadesOcupadas
+  unidadesOcupadas,
+  cuentaDe
 } from './reservas';
 
 const HOY = '2026-09-22';
@@ -274,5 +275,25 @@ describe('estacionamientoVinculado', () => {
     expect(estacionamientoVinculado([sinCliente, porNombre], sinCliente)).toBe(porNombre);
     expect(estacionamientoVinculado([carpa, { ...porNombre, clientId: 7, endDate: '2026-01-16' }], carpa)).toBeNull();
     expect(estacionamientoVinculado([carpa, { ...porNombre, clientId: 7, status: 'cancelled' }], carpa)).toBeNull();
+  });
+});
+
+describe('cuenta de una carpa con servicios asociados', () => {
+  const carpa = { id: 1, serviceType: 'carpa', resourceNumber: 22, clientId: 7, startDate: '2026-10-01', endDate: '2026-10-10', status: 'active', totalPrice: '620000', paidAmount: 400000 };
+  const cochera = { id: 2, serviceType: 'parking', resourceNumber: 21, clientId: 7, startDate: '2026-10-01', endDate: '2026-10-10', status: 'active', totalPrice: '155000', paidAmount: 0, incluidaEnReservaId: 1, vinculo: 'incluido' };
+  const pasePago = { id: 3, serviceType: 'pileta', resourceNumber: 1, clientId: 7, startDate: '2026-10-01', endDate: '2026-10-10', status: 'active', totalPrice: '24000', paidAmount: 4000, incluidaEnReservaId: 1, vinculo: 'adicional' };
+
+  it('suma la carpa, sus cocheras y sus pases pagos', () => {
+    expect(cuentaDe([carpa, cochera, pasePago], carpa)).toEqual({ total: 799000, pagado: 404000, saldo: 395000, asociadas: 2 });
+  });
+
+  it('no cuenta lo cancelado ni lo de otra carpa', () => {
+    const ajena = { ...cochera, id: 9, incluidaEnReservaId: 99 };
+    expect(cuentaDe([carpa, { ...cochera, status: 'cancelled' }, ajena], carpa)).toEqual({ total: 620000, pagado: 400000, saldo: 220000, asociadas: 0 });
+  });
+
+  it('la cochera incluida se reconoce por su vinculo aunque tenga otras fechas', () => {
+    const corrida = { ...cochera, startDate: '2026-10-02' };
+    expect(estacionamientoVinculado([carpa, corrida], carpa)).toBe(corrida);
   });
 });
