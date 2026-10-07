@@ -139,8 +139,8 @@ function App() {
   const refrescarDatos = () => setDatosVersion((v) => v + 1);
   // A que reserva abierta va el cliente que se esta creando desde un modal.
   const [clienteNuevoPara, setClienteNuevoPara] = useState(null);
-  // La carpa desde la que se abrio "Vender pase de pileta": al guardar o
-  // cerrar ese modal se vuelve a su detalle.
+  // La reserva desde cuyo detalle se abrio otro modal (editar, agendar pago,
+  // vender pase de pileta): al guardar o cerrar ese modal se vuelve a su detalle.
   const [volverACarpa, setVolverACarpa] = useState(null);
 
   const {
@@ -1717,6 +1717,7 @@ function App() {
       }
     }
     setReservationEditModal(null);
+    setVolverACarpa(null);
     if (madre) {
       handleViewReservationDetails(madre);
     } else {
@@ -1730,18 +1731,27 @@ function App() {
   const reabrirReserva = async (reserva) => {
     if (!reserva) return;
     const token = authToken || sessionStorage.getItem('authToken');
+    const buscar = async (filtros) => {
+      const params = new URLSearchParams({ service: reserva.serviceType, ...filtros });
+      const res = await fetch(`${API_BASE_URL}/api/reservation-groups?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.reservationGroups || []).find((g) => Number(g.id) === Number(reserva.id)) || null;
+    };
     let fresca = null;
     try {
-      const params = new URLSearchParams({ service: reserva.serviceType, from: reserva.startDate, to: reserva.endDate });
-      const res = await fetch(`${API_BASE_URL}/api/reservation-groups?${params}`, { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) {
-        const data = await res.json();
-        fresca = (data.reservationGroups || []).find((g) => Number(g.id) === Number(reserva.id)) || null;
-      }
+      // Si se acaban de cambiar sus fechas puede no estar en el rango viejo.
+      fresca = (await buscar({ from: reserva.startDate, to: reserva.endDate })) || (await buscar({}));
     } catch (err) {
       console.error('Error actualizando la reserva', err);
     }
     handleViewReservationDetails(fresca || reserva);
+  };
+
+  const volverAlDetalle = () => {
+    if (!volverACarpa) return;
+    reabrirReserva(volverACarpa);
+    setVolverACarpa(null);
   };
 
   const handleViewReservationDetails = (group) => {
@@ -1894,6 +1904,7 @@ function App() {
           return;
         }
         setReservationPaymentModal(null);
+        volverAlDetalle();
         refrescarDatos();
         await fetchReservationGroups(token, {
           service: reservationFilterService,
@@ -1957,6 +1968,7 @@ function App() {
       }
 
       setReservationPaymentModal(null);
+      volverAlDetalle();
     } catch (err) {
       console.error('Error creating reservation payment', err);
     } finally {
@@ -2169,6 +2181,7 @@ function App() {
       });
 
       setReservationEditModal(null);
+      volverAlDetalle();
     } catch (err) {
       console.error('Error updating reservation group', err);
     } finally {
@@ -2513,6 +2526,7 @@ function App() {
               onClose={() => {
                 setReservationEditModal(null);
                 setReservationEditError('');
+                volverAlDetalle();
               }}
               establishment={establishment}
               reservationGroups={reservationGroups}
@@ -2529,6 +2543,7 @@ function App() {
               onClose={() => setReservationDetailsModal(null)}
               onEdit={(group) => {
                 handleOpenReservationEditModal(group);
+                setVolverACarpa(group);
                 setReservationDetailsModal(null);
               }}
               onCancel={(group) => {
@@ -2540,6 +2555,7 @@ function App() {
               }}
               onAddPayment={(group, cuenta) => {
                 handleAddPaymentForReservationGroup(group, cuenta);
+                setVolverACarpa(group);
                 setReservationDetailsModal(null);
               }}
               onViewReservation={(group) => setReservationDetailsModal(group)}
@@ -2576,7 +2592,10 @@ function App() {
           {reservationPaymentModal && (
             <ReservationPaymentModal
               paymentModal={reservationPaymentModal}
-              setPaymentModal={setReservationPaymentModal}
+              setPaymentModal={(valor) => {
+                setReservationPaymentModal(valor);
+                if (valor === null) volverAlDetalle();
+              }}
               saving={reservationPaymentSaving}
               onSave={handleSaveReservationPayment}
             />
@@ -2595,10 +2614,7 @@ function App() {
               onClose={() => {
                 setPoolPassForm(null);
                 // Abierto desde una carpa: se vuelve a su detalle.
-                if (volverACarpa) {
-                  reabrirReserva(volverACarpa);
-                  setVolverACarpa(null);
-                }
+                volverAlDetalle();
               }}
             />
           )}
