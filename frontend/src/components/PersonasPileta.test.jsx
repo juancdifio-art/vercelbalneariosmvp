@@ -102,3 +102,16 @@ describe('pases de pileta en la lista de personas', () => {
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
 });
+
+describe('aviso de personas cargadas', () => {
+  it('cuenta al titular: con titular y 3 acompanantes de 4 personas no falta nadie', async () => {
+    renderPersonas();
+    await screen.findByText('Ana');
+    expect(screen.queryByText(/Cargaste/)).toBeNull();
+  });
+
+  it('sin titular avisa los que faltan', async () => {
+    renderPersonas({ titular: null });
+    expect(await screen.findByText('Cargaste 3 de 4 personas')).toBeInTheDocument();
+  });
+});

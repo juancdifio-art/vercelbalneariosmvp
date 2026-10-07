@@ -12,7 +12,8 @@ import {
   deudasPorCliente,
   hoyISO,
   unidadesOcupadas,
-  cuentaDe
+  cuentaDe,
+  unirPagosDeCuenta
 } from './reservas';
 
 const HOY = '2026-09-22';
@@ -295,5 +296,25 @@ describe('cuenta de una carpa con servicios asociados', () => {
   it('la cochera incluida se reconoce por su vinculo aunque tenga otras fechas', () => {
     const corrida = { ...cochera, startDate: '2026-10-02' };
     expect(estacionamientoVinculado([carpa, corrida], carpa)).toBe(corrida);
+  });
+});
+
+describe('pagos de una cuenta', () => {
+  it('un pago repartido entre varias reservas vuelve a ser uno solo', () => {
+    const carpa = [
+      { id: 1, amount: '50000.00', paymentDate: '2026-10-06', method: 'cash', createdAt: '2026-10-06T23:50:00.100Z' },
+      { id: 3, amount: '50000.00', paymentDate: '2026-10-07', method: 'transfer', createdAt: '2026-10-07T12:00:00.500Z' }
+    ];
+    const cochera = [{ id: 4, amount: '10000.00', paymentDate: '2026-10-07', paymentMethod: 'transfer', createdAt: '2026-10-07T12:00:00.500Z' }];
+    expect(unirPagosDeCuenta([carpa, cochera])).toEqual([
+      { id: 1, amount: 50000, paymentDate: '2026-10-06', method: 'cash', createdAt: '2026-10-06T23:50:00.100Z' },
+      { id: 3, amount: 60000, paymentDate: '2026-10-07', method: 'transfer', createdAt: '2026-10-07T12:00:00.500Z' }
+    ]);
+  });
+
+  it('dos pagos distintos del mismo dia quedan separados', () => {
+    const a = [{ id: 1, amount: 100, paymentDate: '2026-10-06', method: 'cash', createdAt: '2026-10-06T10:00:00Z' }];
+    const b = [{ id: 2, amount: 200, paymentDate: '2026-10-06', method: 'cash', createdAt: '2026-10-06T15:00:00Z' }];
+    expect(unirPagosDeCuenta([a, b]).map((p) => p.amount)).toEqual([100, 200]);
   });
 });

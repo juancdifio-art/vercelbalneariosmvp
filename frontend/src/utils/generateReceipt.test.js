@@ -51,3 +51,35 @@ describe('comprobante de una carpa con servicios incluidos', () => {
     expect(textos).toContain('Plaza 45, AB 123 CD');
   });
 });
+
+describe('comprobante de la cuenta completa', () => {
+  it('suma la carpa, la cochera y la pileta paga, y el saldo es el de toda la cuenta', () => {
+    generateReceipt({
+      ...CARPA, totalPrice: '100000', paidAmount: 100000,
+      payments: [
+        { amount: 50000, paymentDate: '2026-10-06', method: 'cash' },
+        { amount: 60000, paymentDate: '2026-10-07', method: 'transfer' }
+      ],
+      vinculadas: [
+        { id: 501, serviceType: 'pileta', vinculo: 'incluido', paseNombres: ['Lucia'], totalPrice: '0', paidAmount: 0 },
+        { id: 502, serviceType: 'parking', vinculo: 'incluido', resourceNumber: 1, vehiclePlate: 'AE512KD', totalPrice: '25000', paidAmount: 10000 },
+        { id: 503, serviceType: 'pileta', vinculo: 'adicional', paseNombres: ['Marta'], totalPrice: '30000', paidAmount: 0 }
+      ]
+    }, { name: 'Zeus', hasPileta: true });
+    const textos = globalThis.ultimoPdf.textos;
+    const tras = (etiqueta) => textos[textos.indexOf(etiqueta) + 1];
+
+    expect(textos.join(' | ')).toContain('Pileta paga:');
+    expect(tras('Total de la cuenta:')).toBe('$155.000,00');
+    expect(tras('Total a Pagar:')).toBe('$155.000,00');
+    expect(tras('Total Pagado:')).toBe('$110.000,00');
+    expect(textos.join(' | ')).toContain('SALDO: $45.000,00');
+  });
+
+  it('una reserva sin nada asociado sale como antes', () => {
+    generateReceipt({ ...CARPA, vinculadas: [], paidAmount: 0 }, { name: 'Zeus' });
+    const textos = globalThis.ultimoPdf.textos;
+    expect(textos).not.toContain('Total de la cuenta:');
+    expect(textos[textos.indexOf('Total a Pagar:') + 1]).toBe('$100.000,00');
+  });
+});

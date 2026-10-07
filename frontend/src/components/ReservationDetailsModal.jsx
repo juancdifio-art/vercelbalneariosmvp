@@ -3,7 +3,7 @@ import { format } from '../lib/dates';
 import { generateReceipt } from '../utils/generateReceipt';
 import { getApiBaseUrl } from '../apiConfig';
 import { formatPesos } from '../lib/money';
-import { otrasReservasVigentes, saldoDe, hoyISO } from '../lib/reservas';
+import { otrasReservasVigentes, saldoDe, hoyISO, unirPagosDeCuenta } from '../lib/reservas';
 import { ServiceIcon, COLOR_SERVICIO } from './icons';
 import PersonasReserva from './PersonasReserva';
 import { formatearPatente } from '../lib/patente';
@@ -156,6 +156,27 @@ function ReservationDetailsModal({
       pagado: monto(paidAmount) + vinculadas.reduce((suma, g) => suma + monto(g.paidAmount), 0)
     }
     : null;
+
+  // El comprobante es de toda la cuenta: suma los pagos de las cocheras y de
+  // los pases pagos, que estan guardados en sus propias reservas.
+  const descargarComprobante = async () => {
+    const conMonto = vinculadas.filter((g) => (g.serviceType === 'parking' && g.vinculo === 'incluido') || g.vinculo === 'adicional');
+    let pagosDeLaCuenta = payments;
+    if (conMonto.length > 0) {
+      const token = sessionStorage.getItem('authToken');
+      const listas = await Promise.all(conMonto.map(async (g) => {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/reservation-groups/${g.id}/payments`, { headers: { Authorization: `Bearer ${token}` } });
+          return response.ok ? (await response.json()).payments || [] : [];
+        } catch (err) {
+          console.error('Error loading payments for receipt', err);
+          return [];
+        }
+      }));
+      pagosDeLaCuenta = unirPagosDeCuenta([payments, ...listas]);
+    }
+    generateReceipt({ ...reservation, payments: pagosDeLaCuenta, vinculadas }, establishment);
+  };
 
   const balance =
     totalPrice !== null && totalPrice !== undefined && paidAmount !== null && paidAmount !== undefined
@@ -643,7 +664,7 @@ function ReservationDetailsModal({
                 className="inline-flex items-center rounded-lg border border-blue-300 px-4 py-2 text-xs font-semibold text-blue-700 bg-white hover:bg-blue-50 transition shadow-sm"
                 // La reserva de la lista no trae el array de pagos: sin esto el
                 // comprobante salia sin fecha ni metodo de pago y sin historial.
-                onClick={() => generateReceipt({ ...reservation, payments, vinculadas }, establishment)}
+                onClick={descargarComprobante}
               >
                 📄 Descargar comprobante
               </button>

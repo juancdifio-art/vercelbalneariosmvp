@@ -193,7 +193,8 @@ function PersonasReserva({
     }
   };
 
-  const aviso = avisoCantidad(adultsCount, childrenCount, personas);
+  // El titular es una de las personas de la reserva: cuenta para el aviso.
+  const aviso = avisoCantidad(adultsCount, childrenCount, titular ? [titular, ...personas] : personas);
 
   const max = paseIncluido?.max ?? 0;
   const asignados = conPase.length;

@@ -227,3 +227,24 @@ export function cuentaDe(reservas, reserva) {
   const pagado = todas.reduce((suma, g) => suma + numero(g.paidAmount), 0);
   return { total, pagado, saldo: Math.max(0, total - pagado), asociadas: asociadas.length };
 }
+
+/**
+ * Los pagos de una cuenta (la carpa y lo asociado) como los vio el cliente.
+ * Un pago de la cuenta se guarda repartido, una parte por reserva; las partes
+ * comparten fecha, medio y momento de carga, y aca vuelven a ser un solo pago.
+ */
+export function unirPagosDeCuenta(listas) {
+  const porClave = new Map();
+  for (const pago of (listas || []).flat()) {
+    if (!pago) continue;
+    const method = pago.method || pago.paymentMethod || '';
+    const clave = `${pago.createdAt || pago.id}|${String(pago.paymentDate || '').slice(0, 10)}|${method}`;
+    const previo = porClave.get(clave);
+    if (previo) {
+      previo.amount += numero(pago.amount);
+    } else {
+      porClave.set(clave, { id: pago.id, amount: numero(pago.amount), paymentDate: pago.paymentDate, method, createdAt: pago.createdAt });
+    }
+  }
+  return [...porClave.values()].sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
