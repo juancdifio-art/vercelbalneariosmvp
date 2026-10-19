@@ -23,7 +23,7 @@ beforeEach(() => {
 describe('panel de soporte del balneario', () => {
   it('muestra el hilo: lo propio con tipo y pantalla, y las respuestas de soporte', async () => {
     const onLeido = vi.fn();
-    render(<SoportePanel abierto pantalla="Carpas" onCerrar={() => {}} onLeido={onLeido} />);
+    render(<SoportePanel abierto pestanaInicial="mensajes" pantalla="Carpas" onCerrar={() => {}} onLeido={onLeido} />);
 
     expect(await screen.findByText('No me deja guardar la carpa 12')).toBeInTheDocument();
     // La etiqueta del tipo va junto a la pantalla, arriba del texto.
@@ -36,7 +36,7 @@ describe('panel de soporte del balneario', () => {
   });
 
   it('manda el mensaje con el tipo elegido y la pantalla actual, y limpia la caja', async () => {
-    render(<SoportePanel abierto pantalla="Estacionamiento" onCerrar={() => {}} />);
+    render(<SoportePanel abierto pestanaInicial="mensajes" pantalla="Estacionamiento" onCerrar={() => {}} />);
     await screen.findByText('No me deja guardar la carpa 12');
 
     fireEvent.click(screen.getByRole('button', { name: 'Sugerencia' }));
@@ -51,14 +51,14 @@ describe('panel de soporte del balneario', () => {
   });
 
   it('sin texto no deja enviar', async () => {
-    render(<SoportePanel abierto pantalla="Inicio" onCerrar={() => {}} />);
+    render(<SoportePanel abierto pestanaInicial="mensajes" pantalla="Inicio" onCerrar={() => {}} />);
     await screen.findByText('No me deja guardar la carpa 12');
     expect(screen.getByRole('button', { name: 'Enviar' })).toBeDisabled();
   });
 
   it('si la API frena el envio, muestra el aviso y conserva lo escrito', async () => {
     respuestaPost = { ok: false, status: 429, body: { error: 'demasiados_mensajes' } };
-    render(<SoportePanel abierto pantalla="Inicio" onCerrar={() => {}} />);
+    render(<SoportePanel abierto pestanaInicial="mensajes" pantalla="Inicio" onCerrar={() => {}} />);
     await screen.findByText('No me deja guardar la carpa 12');
 
     fireEvent.change(screen.getByLabelText('Mensaje'), { target: { value: 'hola' } });
@@ -74,7 +74,7 @@ describe('panel de soporte del balneario', () => {
     expect(global.fetch).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).toBeNull();
 
-    rerender(<SoportePanel abierto pantalla="Inicio" onCerrar={onCerrar} />);
+    rerender(<SoportePanel abierto pestanaInicial="mensajes" pantalla="Inicio" onCerrar={onCerrar} />);
     await screen.findByRole('dialog', { name: 'Soporte' });
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onCerrar).toHaveBeenCalled();

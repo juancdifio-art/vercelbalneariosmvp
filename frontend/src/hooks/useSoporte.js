@@ -29,14 +29,20 @@ export async function pedirSoporte(ruta, { method = 'GET', body } = {}) {
   return data;
 }
 
-/** Cuantos mensajes del otro lado esperan lectura; se vuelve a preguntar cada `cadaMs`. */
+/**
+ * Contadores de soporte, preguntados cada `cadaMs`. `noLeidos`: respuestas sin
+ * leer en el hilo propio. `bandeja`: mensajes de los balnearios sin leer, o
+ * null si la cuenta no atiende soporte (la API solo lo manda a quien atiende).
+ */
 export function useNoLeidosSoporte(activo, cadaMs = 60000) {
   const [noLeidos, setNoLeidos] = useState(0);
+  const [bandeja, setBandeja] = useState(null);
 
   const refrescar = useCallback(async () => {
     try {
       const d = await pedirSoporte('no-leidos');
       setNoLeidos(d.noLeidos || 0);
+      setBandeja(typeof d.bandeja === 'number' ? d.bandeja : null);
     } catch {
       // El contador no es critico: si falla, queda el ultimo valor.
     }
@@ -49,7 +55,7 @@ export function useNoLeidosSoporte(activo, cadaMs = 60000) {
     return () => clearInterval(id);
   }, [activo, cadaMs, refrescar]);
 
-  return { noLeidos, refrescar };
+  return { noLeidos, bandeja, refrescar };
 }
 
 /**

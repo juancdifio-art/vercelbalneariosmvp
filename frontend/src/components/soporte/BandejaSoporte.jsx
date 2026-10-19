@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SalirIcon } from '../icons';
 import { fechaHora } from '../../lib/formato';
 import { pedirSoporte, useHiloSoporte } from '../../hooks/useSoporte';
@@ -6,19 +6,25 @@ import MensajesSoporte from './MensajesSoporte';
 import EscribirSoporte from './EscribirSoporte';
 
 /**
- * Pantalla de la cuenta de soporte: un hilo por establecimiento. Primero los
- * que esperan respuesta. En el celular se ve la lista o el hilo, no los dos.
+ * Bandeja de soporte: un hilo por establecimiento. Primero los que esperan
+ * respuesta. En el celular se ve la lista o el hilo, no los dos.
+ * Sola ocupa la pantalla (la cuenta con rol 'soporte', con su cerrar sesion);
+ * `embebida` va dentro de la app de un balneario cuya cuenta ademas atiende.
+ * `onCambio` corre cada vez que se recarga la lista (el contador del menu).
  */
-function BandejaSoporte({ userEmail, onLogout }) {
+function BandejaSoporte({ userEmail, onLogout, embebida = false, onCambio }) {
   const [lista, setLista] = useState([]);
   const [errorLista, setErrorLista] = useState('');
   const [elegidoId, setElegidoId] = useState(null);
+  const avisarCambio = useRef(onCambio);
+  avisarCambio.current = onCambio;
 
   const cargarLista = useCallback(async () => {
     try {
       const d = await pedirSoporte('bandeja');
       setLista(d.establecimientos || []);
       setErrorLista('');
+      avisarCambio.current?.();
     } catch (e) {
       setErrorLista(e.message);
     }
@@ -36,26 +42,41 @@ function BandejaSoporte({ userEmail, onLogout }) {
   const totalNoLeidos = lista.reduce((t, e) => t + e.noLeidos, 0);
 
   return (
-    <div className="flex h-screen flex-col bg-slate-100">
-      <header className="flex items-center justify-between gap-3 bg-sky-900 px-4 py-3 text-white">
-        <div className="min-w-0">
-          <h1 className="text-base font-semibold">
-            Bandeja de soporte
-            {totalNoLeidos > 0 && (
-              <span className="ml-2 rounded-full bg-cyan-400 px-2 py-0.5 text-xs font-bold text-sky-950">{totalNoLeidos}</span>
-            )}
-          </h1>
-          <p className="truncate text-xs text-sky-200">{userEmail}</p>
+    <div
+      className={
+        embebida
+          ? 'flex h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm md:h-[calc(100vh-4rem)]'
+          : 'flex h-screen flex-col bg-slate-100'
+      }
+    >
+      {embebida ? (
+        <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-4 py-3">
+          <h1 className="text-sm font-semibold text-slate-900">Bandeja de soporte</h1>
+          {totalNoLeidos > 0 && (
+            <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[10px] font-bold text-white">{totalNoLeidos} sin leer</span>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={onLogout}
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-sky-100 hover:bg-sky-800"
-        >
-          <SalirIcon className="h-4 w-4" />
-          <span className="hidden sm:inline">Cerrar sesión</span>
-        </button>
-      </header>
+      ) : (
+        <header className="flex items-center justify-between gap-3 bg-sky-900 px-4 py-3 text-white">
+          <div className="min-w-0">
+            <h1 className="text-base font-semibold">
+              Bandeja de soporte
+              {totalNoLeidos > 0 && (
+                <span className="ml-2 rounded-full bg-cyan-400 px-2 py-0.5 text-xs font-bold text-sky-950">{totalNoLeidos}</span>
+              )}
+            </h1>
+            <p className="truncate text-xs text-sky-200">{userEmail}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onLogout}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-sky-100 hover:bg-sky-800"
+          >
+            <SalirIcon className="h-4 w-4" />
+            <span className="hidden sm:inline">Cerrar sesión</span>
+          </button>
+        </header>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <nav aria-label="Balnearios" className={`${elegido ? 'hidden md:block' : 'block'} w-full overflow-y-auto border-r border-slate-200 bg-white md:w-80`}>
