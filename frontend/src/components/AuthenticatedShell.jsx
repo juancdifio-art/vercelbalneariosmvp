@@ -189,6 +189,9 @@ function AuthenticatedShell({
         abierto={soporteAbierto}
         onCerrar={cerrarSoporte}
         pantalla={pantallaActual}
+        seccion={activeSection}
+        pestanaInicial={soporteNoLeidos > 0 ? 'mensajes' : 'preguntas'}
+        noLeidos={soporteNoLeidos}
         onLeido={refrescarSoporte}
       />
     </div>
