@@ -203,7 +203,7 @@ describe('precios de pileta en /api/reservation-groups', () => {
       .send({
         serviceType: 'pileta', resourceNumber: 1,
         startDate: '2026-09-22', endDate: '2026-09-22',
-        customerName: 'Prueba', adultsCount: 2, childrenCount: 1,
+        customerName: 'Prueba', clientId: 7, adultsCount: 2, childrenCount: 1,
         poolAdultPricePerDay: 6000, poolChildPricePerDay: 3500
       });
 
@@ -212,6 +212,23 @@ describe('precios de pileta en /api/reservation-groups', () => {
     expect(String(insert[0])).toContain('pool_adult_price_per_day');
     expect(insert[1]).toContain(6000);
     expect(insert[1]).toContain(3500);
+  });
+
+  it('rechaza un pase sin cliente guardado, como el backend local', async () => {
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 1 }] }); // establecimiento
+
+    const res = await request(handler)
+      .post('/?route=reservation-groups')
+      .set('Authorization', `Bearer ${tokenPara(2)}`)
+      .send({
+        serviceType: 'pileta', resourceNumber: 1,
+        startDate: '2026-09-22', endDate: '2026-09-22',
+        customerName: 'Sin ficha', adultsCount: 1, poolAdultPricePerDay: 6000
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('pool_client_required');
+    expect(queryMock.mock.calls.some((c) => String(c[0]).includes('INSERT INTO reservation_groups'))).toBe(false);
   });
 
   it('los devuelve al leer la reserva', async () => {
