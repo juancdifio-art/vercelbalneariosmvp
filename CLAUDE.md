@@ -43,6 +43,8 @@ En `reservation_payments`, la base local tiene la columna `method` (y `client_id
 
 Por eso el código compartido no inserta pagos por su cuenta: `_incluidos/servicio.js` recibe una función `insertarPago` que define cada API. Antes de desplegar algo que toque pagos, confirmar en Supabase qué columnas tiene la tabla.
 
+En Supabase existen las dos columnas, pero `method` queda vacía. Al leer el medio de pago en producción, usar `COALESCE(p.payment_method, p.method)`: es lo que hace el reporte de pagos (`api/_handlers/reports/payments.js`), que antes leía `method` y mostraba todos los pagos sin medio, así que el filtro "solo efectivo" daba cero.
+
 ## Entornos
 
 **Local:** backend en 9000 (`cd backend && npm start`), frontend en 9001 (`cd frontend && npm run dev`). Postgres local, base `balnearios_mvp`.
