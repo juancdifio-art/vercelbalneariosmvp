@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import Sidebar from './Sidebar';
+import SoportePanel from './soporte/SoportePanel';
 import { isWideSection, DEFAULT_MAX_WIDTH, groupNavItems } from '../config/sections';
-import { NavIcon, SalirIcon } from './icons';
+import { NavIcon, SalirIcon, SoporteIcon } from './icons';
+import { useNoLeidosSoporte } from '../hooks/useSoporte';
 
 function AuthenticatedShell({
   establishment,
@@ -28,6 +30,17 @@ function AuthenticatedShell({
     setMobileMenuOpen(false);
   };
 
+  // Chat de soporte: se abre encima de la pantalla actual, que viaja con cada
+  // mensaje para saber desde donde escribieron.
+  const [soporteAbierto, setSoporteAbierto] = useState(false);
+  const { noLeidos: soporteNoLeidos, refrescar: refrescarSoporte } = useNoLeidosSoporte(true);
+  const pantallaActual = (navItems || []).find((item) => item.id === activeSection)?.label || activeSection;
+  const abrirSoporte = () => {
+    setSoporteAbierto(true);
+    setMobileMenuOpen(false);
+  };
+  const cerrarSoporte = useCallback(() => setSoporteAbierto(false), []);
+
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-sky-50 via-cyan-50 to-amber-50">
       {/* Mobile Header - Fixed at top */}
@@ -42,9 +55,12 @@ function AuthenticatedShell({
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-lg text-white hover:bg-sky-800 transition"
+            className="relative p-2 rounded-lg text-white hover:bg-sky-800 transition"
             aria-label="Abrir menú"
           >
+            {soporteNoLeidos > 0 && !mobileMenuOpen && (
+              <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-cyan-400" aria-hidden="true" />
+            )}
             {mobileMenuOpen ? (
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -94,6 +110,17 @@ function AuthenticatedShell({
             ))}
 
             <div className="border-t border-white/10 pt-3">
+              <button
+                type="button"
+                onClick={abrirSoporte}
+                className="mb-2 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-sky-100/75 transition hover:bg-sky-900 hover:text-white"
+              >
+                <SoporteIcon className="h-[18px] w-[18px] shrink-0" />
+                <span className="flex-1 text-left">Soporte</span>
+                {soporteNoLeidos > 0 && (
+                  <span className="rounded-full bg-cyan-400 px-1.5 text-[10px] font-bold leading-4 text-sky-950">{soporteNoLeidos}</span>
+                )}
+              </button>
               <p className="mb-2 truncate px-1 text-[11px] text-sky-200/80">{userEmail}</p>
               <button
                 type="button"
@@ -127,6 +154,8 @@ function AuthenticatedShell({
         onToggleSidebar={onToggleSidebar}
         onLogout={onLogout}
         navItems={navItems}
+        onAbrirSoporte={abrirSoporte}
+        soporteNoLeidos={soporteNoLeidos}
       />
 
       {/* Main content */}
@@ -135,6 +164,13 @@ function AuthenticatedShell({
           {children}
         </div>
       </main>
+
+      <SoportePanel
+        abierto={soporteAbierto}
+        onCerrar={cerrarSoporte}
+        pantalla={pantallaActual}
+        onLeido={refrescarSoporte}
+      />
     </div>
   );
 }

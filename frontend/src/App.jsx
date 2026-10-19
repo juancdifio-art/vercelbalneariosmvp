@@ -18,6 +18,7 @@ import SombrillaReservationModal from './components/SombrillaReservationModal';
 import PoolPassModal from './components/PoolPassModal';
 import ReservationEditModal from './components/ReservationEditModal';
 import EstablishmentConfigForm from './components/EstablishmentConfigForm';
+import BandejaSoporte from './components/soporte/BandejaSoporte';
 import PanelUsuarioSection from './components/PanelUsuarioSection';
 import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
@@ -104,6 +105,7 @@ function App() {
     authToken,
     userEmail,
     setUserEmail,
+    userRole,
     email,
     setEmail,
     password,
@@ -2285,6 +2287,11 @@ function App() {
   };
 
   if (isAuthenticated) {
+    // La cuenta de soporte no administra un balneario: atiende la bandeja.
+    if (userRole === 'soporte') {
+      return <BandejaSoporte userEmail={userEmail} onLogout={handleLogout} />;
+    }
+
     if (!establishmentLoaded) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">

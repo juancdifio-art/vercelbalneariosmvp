@@ -103,6 +103,15 @@ Spec: `docs/superpowers/specs/2026-09-26-servicios-incluidos-design.md`.
 - **Cuenta única:** la carpa y todo lo suyo (cocheras, pase de pileta pago) se cobran con **un solo pago**, que `cobrarCuenta` reparte en orden (la carpa, las cocheras, la pileta paga) y guarda como un pago por reserva, así los reportes por rubro no cambian. En el alta va en `pagoInicial`, dentro de la transacción; después, por `POST /reservation-groups/:id/pago-cuenta`. El pase pago se vende en el alta con precio por día de adulto y de menor (`pasePago`).
 - **Tope de personas y pases por unidad** son ajustes del establecimiento (`pases_pileta_por_carpa` 4, `pases_pileta_por_sombrilla` 0, `max_personas_por_unidad` 6).
 
+## Chat de soporte
+
+El balneario nos escribe desde la app (error, sugerencia o consulta) y respondemos desde una bandeja. Todo en la misma base, sin servicios externos: tabla `soporte_mensajes`, un hilo por establecimiento. Migración: `backend/migrate-soporte.sql`.
+
+- **La lógica vive en `api/_soporte/servicio.js`** (`rutearSoporte`), compartida por las dos APIs como `_tarifas`. Rutas: `soporte/mensajes` y `soporte/no-leidos` para el establecimiento; `soporte/bandeja` y `soporte/bandeja/:estId` solo para el rol `soporte`.
+- **El rol `soporte` se lee de la base en cada pedido**, no del token. El login devuelve `user.role` solo para que el frontend elija pantalla: con `soporte`, `App.jsx` muestra `BandejaSoporte` en vez del balneario. No hay alta por la app: se crea el usuario y se le pone `role = 'soporte'` por SQL, con una contraseña larga y aleatoria (esa cuenta ve todos los balnearios).
+- **Frontend:** el botón Soporte del menú (`Sidebar` y el menú mobile, con contador de no leídos) abre `SoportePanel` encima de la pantalla actual, que se guarda con el mensaje. Componentes en `components/soporte/`, pedidos en `hooks/useSoporte.js`.
+- **Envíos:** máximo 10 por minuto por lado, contados e insertados en una transacción con `pg_advisory_xact_lock` (`soporte:<estId>:<deSoporte>`). El hilo devuelve los últimos 200 mensajes.
+
 ## Seguridad
 
 Antes de mergear cualquier feature que toque autenticación, autorización, upload de archivos u OAuth, pasar por `@security`.
@@ -112,6 +121,7 @@ Pendientes conocidos, fuera del alcance de lo hecho hasta ahora:
 - `api/lib/auth.js` e `index.js` usan `process.env.JWT_SECRET || 'change_this_secret'`. El fallback hace que la app arranque sin secreto en vez de fallar ruidosamente.
 - El token expira en 1 hora; la convención del equipo son 15 minutos de access token más refresh token.
 - El login hashea con bcrypt rounds 10. Los endpoints nuevos de cambio de contraseña usan 12, así que cada usuario sube de rounds al cambiarla.
+- El login no tiene rate limiting por IP ni por cuenta, y con un email inexistente responde sin correr bcrypt (se puede averiguar qué emails existen). Pesa más desde que existe el rol `soporte`. En Vercel un límite en memoria no sirve: tiene que vivir en la base (tabla de intentos por `ip:` y `cuenta:`, 15 minutos).
 
 ## Estado del modelo de datos
 

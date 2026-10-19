@@ -71,3 +71,31 @@ describe('useAuth y la sesion vencida', () => {
     expect(result.current.error).toBe(MENSAJE);
   });
 });
+
+describe('useAuth y el rol', () => {
+  it('guarda el rol que devuelve el login, lo rehidrata y lo borra al salir', async () => {
+    global.fetch = vi.fn(() => Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ token: tokenQueVence(3600), user: { id: 9, email: 'soporte@infinite.test', role: 'soporte' } })
+    }));
+    const { result } = renderHook(() => useAuth());
+    act(() => {
+      result.current.setEmail('soporte@infinite.test');
+      result.current.setPassword('clave123');
+    });
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: () => {} });
+    });
+    expect(result.current.userRole).toBe('soporte');
+    expect(sessionStorage.getItem('authRole')).toBe('soporte');
+
+    const recargada = renderHook(() => useAuth());
+    expect(recargada.result.current.userRole).toBe('soporte');
+
+    act(() => {
+      result.current.handleLogout();
+    });
+    expect(result.current.userRole).toBe('');
+    expect(sessionStorage.getItem('authRole')).toBeNull();
+  });
+});
