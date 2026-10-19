@@ -20,7 +20,8 @@ import {
   Banknote,
   X,
   TriangleAlert,
-  Tags
+  Tags,
+  MessageCircle
 } from 'lucide-react';
 
 /**
@@ -105,6 +106,7 @@ const POR_SECCION = {
 };
 
 export const SalirIcon = conTrazo(LogOut);
+export const SoporteIcon = conTrazo(MessageCircle);
 
 // --- Dashboard ---------------------------------------------------------
 // Encabezados de seccion y tarjetas de metrica del resumen.

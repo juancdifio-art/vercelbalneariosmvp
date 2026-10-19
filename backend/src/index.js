@@ -19,6 +19,7 @@ const queryTarifas = (sql, params) => pool.query(sql, params);
 const incluidos = require('../../api/_incluidos/servicio');
 const reglasIncluidos = require('../../api/_incluidos/reglas');
 const { enTransaccion } = require('../../api/_incluidos/transaccion');
+const soporte = require('../../api/_soporte/servicio');
 
 async function conTransaccion(fn) {
   const client = await pool.connect();
@@ -164,7 +165,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const result = await pool.query(
-      'SELECT id, email, password_hash FROM users WHERE email = $1',
+      'SELECT id, email, password_hash, role FROM users WHERE email = $1',
       [email]
     );
 
@@ -188,9 +189,12 @@ app.post('/api/auth/login', async (req, res) => {
 
     res.json({
       token,
+      // El rol solo decide que pantalla muestra el frontend; cada endpoint
+      // lo vuelve a leer de la base.
       user: {
         id: user.id,
-        email: user.email
+        email: user.email,
+        role: user.role
       }
     });
   } catch (error) {
@@ -2307,6 +2311,21 @@ const pasePersonas = async (req, res) => {
 
 app.get('/api/reservation-groups/:id/pase-personas', authenticateToken, pasePersonas);
 app.put('/api/reservation-groups/:id/pase-personas', authenticateToken, pasePersonas);
+
+// Chat de soporte. La logica vive en api/_soporte/servicio.js.
+app.all(/^\/api\/soporte(\/.*)?$/, authenticateToken, async (req, res) => {
+  try {
+    const r = await soporte.rutearSoporte(queryTarifas, req.user.id, {
+      method: req.method,
+      partes: req.path.split('/').filter(Boolean).slice(2),
+      body: req.body || {}
+    });
+    return res.status(r.status).json(r.body);
+  } catch (error) {
+    console.error('Error en soporte', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
 
 app.all(/^\/api\/tarifas(\/.*)?$/, authenticateToken, async (req, res) => {
   try {

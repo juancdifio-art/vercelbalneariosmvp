@@ -12,6 +12,9 @@ function useAuth(options = {}) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authToken, setAuthToken] = useState('');
   const [userEmail, setUserEmail] = useState('');
+  // Solo decide que pantalla se muestra ('soporte' ve la bandeja); la API
+  // vuelve a leer el rol de la base en cada pedido.
+  const [userRole, setUserRole] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -40,6 +43,7 @@ function useAuth(options = {}) {
       if (vence !== null && vence <= Date.now()) {
         sessionStorage.removeItem('authToken');
         sessionStorage.removeItem('authEmail');
+        sessionStorage.removeItem('authRole');
         setEmail(storedEmail);
         setError(MENSAJE_SESION_VENCIDA);
         return;
@@ -47,6 +51,7 @@ function useAuth(options = {}) {
       setIsAuthenticated(true);
       setAuthToken(token);
       setUserEmail(storedEmail);
+      setUserRole(sessionStorage.getItem('authRole') || '');
       setEmail(storedEmail);
     }
   }, []);
@@ -98,6 +103,9 @@ function useAuth(options = {}) {
       const finalEmail = (data && data.user && data.user.email) || email;
       sessionStorage.setItem('authEmail', finalEmail);
       setUserEmail(finalEmail);
+      const rol = (data && data.user && data.user.role) || '';
+      sessionStorage.setItem('authRole', rol);
+      setUserRole(rol);
       setIsAuthenticated(true);
       setSuccess('Login correcto.');
     } catch (err) {
@@ -110,9 +118,11 @@ function useAuth(options = {}) {
   const handleLogout = () => {
     sessionStorage.removeItem('authToken');
     sessionStorage.removeItem('authEmail');
+    sessionStorage.removeItem('authRole');
     setIsAuthenticated(false);
     setAuthToken('');
     setUserEmail('');
+    setUserRole('');
     setPassword('');
     setError('');
     setSuccess('');
@@ -153,6 +163,7 @@ function useAuth(options = {}) {
     setAuthToken,
     userEmail,
     setUserEmail,
+    userRole,
     email,
     setEmail,
     password,

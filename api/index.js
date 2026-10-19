@@ -7,6 +7,7 @@ const tarifas = require('./_tarifas/servicio');
 const incluidos = require('./_incluidos/servicio');
 const reglasIncluidos = require('./_incluidos/reglas');
 const { enTransaccion } = require('./_incluidos/transaccion');
+const soporte = require('./_soporte/servicio');
 
 // Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
 // Es obligatoria en toda reserva de estacionamiento.
@@ -492,7 +493,7 @@ module.exports = async (req, res) => {
         }
 
         const result = await db.query(
-          'SELECT id, email, password_hash FROM users WHERE email = $1',
+          'SELECT id, email, password_hash, role FROM users WHERE email = $1',
           [email]
         );
 
@@ -517,9 +518,12 @@ module.exports = async (req, res) => {
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({
           token,
+          // El rol solo decide que pantalla muestra el frontend; cada endpoint
+          // lo vuelve a leer de la base.
           user: {
             id: user.id,
-            email: user.email
+            email: user.email,
+            role: user.role
           }
         }));
       } catch (error) {
@@ -1908,6 +1912,22 @@ module.exports = async (req, res) => {
         res.statusCode = 500;
         res.setHeader('Content-Type', 'application/json');
         return res.end(JSON.stringify({ error: 'server_error' }));
+      }
+    }
+
+    // ============= /api/soporte/* =============
+    // Chat de soporte: la logica vive en _soporte/servicio.js, compartida con el backend local.
+    if (first === 'soporte') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const body = method === 'POST' ? await parseJsonBody(req) : {};
+        const r = await soporte.rutearSoporte(db.query, user.id, { method, partes: segments.slice(2), body });
+        return responder(res, r.status, r.body);
+      } catch (error) {
+        console.error('Error en soporte:', error);
+        return responder(res, 500, { error: 'server_error' });
       }
     }
 

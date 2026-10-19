@@ -18,6 +18,15 @@ export function fechaCorta(valor) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : String(valor || '');
 }
 
+// Timestamp ISO → '19/10/2026 14:32', en hora local (no corta el texto: a la
+// noche la fecha UTC ya es la del dia siguiente).
+export function fechaHora(valor) {
+  const d = new Date(valor);
+  if (!valor || Number.isNaN(d.getTime())) return String(valor || '');
+  const dos = (n) => String(n).padStart(2, '0');
+  return `${dos(d.getDate())}/${dos(d.getMonth() + 1)}/${d.getFullYear()} ${dos(d.getHours())}:${dos(d.getMinutes())}`;
+}
+
 export function nombreUnidad(serviceType, numero) {
   if (serviceType === 'carpa') return `Carpa ${numero}`;
   if (serviceType === 'sombrilla') return `Sombrilla ${numero}`;

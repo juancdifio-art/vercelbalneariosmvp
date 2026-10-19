@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavIcon, SalirIcon } from './icons';
+import { NavIcon, SalirIcon, SoporteIcon } from './icons';
 import { groupNavItems } from '../config/sections';
 
 /**
@@ -17,7 +17,9 @@ function Sidebar({
   sidebarCollapsed,
   onToggleSidebar,
   onLogout,
-  navItems
+  navItems,
+  onAbrirSoporte,
+  soporteNoLeidos = 0
 }) {
   const grupos = groupNavItems(navItems);
   const inicial = (userEmail || '?').trim().charAt(0).toUpperCase();
@@ -101,6 +103,34 @@ function Sidebar({
 
       {/* Cuenta */}
       <div className="mt-4 border-t border-white/10 pt-3">
+        {onAbrirSoporte && (
+          <button
+            type="button"
+            onClick={onAbrirSoporte}
+            title={sidebarCollapsed ? 'Soporte' : undefined}
+            aria-label={soporteNoLeidos > 0 ? `Soporte, ${soporteNoLeidos} sin leer` : 'Soporte'}
+            className={
+              'relative mb-2 flex w-full items-center rounded-lg py-2 text-[13px] text-sky-100/75 transition hover:bg-sky-900 hover:text-white ' +
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-sky-950 ' +
+              (sidebarCollapsed ? 'justify-center px-0' : 'gap-3 px-3')
+            }
+          >
+            <SoporteIcon className="h-[18px] w-[18px] shrink-0" />
+            {!sidebarCollapsed && <span className="flex-1 text-left">Soporte</span>}
+            {soporteNoLeidos > 0 && (
+              <span
+                aria-hidden="true"
+                className={
+                  'rounded-full bg-cyan-400 px-1.5 text-[10px] font-bold leading-4 text-sky-950 ' +
+                  (sidebarCollapsed ? 'absolute right-1 top-0.5' : '')
+                }
+              >
+                {soporteNoLeidos}
+              </span>
+            )}
+          </button>
+        )}
+
         {!sidebarCollapsed && (
           <div className="mb-2 flex items-center gap-2.5 px-1">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan-500/20 text-[11px] font-semibold text-cyan-200">
