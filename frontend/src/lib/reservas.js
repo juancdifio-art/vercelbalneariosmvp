@@ -195,6 +195,13 @@ export function proximaReserva(reservas, serviceType, resourceNumber, fecha) {
  */
 export function estacionamientoVinculado(reservas, reserva) {
   if (!reserva) return null;
+  // La cochera incluida en la reserva se reconoce por su vinculo real; el
+  // criterio de cliente y fechas queda para las cargadas antes de que existiera.
+  const incluida = (reservas || []).find(
+    (g) => g && g.serviceType === 'parking' && g.status !== 'cancelled' &&
+      g.vinculo === 'incluido' && Number(g.incluidaEnReservaId) === Number(reserva.id)
+  );
+  if (incluida) return incluida;
   const nombre = (reserva.customerName || '').trim().toLowerCase();
   return (
     (reservas || []).find((g) => {
@@ -204,4 +211,40 @@ export function estacionamientoVinculado(reservas, reserva) {
       return Boolean(nombre) && (g.customerName || '').trim().toLowerCase() === nombre;
     }) || null
   );
+}
+
+/**
+ * La cuenta de una carpa o sombrilla: ella y todo lo asociado (cocheras
+ * incluidas y pases de pileta pagos). Es contra este saldo que se cobra.
+ */
+export function cuentaDe(reservas, reserva) {
+  if (!reserva) return { total: 0, pagado: 0, saldo: 0, asociadas: 0 };
+  const asociadas = (reservas || []).filter(
+    (g) => g && g.status !== 'cancelled' && Number(g.incluidaEnReservaId) === Number(reserva.id)
+  );
+  const todas = [reserva, ...asociadas];
+  const total = todas.reduce((suma, g) => suma + numero(g.totalPrice), 0);
+  const pagado = todas.reduce((suma, g) => suma + numero(g.paidAmount), 0);
+  return { total, pagado, saldo: Math.max(0, total - pagado), asociadas: asociadas.length };
+}
+
+/**
+ * Los pagos de una cuenta (la carpa y lo asociado) como los vio el cliente.
+ * Un pago de la cuenta se guarda repartido, una parte por reserva; las partes
+ * comparten fecha, medio y momento de carga, y aca vuelven a ser un solo pago.
+ */
+export function unirPagosDeCuenta(listas) {
+  const porClave = new Map();
+  for (const pago of (listas || []).flat()) {
+    if (!pago) continue;
+    const method = pago.method || pago.paymentMethod || '';
+    const clave = `${pago.createdAt || pago.id}|${String(pago.paymentDate || '').slice(0, 10)}|${method}`;
+    const previo = porClave.get(clave);
+    if (previo) {
+      previo.amount += numero(pago.amount);
+    } else {
+      porClave.set(clave, { id: pago.id, amount: numero(pago.amount), paymentDate: pago.paymentDate, method, createdAt: pago.createdAt });
+    }
+  }
+  return [...porClave.values()].sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
 }

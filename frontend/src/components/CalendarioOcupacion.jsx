@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { addDays, isSameDay } from 'date-fns';
 import { format, weekdayInitial } from '../lib/dates';
-import { diasInclusivos, estacionamientoVinculado, hoyISO } from '../lib/reservas';
+import { diasInclusivos, estacionamientoVinculado, hoyISO, cuentaDe } from '../lib/reservas';
 import ReservaEtiqueta from './ReservaEtiqueta';
 import TooltipFlotante from './TooltipFlotante';
 import FichaUnidad from './FichaUnidad';
@@ -146,6 +146,7 @@ function CalendarioOcupacion({
         fecha={hoy}
         reserva={group}
         estacionamiento={estacionamientoVinculado(reservationGroups, group)}
+        cuenta={group ? cuentaDe(reservationGroups, group) : null}
       />
     );
   };

@@ -417,6 +417,9 @@ describe('precio por tarifa en /api/reservation-groups', () => {
     queryMock.mockResolvedValueOnce({ rows: [] }); // sin conflicto
     conTarifa();
     queryMock.mockResolvedValueOnce({ rows: [{ ...guardada, end_date: '2026-01-14' }] });
+    // Con fechas nuevas la carpa mueve sus servicios incluidos: no tiene ninguno.
+    queryMock.mockResolvedValueOnce({ rows: [] });
+    queryMock.mockResolvedValueOnce({ rows: [{ n: 0 }] });
 
     const res = await request(handler).patch('/?route=reservation-groups/60').set('Authorization', `Bearer ${tokenPara(2)}`).send({ endDate: '2026-01-14' });
 

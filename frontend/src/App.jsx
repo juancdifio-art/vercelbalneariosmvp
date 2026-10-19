@@ -21,9 +21,11 @@ import EstablishmentConfigForm from './components/EstablishmentConfigForm';
 import PanelUsuarioSection from './components/PanelUsuarioSection';
 import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
+import AvisoGlobal from './components/AvisoGlobal';
 import DailyViewSection from './components/DailyViewSection';
 import { normalizarPatente } from './lib/patente';
 import { precioDesdeReserva } from './lib/tarifas';
+import { armarIncluidos, mensajeErrorIncluidos, cambiosIncluidos } from './lib/incluidos';
 import DashboardSection from './components/DashboardSection';
 import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
@@ -131,6 +133,16 @@ function App() {
     }
   });
 
+  // Sube cada vez que un cambio toca varias reservas a la vez (una carpa con
+  // sus incluidos): las grillas y listas que dependen de esto se vuelven a pedir.
+  const [datosVersion, setDatosVersion] = useState(0);
+  const refrescarDatos = () => setDatosVersion((v) => v + 1);
+  // A que reserva abierta va el cliente que se esta creando desde un modal.
+  const [clienteNuevoPara, setClienteNuevoPara] = useState(null);
+  // La reserva desde cuyo detalle se abrio otro modal (editar, agendar pago,
+  // vender pase de pileta): al guardar o cerrar ese modal se vuelve a su detalle.
+  const [volverACarpa, setVolverACarpa] = useState(null);
+
   const {
     establishment,
     establishmentLoaded,
@@ -152,6 +164,8 @@ function App() {
     setEstSombrillasCapacity,
     estPoolMaxOccupancy,
     setEstPoolMaxOccupancy,
+    estAjustes,
+    setEstAjustes,
     estSaving,
     fetchEstablishment,
     handleSaveEstablishment
@@ -226,6 +240,7 @@ function App() {
     // Cargar reservas (si no hay servicio seleccionado, carga todas)
     fetchReservationGroups(token);
   }, [
+    datosVersion,
     isAuthenticated,
     activeSection,
     authToken,
@@ -254,7 +269,7 @@ function App() {
       from,
       to
     });
-  }, [isAuthenticated, activeSection, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, activeSection, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -270,7 +285,7 @@ function App() {
       from: '',
       to: ''
     });
-  }, [isAuthenticated, activeSection, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, activeSection, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -284,7 +299,7 @@ function App() {
       service: 'pileta',
       status: 'active'
     });
-  }, [isAuthenticated, establishment, activeSection, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -368,7 +383,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, establishment, carpasDayOffset, authToken]);
+  }, [datosVersion, isAuthenticated, establishment, carpasDayOffset, authToken]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -388,7 +403,7 @@ function App() {
       from: format(startDate, 'yyyy-MM-dd'),
       to: format(endDate, 'yyyy-MM-dd')
     });
-  }, [isAuthenticated, establishment, activeSection, carpasDayOffset, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, carpasDayOffset, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -460,7 +475,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, establishment, sombrillasDayOffset, authToken]);
+  }, [datosVersion, isAuthenticated, establishment, sombrillasDayOffset, authToken]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -480,7 +495,7 @@ function App() {
       from: format(startDate, 'yyyy-MM-dd'),
       to: format(endDate, 'yyyy-MM-dd')
     });
-  }, [isAuthenticated, establishment, activeSection, sombrillasDayOffset, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, sombrillasDayOffset, authToken, fetchReservationGroups]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -552,7 +567,7 @@ function App() {
     return () => {
       controller.abort();
     };
-  }, [isAuthenticated, establishment, parkingDayOffset, authToken]);
+  }, [datosVersion, isAuthenticated, establishment, parkingDayOffset, authToken]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -572,7 +587,7 @@ function App() {
       from: format(startDate, 'yyyy-MM-dd'),
       to: format(endDate, 'yyyy-MM-dd')
     });
-  }, [isAuthenticated, establishment, activeSection, parkingDayOffset, authToken, fetchReservationGroups]);
+  }, [datosVersion, isAuthenticated, establishment, activeSection, parkingDayOffset, authToken, fetchReservationGroups]);
 
   // Toggle individual deshabilitado - Ahora se usan solo modales para crear reservas
   const handleToggleCarpaReservation = (carpaNumero, day) => {
@@ -607,38 +622,10 @@ function App() {
     return new Date(year, month - 1, dayNum);
   };
 
-  const findAvailableParkingSpotForRange = (startDateObj, endDateObj, preferredSpot) => {
-    if (!establishment || !establishment.hasParking) return null;
-
-    const totalPlazasRaw = establishment.parkingCapacity ?? '0';
-    const totalPlazas = Number.parseInt(totalPlazasRaw, 10);
-    if (!totalPlazas || Number.isNaN(totalPlazas)) return null;
-
-    const preferred =
-      preferredSpot && Number.isInteger(preferredSpot) && preferredSpot >= 1 && preferredSpot <= totalPlazas
-        ? preferredSpot
-        : 1;
-
-    for (let offset = 0; offset < totalPlazas; offset += 1) {
-      const plazaNumero = ((preferred - 1 + offset) % totalPlazas) + 1;
-
-      let disponible = true;
-
-      for (let d = new Date(startDateObj); d <= endDateObj; d = addDays(d, 1)) {
-        const dateKeyStr = format(d, 'yyyy-MM-dd');
-        const key = `${dateKeyStr}-${plazaNumero}`;
-        if (parkingReservations[key]) {
-          disponible = false;
-          break;
-        }
-      }
-
-      if (disponible) {
-        return plazaNumero;
-      }
-    }
-
-    return null;
+  // Los pases pagos asociados no se mueven ni se cancelan con la carpa: se avisa.
+  const avisarPasesPagos = (n, accion) => {
+    if (!n) return;
+    setSuccess(`La carpa ${accion}. Tiene ${n === 1 ? '1 pase de pileta pago asociado' : `${n} pases de pileta pagos asociados`}: revisalo.`);
   };
 
   const handleSaveCarpaReservationRange = async (
@@ -688,14 +675,12 @@ function App() {
       childrenCount,
       precio,
       clientId,
-      includeParking,
-      parkingSpotNumber,
-      precioCochera,
-      initialPaymentAmount,
-      initialPaymentMethod,
-      parkingInitialPaymentAmount,
-      parkingInitialPaymentMethod,
-      vehiclePlate
+      incluyePileta,
+      cocheras,
+      personas,
+      titular,
+      pasePago,
+      pagoInicial
     } = extra;
 
     try {
@@ -717,7 +702,16 @@ function App() {
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
-          childrenCount: String(childrenCount ?? '')
+          childrenCount: String(childrenCount ?? ''),
+          // Pileta y cocheras: el servidor crea todo junto o nada.
+          incluidos: armarIncluidos({ incluyePileta, cocheras }),
+          // Acompanantes de esta reserva y datos del titular (van a su ficha).
+          personas,
+          titular,
+          // Pases de pileta pagos (precio por dia) y un solo pago por toda la
+          // cuenta: el servidor lo reparte y lo guarda en la misma transaccion.
+          pasePago,
+          pagoInicial
         })
       });
 
@@ -730,12 +724,10 @@ function App() {
       }
 
       if (!response.ok) {
-        if (data && data.error === 'no_availability') {
-          setCarpaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
-        } else if (data && data.error === 'motivo_ajuste_required') {
-          setCarpaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
-        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
-          setCarpaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        // Si una cochera o la pileta no se pudo reservar, no se guardo nada.
+        const mensaje = mensajeErrorIncluidos(data);
+        if (mensaje) {
+          setCarpaReservationError(mensaje);
         } else {
           console.error('Error creating reservation group for carpas', data);
           setError('No se pudo crear la reserva.');
@@ -751,59 +743,6 @@ function App() {
           }
           return [...prev, data.group];
         });
-
-        const method = (initialPaymentMethod || '').trim();
-        const rawAmount = initialPaymentAmount;
-
-        if (method && rawAmount !== undefined && rawAmount !== null && rawAmount !== '') {
-          const amountNum = Number.parseFloat(String(rawAmount).replace(',', '.'));
-
-          if (!Number.isNaN(amountNum) && amountNum > 0) {
-            try {
-              const today = new Date();
-              const yyyy = today.getFullYear();
-              const mm = String(today.getMonth() + 1).padStart(2, '0');
-              const dd = String(today.getDate()).padStart(2, '0');
-              const todayStr = `${yyyy}-${mm}-${dd}`;
-
-              const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.group.id}/payments`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                  },
-                  body: JSON.stringify({
-                    amount: String(rawAmount),
-                    paymentDate: todayStr,
-                    method,
-                    notes: ''
-                  })
-                }
-              );
-
-              if (paymentResponse.ok) {
-                const paymentData = await paymentResponse.json();
-                if (paymentData.payment) {
-                  setReservationGroups((prev) =>
-                    prev.map((g) =>
-                      g.id === data.group.id
-                        ? {
-                          ...g,
-                          paidAmount:
-                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                        }
-                        : g
-                    )
-                  );
-                }
-              }
-            } catch (paymentErr) {
-              console.error('Error creating initial payment for carpa reservation', paymentErr);
-            }
-          }
-        }
       }
 
       // Actualizamos el mapa local para que el rango quede pintado sin esperar a un refetch
@@ -818,31 +757,17 @@ function App() {
       });
       setCarpaReservationError('');
 
-      if (
-        includeParking &&
-        establishment &&
-        establishment.hasParking
-      ) {
-        const preferredRaw = parkingSpotNumber ? Number.parseInt(String(parkingSpotNumber), 10) : null;
-        const plazaNumero = findAvailableParkingSpotForRange(start, end, preferredRaw);
-
-        if (plazaNumero !== null) {
-          await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
-            customerName,
-            customerPhone,
-            adultsCount,
-            childrenCount,
-            precio: precioCochera,
-            clientId,
-            initialPaymentAmount: parkingInitialPaymentAmount,
-            initialPaymentMethod: parkingInitialPaymentMethod,
-            vehiclePlate
-          });
-        } else {
-          setError(
-            'Se creó la reserva de carpa, pero no se encontró ninguna plaza de estacionamiento disponible para ese rango de fechas.'
-          );
-        }
+      const cocherasCreadas = data?.incluidos?.cocheras || [];
+      if (cocherasCreadas.length) {
+        const plazas = cocherasCreadas.map((c) => c.plaza).join(', ');
+        setSuccess(`Reserva guardada. ${cocherasCreadas.length === 1 ? 'Cochera en la plaza' : 'Cocheras en las plazas'} ${plazas}.`);
+      }
+      if (cocherasCreadas.length || data?.incluidos?.pileta || data?.incluidos?.pasePago || data?.pago) {
+        refrescarDatos();
+      }
+      // La ficha del titular pudo haberse completado con DNI y fecha de nacimiento.
+      if (titular && clientId) {
+        fetchClients(token);
       }
 
       return true;
@@ -851,6 +776,67 @@ function App() {
       setError('No se pudo conectar con el servidor para crear la reserva.');
       return false;
     }
+  };
+
+  // Pase de pileta pago para personas de la carpa que no tienen pase.
+  const handleVenderPase = async (carpa) => {
+    const token = authToken || sessionStorage.getItem('authToken');
+    if (!token || !carpa) return;
+    const headers = { Authorization: `Bearer ${token}` };
+    const leer = async (url, clave) => {
+      try {
+        const res = await fetch(`${API_BASE_URL}${url}`, { headers });
+        if (!res.ok) return [];
+        const data = await res.json();
+        return data[clave] || [];
+      } catch (err) {
+        console.error('Error leyendo personas de la carpa', err);
+        return [];
+      }
+    };
+
+    const idsPases = [
+      carpa.incluidos?.pileta?.id,
+      ...(carpa.incluidos?.pasesPagos || []).map((p) => p.id)
+    ].filter(Boolean);
+    const [guests, ...conPase] = await Promise.all([
+      leer(`/api/reservation-groups/${carpa.id}/guests`, 'guests'),
+      ...idsPases.map((id) => leer(`/api/reservation-groups/${id}/pase-personas`, 'personas'))
+    ]);
+    const tienen = conPase.flat();
+    const titular = (clients || []).find((c) => Number(c.id) === Number(carpa.clientId));
+
+    const disponibles = [
+      ...(titular && !tienen.some((p) => Number(p.clientId) === Number(titular.id))
+        ? [{ key: `c-${titular.id}`, clientId: titular.id, fullName: titular.fullName, documentNumber: titular.documentNumber, birthDate: titular.birthDate }]
+        : []),
+      ...guests
+        .filter((g) => !tienen.some((p) => Number(p.guestId) === Number(g.id)))
+        .map((g) => ({ key: `g-${g.id}`, guestId: g.id, fullName: g.fullName, documentNumber: g.documentNumber, age: g.age, birthDate: g.birthDate }))
+    ];
+
+    setPoolPassError('');
+    // El detalle se cierra para no apilar modales; al guardar o cerrar el
+    // pase se vuelve a esta carpa.
+    setVolverACarpa(carpa);
+    setReservationDetailsModal(null);
+    setPoolPassForm({
+      startDate: carpa.startDate,
+      endDate: carpa.endDate,
+      clientId: carpa.clientId ?? null,
+      customerName: carpa.customerName || '',
+      customerPhone: carpa.customerPhone || '',
+      poolAdultsCount: '0',
+      poolChildrenCount: '0',
+      poolAdultPricePerDay: '',
+      poolChildPricePerDay: '',
+      initialPaymentAmount: '',
+      initialPaymentMethod: '',
+      incluidaEnReservaId: carpa.id,
+      carpaEtiqueta: `${carpa.serviceType === 'sombrilla' ? 'Sombrilla' : 'Carpa'} ${carpa.resourceNumber}`,
+      personasDisponibles: disponibles,
+      personasElegidas: []
+    });
   };
 
   const handleOpenNewPoolPass = () => {
@@ -962,7 +948,9 @@ function App() {
           adultsCount: String(adults),
           childrenCount: String(children),
           poolAdultPricePerDay: poolAdultPricePerDay ? String(poolAdultPricePerDay) : '',
-          poolChildPricePerDay: poolChildPricePerDay ? String(poolChildPricePerDay) : ''
+          poolChildPricePerDay: poolChildPricePerDay ? String(poolChildPricePerDay) : '',
+          // Pase pago vendido desde una carpa: queda asociado a ella.
+          incluidaEnReservaId: form.incluidaEnReservaId || undefined
         })
       });
 
@@ -984,7 +972,8 @@ function App() {
         return false;
       }
 
-      if (data && data.reservationGroup) {
+      const paseCreado = data && (data.group || data.reservationGroup);
+      if (paseCreado) {
         const method = (initialPaymentMethod || '').trim();
         const rawAmount = initialPaymentAmount;
 
@@ -1000,7 +989,7 @@ function App() {
               const todayStr = `${yyyy}-${mm}-${dd}`;
 
               const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.reservationGroup.id}/payments`,
+                `${API_BASE_URL}/api/reservation-groups/${paseCreado.id}/payments`,
                 {
                   method: 'POST',
                   headers: {
@@ -1026,8 +1015,26 @@ function App() {
         }
       }
 
+      // Las personas elegidas de la carpa quedan con este pase.
+      const elegidas = (form.personasDisponibles || []).filter((p) => (form.personasElegidas || []).includes(p.key));
+      if (paseCreado && form.incluidaEnReservaId && elegidas.length) {
+        const res = await fetch(`${API_BASE_URL}/api/reservation-groups/${paseCreado.id}/pase-personas`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            guestIds: elegidas.filter((p) => p.guestId).map((p) => p.guestId),
+            incluyeTitular: elegidas.some((p) => p.clientId)
+          })
+        });
+        if (!res.ok) {
+          const falla = await res.json().catch(() => null);
+          setError(`Se creó el pase, pero no se pudieron asignar las personas: ${mensajeErrorIncluidos(falla) || 'error del servidor'}.`);
+        }
+      }
+
       // Refresh the list from server
       await fetchReservationGroups(token);
+      if (form.incluidaEnReservaId) refrescarDatos();
 
       return true;
     } catch (err) {
@@ -1084,14 +1091,12 @@ function App() {
       childrenCount,
       precio,
       clientId,
-      includeParking,
-      parkingSpotNumber,
-      precioCochera,
-      initialPaymentAmount,
-      initialPaymentMethod,
-      parkingInitialPaymentAmount,
-      parkingInitialPaymentMethod,
-      vehiclePlate
+      incluyePileta,
+      cocheras,
+      personas,
+      titular,
+      pasePago,
+      pagoInicial
     } = extra;
 
     try {
@@ -1113,7 +1118,16 @@ function App() {
           notes: '',
           clientId: clientId ?? '',
           adultsCount: String(adultsCount ?? ''),
-          childrenCount: String(childrenCount ?? '')
+          childrenCount: String(childrenCount ?? ''),
+          // Pileta y cocheras: el servidor crea todo junto o nada.
+          incluidos: armarIncluidos({ incluyePileta, cocheras }),
+          // Acompanantes de esta reserva y datos del titular (van a su ficha).
+          personas,
+          titular,
+          // Pases de pileta pagos (precio por dia) y un solo pago por toda la
+          // cuenta: el servidor lo reparte y lo guarda en la misma transaccion.
+          pasePago,
+          pagoInicial
         })
       });
 
@@ -1126,12 +1140,10 @@ function App() {
       }
 
       if (!response.ok) {
-        if (data && data.error === 'no_availability') {
-          setSombrillaReservationError('No hay disponibilidad en esa unidad en la fecha seleccionada.');
-        } else if (data && data.error === 'motivo_ajuste_required') {
-          setSombrillaReservationError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
-        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
-          setSombrillaReservationError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        // Si una cochera o la pileta no se pudo reservar, no se guardo nada.
+        const mensaje = mensajeErrorIncluidos(data);
+        if (mensaje) {
+          setSombrillaReservationError(mensaje);
         } else {
           console.error('Error creating reservation group for sombrillas', data);
           setError('No se pudo crear la reserva.');
@@ -1147,59 +1159,6 @@ function App() {
           }
           return [...prev, data.group];
         });
-
-        const method = (initialPaymentMethod || '').trim();
-        const rawAmount = initialPaymentAmount;
-
-        if (method && rawAmount !== undefined && rawAmount !== null && rawAmount !== '') {
-          const amountNum = Number.parseFloat(String(rawAmount).replace(',', '.'));
-
-          if (!Number.isNaN(amountNum) && amountNum > 0) {
-            try {
-              const today = new Date();
-              const yyyy = today.getFullYear();
-              const mm = String(today.getMonth() + 1).padStart(2, '0');
-              const dd = String(today.getDate()).padStart(2, '0');
-              const todayStr = `${yyyy}-${mm}-${dd}`;
-
-              const paymentResponse = await fetch(
-                `${API_BASE_URL}/api/reservation-groups/${data.group.id}/payments`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`
-                  },
-                  body: JSON.stringify({
-                    amount: String(rawAmount),
-                    paymentDate: todayStr,
-                    method,
-                    notes: ''
-                  })
-                }
-              );
-
-              if (paymentResponse.ok) {
-                const paymentData = await paymentResponse.json();
-                if (paymentData.payment) {
-                  setReservationGroups((prev) =>
-                    prev.map((g) =>
-                      g.id === data.group.id
-                        ? {
-                          ...g,
-                          paidAmount:
-                            Number(g.paidAmount || 0) + Number(paymentData.payment.amount || 0)
-                        }
-                        : g
-                    )
-                  );
-                }
-              }
-            } catch (paymentErr) {
-              console.error('Error creating initial payment for sombrilla reservation', paymentErr);
-            }
-          }
-        }
       }
 
       setSombrillasReservations((prev) => {
@@ -1213,31 +1172,17 @@ function App() {
       });
       setSombrillaReservationError('');
 
-      if (
-        includeParking &&
-        establishment &&
-        establishment.hasParking
-      ) {
-        const preferredRaw = parkingSpotNumber ? Number.parseInt(String(parkingSpotNumber), 10) : null;
-        const plazaNumero = findAvailableParkingSpotForRange(start, end, preferredRaw);
-
-        if (plazaNumero !== null) {
-          await handleSaveParkingReservationRange(plazaNumero, fromStr, toStr, {
-            customerName,
-            customerPhone,
-            adultsCount,
-            childrenCount,
-            precio: precioCochera,
-            clientId,
-            initialPaymentAmount: parkingInitialPaymentAmount,
-            initialPaymentMethod: parkingInitialPaymentMethod,
-            vehiclePlate
-          });
-        } else {
-          setError(
-            'Se creó la reserva de sombrilla, pero no se encontró ninguna plaza de estacionamiento disponible para ese rango de fechas.'
-          );
-        }
+      const cocherasCreadas = data?.incluidos?.cocheras || [];
+      if (cocherasCreadas.length) {
+        const plazas = cocherasCreadas.map((c) => c.plaza).join(', ');
+        setSuccess(`Reserva guardada. ${cocherasCreadas.length === 1 ? 'Cochera en la plaza' : 'Cocheras en las plazas'} ${plazas}.`);
+      }
+      if (cocherasCreadas.length || data?.incluidos?.pileta || data?.incluidos?.pasePago || data?.pago) {
+        refrescarDatos();
+      }
+      // La ficha del titular pudo haberse completado con DNI y fecha de nacimiento.
+      if (titular && clientId) {
+        fetchClients(token);
       }
 
       return true;
@@ -1452,13 +1397,10 @@ function App() {
       adultsCount: '',
       childrenCount: '',
       dailyPrice: '',
-      includeParking: false,
-      parkingSpotNumber: '',
-      parkingDailyPrice: '',
+      incluyePileta: false,
+      cocheras: [],
       initialPaymentAmount: '',
-      initialPaymentMethod: '',
-      parkingInitialPaymentAmount: '',
-      parkingInitialPaymentMethod: ''
+      initialPaymentMethod: ''
     });
   };
 
@@ -1483,13 +1425,10 @@ function App() {
       adultsCount: '',
       childrenCount: '',
       dailyPrice: '',
-      includeParking: false,
-      parkingSpotNumber: '',
-      parkingDailyPrice: '',
+      incluyePileta: false,
+      cocheras: [],
       initialPaymentAmount: '',
-      initialPaymentMethod: '',
-      parkingInitialPaymentAmount: '',
-      parkingInitialPaymentMethod: ''
+      initialPaymentMethod: ''
     });
   };
 
@@ -1592,11 +1531,16 @@ function App() {
       });
 
       if (!response.ok) {
-        console.error('Error cancelling reservation group');
+        const falla = await response.json().catch(() => null);
+        setError(mensajeErrorIncluidos(falla) || 'No se pudo cancelar la reserva.');
         return;
       }
 
       const data = await response.json();
+      avisarPasesPagos(data.adicionalesAsociados, 'se canceló');
+      if (['carpa', 'sombrilla'].includes(group.serviceType)) {
+        refrescarDatos();
+      }
 
       if (data.reservationGroup) {
         if (data.reservationGroup.serviceType === 'carpa') {
@@ -1685,8 +1629,24 @@ function App() {
     }
   };
 
-  const handleAddPaymentForReservationGroup = (group) => {
+  // `cuenta` ({ total, pagado }) viene del detalle de una carpa con servicios
+  // asociados: el pago se cobra contra el saldo de toda la cuenta.
+  const handleAddPaymentForReservationGroup = (group, cuenta = null) => {
     if (!group) return;
+    if (cuenta) {
+      const saldo = cuenta.total - cuenta.pagado;
+      setReservationPaymentModal({
+        ...group,
+        esCuenta: true,
+        totalPrice: cuenta.total,
+        paidAmount: cuenta.pagado,
+        tempAmount: saldo > 0 ? saldo.toFixed(2) : '',
+        tempPaymentDate: format(new Date(), 'yyyy-MM-dd'),
+        tempMethod: '',
+        tempNotes: ''
+      });
+      return;
+    }
 
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -1733,7 +1693,65 @@ function App() {
       tempNotes: group.notes || '',
       tempVehiclePlate: group.vehiclePlate || '',
       tempPrecio: precioDesdeReserva(group),
+      tempIncluyePileta: undefined,
+      tempCocherasCanceladas: [],
+      cocheras: []
     });
+  };
+
+  // Desde un servicio incluido o un pase pago: abrir la reserva de su carpa.
+  // Puede no estar en la lista cargada (la seccion Pileta trae solo pases).
+  const abrirReservaVinculada = async (group) => {
+    const id = group?.incluidaEnReservaId;
+    if (!id) return;
+    let madre = reservationGroups.find((g) => Number(g.id) === Number(id));
+    if (!madre) {
+      const token = authToken || sessionStorage.getItem('authToken');
+      try {
+        const params = new URLSearchParams({ service: group.incluidaEnTipo || 'carpa', from: group.startDate, to: group.endDate });
+        const res = await fetch(`${API_BASE_URL}/api/reservation-groups?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+        const data = await res.json();
+        madre = (data.reservationGroups || []).find((g) => Number(g.id) === Number(id));
+      } catch (err) {
+        console.error('Error buscando la reserva de la carpa', err);
+      }
+    }
+    setReservationEditModal(null);
+    setVolverACarpa(null);
+    if (madre) {
+      handleViewReservationDetails(madre);
+    } else {
+      setError('No se encontró la reserva de la carpa.');
+    }
+  };
+
+  // Vuelve a abrir el detalle de una reserva con sus datos al dia (por ejemplo,
+  // con el pase pago que se le acaba de vender). Si no se puede traer del
+  // servidor, se abre con lo que ya se tenia.
+  const reabrirReserva = async (reserva) => {
+    if (!reserva) return;
+    const token = authToken || sessionStorage.getItem('authToken');
+    const buscar = async (filtros) => {
+      const params = new URLSearchParams({ service: reserva.serviceType, ...filtros });
+      const res = await fetch(`${API_BASE_URL}/api/reservation-groups?${params}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return (data.reservationGroups || []).find((g) => Number(g.id) === Number(reserva.id)) || null;
+    };
+    let fresca = null;
+    try {
+      // Si se acaban de cambiar sus fechas puede no estar en el rango viejo.
+      fresca = (await buscar({ from: reserva.startDate, to: reserva.endDate })) || (await buscar({}));
+    } catch (err) {
+      console.error('Error actualizando la reserva', err);
+    }
+    handleViewReservationDetails(fresca || reserva);
+  };
+
+  const volverAlDetalle = () => {
+    if (!volverACarpa) return;
+    reabrirReserva(volverACarpa);
+    setVolverACarpa(null);
   };
 
   const handleViewReservationDetails = (group) => {
@@ -1746,130 +1764,19 @@ function App() {
       return;
     }
 
-    let linkedParkingResourceNumber = null;
-    let linkedParkingData = null;
-
-    if (group.serviceType === 'carpa' || group.serviceType === 'sombrilla') {
-      const maybeParking = reservationGroups.find((g) => {
-        if (!g) return false;
-        if (g.serviceType !== 'parking') return false;
-        if (g.status === 'cancelled') return false;
-        if (g.startDate !== group.startDate || g.endDate !== group.endDate) return false;
-
-        if (
-          group.clientId &&
-          g.clientId &&
-          String(g.clientId) === String(group.clientId)
-        ) {
-          return true;
-        }
-
-        if (
-          group.customerName &&
-          g.customerName &&
-          g.customerName === group.customerName
-        ) {
-          return true;
-        }
-
-        return false;
-      });
-
-      if (maybeParking) {
-        linkedParkingResourceNumber = maybeParking.resourceNumber;
-        linkedParkingData = {
-          totalPrice: maybeParking.totalPrice,
-          paidAmount: maybeParking.paidAmount,
-          vehiclePlate: maybeParking.vehiclePlate || null
-        };
-      }
+    // El titular (datos de su ficha) puede ocupar un pase de pileta: hace
+    // falta la lista de clientes aunque la seccion no la haya cargado.
+    if (group.clientId && !(clients || []).some((c) => Number(c.id) === Number(group.clientId))) {
+      fetchClients(token);
     }
 
+    // Los servicios incluidos vienen con el vinculo real (incluidos /
+    // incluidaEnReservaId): ya no se busca una cochera "parecida".
     setReservationDetailsModal({
       ...group,
-      linkedParkingResourceNumber,
-      linkedParkingData,
       payments: [],
       paymentsLoading: true
     });
-
-    if (
-      linkedParkingResourceNumber === null &&
-      (group.serviceType === 'carpa' || group.serviceType === 'sombrilla') &&
-      group.startDate &&
-      group.endDate
-    ) {
-      (async () => {
-        try {
-          const params = new URLSearchParams();
-          params.set('service', 'parking');
-          params.set('status', 'active');
-          params.set('from', group.startDate);
-          params.set('to', group.endDate);
-
-          const url = `${API_BASE_URL}/api/reservation-groups?${params.toString()}`;
-
-          const response = await fetch(url, {
-            headers: {
-              Authorization: `Bearer ${token}`
-            }
-          });
-
-          if (!response.ok) {
-            return;
-          }
-
-          const data = await response.json();
-
-          if (!data || !Array.isArray(data.reservationGroups)) {
-            return;
-          }
-
-          const maybeParking = data.reservationGroups.find((g) => {
-            if (!g) return false;
-            if (g.serviceType !== 'parking') return false;
-            if (g.status === 'cancelled') return false;
-            if (g.startDate !== group.startDate || g.endDate !== group.endDate) return false;
-
-            if (
-              group.clientId &&
-              g.clientId &&
-              String(g.clientId) === String(group.clientId)
-            ) {
-              return true;
-            }
-
-            if (
-              group.customerName &&
-              g.customerName &&
-              g.customerName === group.customerName
-            ) {
-              return true;
-            }
-
-            return false;
-          });
-
-          if (maybeParking) {
-            setReservationDetailsModal((prev) =>
-              prev && prev.id === group.id
-                ? {
-                  ...prev,
-                  linkedParkingResourceNumber: maybeParking.resourceNumber,
-                  linkedParkingData: {
-                    totalPrice: maybeParking.totalPrice,
-                    paidAmount: maybeParking.paidAmount,
-                    vehiclePlate: maybeParking.vehiclePlate || null
-                  }
-                }
-                : prev
-            );
-          }
-        } catch (fetchErr) {
-          console.error('Error fetching linked parking reservation for details', fetchErr);
-        }
-      })();
-    }
 
     (async () => {
       try {
@@ -1980,6 +1887,39 @@ function App() {
       }
     }
 
+    // Pago de la cuenta de una carpa: el servidor lo reparte en orden entre
+    // la carpa, las cocheras y la pileta paga.
+    if (reservationPaymentModal.esCuenta) {
+      try {
+        setReservationPaymentSaving(true);
+        const response = await fetch(`${API_BASE_URL}/api/reservation-groups/${id}/pago-cuenta`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ amount: String(tempAmount ?? ''), paymentDate: tempPaymentDate, method: tempMethod, notes: tempNotes || '' })
+        });
+        if (!response.ok) {
+          const falla = await response.json().catch(() => null);
+          // eslint-disable-next-line no-alert
+          window.alert(mensajeErrorIncluidos(falla) || 'No se pudo registrar el pago.');
+          return;
+        }
+        setReservationPaymentModal(null);
+        volverAlDetalle();
+        refrescarDatos();
+        await fetchReservationGroups(token, {
+          service: reservationFilterService,
+          status: reservationFilterStatus,
+          from: reservationFilterFrom,
+          to: reservationFilterTo
+        });
+      } catch (err) {
+        console.error('Error registrando el pago de la cuenta', err);
+      } finally {
+        setReservationPaymentSaving(false);
+      }
+      return;
+    }
+
     try {
       setReservationPaymentSaving(true);
 
@@ -2028,6 +1968,7 @@ function App() {
       }
 
       setReservationPaymentModal(null);
+      volverAlDetalle();
     } catch (err) {
       console.error('Error creating reservation payment', err);
     } finally {
@@ -2035,7 +1976,7 @@ function App() {
     }
   };
 
-  const handleSaveReservationEdit = async () => {
+  const handleSaveReservationEdit = async ({ plazasCocheras = [] } = {}) => {
     if (!reservationEditModal) return;
 
     const token = authToken || sessionStorage.getItem('authToken');
@@ -2144,6 +2085,12 @@ function App() {
         updateBody.totalPrice = String(calculatedTotalPrice);
       }
 
+      // Carpa o sombrilla: pileta y cocheras que se agregan o se quitan.
+      const cambios = ['carpa', 'sombrilla'].includes(serviceType) ? cambiosIncluidos(reservationEditModal, plazasCocheras) : undefined;
+      if (cambios) {
+        updateBody.incluidos = cambios;
+      }
+
       // Agregar resourceNumber solo si cambió
       const resourceNumberChanged = tempResourceNumber !== undefined && tempResourceNumber !== resourceNumber;
       if (resourceNumberChanged) {
@@ -2171,10 +2118,9 @@ function App() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        if (data && data.error === 'motivo_ajuste_required') {
-          setReservationEditError('El total es distinto al de la tarifa: falta el motivo del ajuste.');
-        } else if (data && (data.error === 'rango_invalido' || data.error === 'fecha_invalida')) {
-          setReservationEditError('Revisá las fechas: la salida no puede ser anterior a la entrada.');
+        const mensaje = mensajeErrorIncluidos(data);
+        if (mensaje) {
+          setReservationEditError(mensaje);
         } else {
           console.error('Error updating reservation group');
         }
@@ -2182,6 +2128,12 @@ function App() {
       }
 
       setReservationEditError('');
+      const respuesta = await response.json().catch(() => null);
+
+      avisarPasesPagos(respuesta?.adicionalesAsociados, 'cambió de fechas');
+      if (cambios || ['carpa', 'sombrilla'].includes(serviceType)) {
+        refrescarDatos();
+      }
 
       // Si cambió el resourceNumber o las fechas, actualizar el mapa visual de reservas
       const datesChanged = startDateChanged || endDateChanged;
@@ -2229,6 +2181,7 @@ function App() {
       });
 
       setReservationEditModal(null);
+      volverAlDetalle();
     } catch (err) {
       console.error('Error updating reservation group', err);
     } finally {
@@ -2386,6 +2339,8 @@ function App() {
               setEstHasPileta={setEstHasPileta}
               estPoolMaxOccupancy={estPoolMaxOccupancy}
               setEstPoolMaxOccupancy={setEstPoolMaxOccupancy}
+              estAjustes={estAjustes}
+              setEstAjustes={setEstAjustes}
               onSubmit={handleSaveEstablishment}
               estSaving={estSaving}
               error={error}
@@ -2456,6 +2411,8 @@ function App() {
       setEstHasPileta,
       estPoolMaxOccupancy,
       setEstPoolMaxOccupancy,
+      estAjustes,
+      setEstAjustes,
       onSubmit: handleSaveEstablishment,
       estSaving,
       error,
@@ -2493,6 +2450,13 @@ function App() {
         navItems={navItems}
       >
         <>
+          <AvisoGlobal
+            error={error}
+            success={success}
+            onCerrarError={() => setError('')}
+            onCerrarSuccess={() => setSuccess('')}
+          />
+
           {/* Modal de reserva de carpa */}
           {carpaReservationForm && (
             <CarpaReservationModal
@@ -2506,6 +2470,11 @@ function App() {
               onReleaseRange={handleReleaseCarpaReservationRange}
               onClose={() => setCarpaReservationForm(null)}
               reservationGroups={reservationGroups}
+              onNuevoCliente={() => {
+                handleResetClientForm();
+                setClienteNuevoPara('carpa');
+                setClientFormOpen(true);
+              }}
             />
           )}
 
@@ -2538,6 +2507,11 @@ function App() {
               onReleaseRange={handleReleaseSombrillaReservationRange}
               onClose={() => setSombrillaReservationForm(null)}
               reservationGroups={reservationGroups}
+              onNuevoCliente={() => {
+                handleResetClientForm();
+                setClienteNuevoPara('sombrilla');
+                setClientFormOpen(true);
+              }}
             />
           )}
 
@@ -2552,9 +2526,11 @@ function App() {
               onClose={() => {
                 setReservationEditModal(null);
                 setReservationEditError('');
+                volverAlDetalle();
               }}
               establishment={establishment}
               reservationGroups={reservationGroups}
+              onIrALaReserva={abrirReservaVinculada}
             />
           )}
 
@@ -2567,6 +2543,7 @@ function App() {
               onClose={() => setReservationDetailsModal(null)}
               onEdit={(group) => {
                 handleOpenReservationEditModal(group);
+                setVolverACarpa(group);
                 setReservationDetailsModal(null);
               }}
               onCancel={(group) => {
@@ -2576,11 +2553,19 @@ function App() {
                 handleCancelReservationGroup(group);
                 setReservationDetailsModal(null);
               }}
-              onAddPayment={(group) => {
-                handleAddPaymentForReservationGroup(group);
+              onAddPayment={(group, cuenta) => {
+                handleAddPaymentForReservationGroup(group, cuenta);
+                setVolverACarpa(group);
                 setReservationDetailsModal(null);
               }}
               onViewReservation={(group) => setReservationDetailsModal(group)}
+              titular={(() => {
+                const c = (clients || []).find((x) => Number(x.id) === Number(reservationDetailsModal.clientId));
+                return c ? { id: c.id, fullName: c.fullName, documentNumber: c.documentNumber, birthDate: c.birthDate } : null;
+              })()}
+              onVenderPase={handleVenderPase}
+              onIrALaReserva={abrirReservaVinculada}
+              onCambioPases={refrescarDatos}
               onViewClient={(clientId) => {
                 // No se apilan los modales: se cierra la reserva y se abre la
                 // ficha. Desde la ficha, tocar una reserva hace el camino inverso.
@@ -2607,7 +2592,10 @@ function App() {
           {reservationPaymentModal && (
             <ReservationPaymentModal
               paymentModal={reservationPaymentModal}
-              setPaymentModal={setReservationPaymentModal}
+              setPaymentModal={(valor) => {
+                setReservationPaymentModal(valor);
+                if (valor === null) volverAlDetalle();
+              }}
               saving={reservationPaymentSaving}
               onSave={handleSaveReservationPayment}
             />
@@ -2623,7 +2611,11 @@ function App() {
               parseLocalDateFromInput={parseLocalDateFromInput}
               onChangeForm={setPoolPassForm}
               onSave={handleSavePoolPass}
-              onClose={() => setPoolPassForm(null)}
+              onClose={() => {
+                setPoolPassForm(null);
+                // Abierto desde una carpa: se vuelve a su detalle.
+                volverAlDetalle();
+              }}
             />
           )}
 
@@ -2633,10 +2625,27 @@ function App() {
               clientForm={clientForm}
               clientSaving={clientSaving}
               onFieldChange={handleClientFieldChange}
-              onSubmit={handleSubmitClientForm}
+              onSubmit={async (e) => {
+                const cliente = await handleSubmitClientForm(e);
+                // Creado desde una reserva abierta: queda elegido en ella.
+                if (cliente && clienteNuevoPara) {
+                  const setForm = clienteNuevoPara === 'sombrilla' ? setSombrillaReservationForm : setCarpaReservationForm;
+                  setForm((prev) => (prev ? {
+                    ...prev,
+                    clientId: cliente.id,
+                    customerName: cliente.fullName || '',
+                    customerPhone: cliente.phone || '',
+                    cocheras: (prev.cocheras || []).map((c, i) =>
+                      i === 0 && !c.vehiclePlate && cliente.vehiclePlate ? { ...c, vehiclePlate: cliente.vehiclePlate } : c
+                    )
+                  } : prev));
+                  setClienteNuevoPara(null);
+                }
+              }}
               onCancel={() => {
                 handleResetClientForm();
                 setClientFormOpen(false);
+                setClienteNuevoPara(null);
               }}
             />
           )}

@@ -1,5 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { format } from '../lib/dates';
+import { etiquetaVinculo } from '../lib/incluidos';
+import { formatPesos } from '../lib/money';
 function PiletaSection({
   establishment,
   reservationGroups,
@@ -501,6 +503,16 @@ function PiletaSection({
                           {group.customerPhone && (
                             <span className="text-xs text-slate-500">{group.customerPhone}</span>
                           )}
+                          {etiquetaVinculo(group) && (
+                            <span
+                              className={`mt-1 inline-flex w-fit rounded px-2 py-0.5 text-[10px] font-semibold ${group.vinculo === 'adicional' ? 'bg-amber-100 text-amber-800' : 'bg-cyan-100 text-cyan-800'}`}
+                            >
+                              {etiquetaVinculo(group)}
+                            </span>
+                          )}
+                          {Array.isArray(group.paseNombres) && group.paseNombres.length > 0 && (
+                            <span className="mt-0.5 text-[10px] text-slate-500">{group.paseNombres.join(', ')}</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -529,15 +541,13 @@ function PiletaSection({
                           <div className="flex items-baseline gap-1.5">
                             <span className="text-xs text-slate-500">Pagado:</span>
                             <span className={paidClassName.replace('text-xs', 'text-sm')}>
-                              {paidAmountNum !== null && !Number.isNaN(paidAmountNum)
-                                ? `$${paidAmountNum.toFixed(2)}`
-                                : '$0.00'}
+                              {formatPesos(paidAmountNum, 0)}
                             </span>
                           </div>
                           {totalPriceNum !== null && !Number.isNaN(totalPriceNum) && (
                             <div className="flex items-baseline gap-1.5">
                               <span className="text-xs text-slate-500">Total:</span>
-                              <span className="text-sm font-medium text-slate-700">${totalPriceNum.toFixed(2)}</span>
+                              <span className="text-sm font-medium text-slate-700">{formatPesos(totalPriceNum, 0)}</span>
                             </div>
                           )}
                         </div>

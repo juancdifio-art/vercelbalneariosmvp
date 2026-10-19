@@ -39,13 +39,10 @@ function CarpasSection({
       adultsCount: '',
       childrenCount: '',
       dailyPrice: '',
-      includeParking: false,
-      parkingSpotNumber: '',
-      parkingDailyPrice: '',
+      incluyePileta: false,
+      cocheras: [],
       initialPaymentAmount: '',
-      initialPaymentMethod: '',
-      parkingInitialPaymentAmount: '',
-      parkingInitialPaymentMethod: ''
+      initialPaymentMethod: ''
     });
   };
 

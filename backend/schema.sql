@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS establishments (
   carpas_capacity INTEGER,
   sombrillas_capacity INTEGER,
   pool_max_occupancy INTEGER,
+  -- Pases de pileta que incluye cada unidad y tope de personas por unidad.
+  pases_pileta_por_carpa INTEGER NOT NULL DEFAULT 4,
+  pases_pileta_por_sombrilla INTEGER NOT NULL DEFAULT 0,
+  max_personas_por_unidad INTEGER NOT NULL DEFAULT 6,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE (user_id)
 );
@@ -83,7 +87,11 @@ ALTER TABLE reservation_groups
   ADD COLUMN IF NOT EXISTS vehicle_plate VARCHAR(20),
   ADD COLUMN IF NOT EXISTS precio_tarifa NUMERIC(12, 2),
   ADD COLUMN IF NOT EXISTS desglose JSONB,
-  ADD COLUMN IF NOT EXISTS motivo_ajuste TEXT;
+  ADD COLUMN IF NOT EXISTS motivo_ajuste TEXT,
+  -- Servicio incluido en una carpa o sombrilla (ver migrate-servicios-incluidos.sql).
+  ADD COLUMN IF NOT EXISTS incluida_en_reserva_id INTEGER REFERENCES reservation_groups(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS vinculo VARCHAR(10)
+    CONSTRAINT reservation_groups_vinculo_valido CHECK (vinculo IS NULL OR vinculo IN ('incluido', 'adicional'));
 
 -- Las personas que ocupan una reserva. Solo full_name es obligatorio.
 -- age y birth_date conviven: si esta la fecha, la edad se calcula de ahi.
@@ -101,6 +109,43 @@ CREATE TABLE IF NOT EXISTS reservation_guests (
 
 CREATE INDEX IF NOT EXISTS idx_reservation_guests_group
   ON reservation_guests(reservation_group_id);
+
+-- 'incluido' nace, se mueve y se cancela con la carpa; 'adicional' es un pase
+-- de pileta pago asociado a la carpa solo para mostrarlo junto a ella.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'reservation_groups_vinculo_coherente') THEN
+    ALTER TABLE reservation_groups ADD CONSTRAINT reservation_groups_vinculo_coherente
+      CHECK ((vinculo IS NULL) = (incluida_en_reserva_id IS NULL));
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pileta_incluida_unica
+  ON reservation_groups(incluida_en_reserva_id)
+  WHERE vinculo = 'incluido' AND service_type = 'pileta';
+
+CREATE INDEX IF NOT EXISTS idx_reservation_groups_incluida
+  ON reservation_groups(incluida_en_reserva_id)
+  WHERE incluida_en_reserva_id IS NOT NULL;
+
+-- Personas de cada pase de pileta con nombre: un acompanante (guest_id) o el
+-- titular (client_id). Los datos se leen de su tabla, no se copian.
+CREATE TABLE IF NOT EXISTS pase_pileta_personas (
+  id SERIAL PRIMARY KEY,
+  establishment_id INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+  pase_id INTEGER NOT NULL REFERENCES reservation_groups(id) ON DELETE CASCADE,
+  guest_id INTEGER REFERENCES reservation_guests(id) ON DELETE CASCADE,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT pase_persona_una_sola CHECK ((guest_id IS NULL) <> (client_id IS NULL))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pase_persona_guest
+  ON pase_pileta_personas(guest_id) WHERE guest_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pase_persona_client
+  ON pase_pileta_personas(pase_id, client_id) WHERE client_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pase_pileta_personas_pase
+  ON pase_pileta_personas(pase_id);
 
 CREATE TABLE IF NOT EXISTS reservation_payments (
   id SERIAL PRIMARY KEY,

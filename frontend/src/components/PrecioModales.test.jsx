@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import CarpaReservationModal from './CarpaReservationModal';
+import { cocheraVacia } from '../lib/incluidos';
 
 function parseLocal(value) {
   if (!value) return null;
@@ -26,7 +27,7 @@ afterEach(() => vi.restoreAllMocks());
 function ConEstado({ onSaveRange, formOverrides = {} }) {
   const [form, setForm] = useState({
     carpaNumero: 58, isReserved: false, startDate: '2026-09-26', endDate: '2026-09-30',
-    clientId: null, customerName: 'Lucia', customerPhone: '', includeParking: false,
+    clientId: null, customerName: 'Lucia', customerPhone: '', cocheras: [],
     initialPaymentAmount: '', initialPaymentMethod: '',
     ...formOverrides
   });
@@ -79,7 +80,7 @@ describe('plaza de estacionamiento sin elegir', () => {
     render(
       <ConEstado
         onSaveRange={onSaveRange}
-        formOverrides={{ includeParking: true, parkingSpotNumber: null, vehiclePlate: 'AB123CD' }}
+        formOverrides={{ clientId: 7, cocheras: [{ ...cocheraVacia(), vehiclePlate: 'AB123CD' }] }}
       />
     );
 
@@ -95,6 +96,6 @@ describe('plaza de estacionamiento sin elegir', () => {
     await screen.findByText('Se asigna la plaza 1.');
     await waitFor(() => expect(guardar()).toBeEnabled());
     await userEvent.click(guardar());
-    expect(onSaveRange.mock.calls[0][3].parkingSpotNumber).toBe(1);
+    expect(onSaveRange.mock.calls[0][3].cocheras[0].plaza).toBe(1);
   }, 15000);
 });

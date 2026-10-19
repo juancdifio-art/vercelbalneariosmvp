@@ -1,4 +1,6 @@
 import { jsPDF } from 'jspdf';
+import { pasesIncluidosPara } from '../lib/incluidos';
+import { formatearPatente } from '../lib/patente';
 import { format } from '../lib/dates';
 /** Formato argentino: $126.000,00. El resto de la app ya lo usa. */
 function pesos(valor) {
@@ -186,38 +188,52 @@ export function generateReceipt(reservation, establishment) {
   doc.text(pesos(totalPrice), rightMargin, yPos, { align: 'right' });
   yPos += 4;
   
-  // Estacionamiento asociado (si existe y no es una reserva de parking)
-  if (reservation.serviceType !== 'parking' && reservation.linkedParkingResourceNumber) {
+  // Servicios incluidos en la carpa: la pileta (con quienes tienen pase) y
+  // cada cochera. Vienen del vinculo real con la carpa (`vinculadas`).
+  const vinculadas = Array.isArray(reservation.vinculadas) ? reservation.vinculadas : [];
+  const lineaIncluido = (etiqueta, valor) => {
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(...grayText);
-    doc.text('Estacionamiento:', leftMargin, yPos);
-    
-    // Número de plaza en negro
+    doc.text(etiqueta, leftMargin, yPos);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(...primaryColor);
-    const plazaText = `Plaza ${reservation.linkedParkingResourceNumber}`;
-    const plazaWidth = doc.getTextWidth(plazaText);
-    doc.text(plazaText, rightMargin, yPos, { align: 'right' });
-    
-    // Estado de pago con color si existe la información
-    if (reservation.linkedParkingData) {
-      const parkingTotal = parseFloat(reservation.linkedParkingData.totalPrice || 0);
-      const parkingPaid = parseFloat(reservation.linkedParkingData.paidAmount || 0);
-      const parkingBalance = parkingTotal - parkingPaid;
-      
-      let statusText = '';
-      if (parkingBalance <= 0) {
-        doc.setTextColor(...greenSuccess); // Verde
-        statusText = ' (Pagado)';
-      } else {
-        doc.setTextColor(220, 38, 38); // Rojo
-        statusText = ' (Pago pendiente)';
-      }
-      
-      doc.text(statusText, rightMargin - plazaWidth, yPos, { align: 'right' });
-    }
-    
+    const texto = valor.length > 48 ? `${valor.slice(0, 47)}…` : valor;
+    doc.text(texto, rightMargin, yPos, { align: 'right' });
+    yPos += 4;
+  };
+
+  const paseIncluido = vinculadas.find((g) => g.serviceType === 'pileta' && g.vinculo === 'incluido');
+  if (paseIncluido) {
+    const pases = pasesIncluidosPara(establishment, reservation.serviceType) || 0;
+    const nombres = Array.isArray(paseIncluido.paseNombres) ? paseIncluido.paseNombres : [];
+    lineaIncluido('Pileta incluida:', `${pases} pases${nombres.length ? ` (${nombres.join(', ')})` : ''}`);
+  }
+
+  // La cuenta: la reserva y lo asociado que se cobra (cocheras incluidas y
+  // pases de pileta pagos). El cliente paga todo junto, asi que los totales y
+  // el saldo del comprobante son los de toda la cuenta.
+  const cocheras = vinculadas.filter((g) => g.serviceType === 'parking' && g.vinculo === 'incluido');
+  const pasesPagos = vinculadas.filter((g) => g.serviceType === 'pileta' && g.vinculo === 'adicional');
+  const conMonto = [...cocheras, ...pasesPagos];
+  const totalCuenta = totalPrice + conMonto.reduce((suma, g) => suma + parseFloat(g.totalPrice || 0), 0);
+  const pagadoAsociado = conMonto.reduce((suma, g) => suma + parseFloat(g.paidAmount || 0), 0);
+
+  cocheras.forEach((g) => {
+    const patente = g.vehiclePlate ? `, ${formatearPatente(g.vehiclePlate)}` : '';
+    lineaIncluido('Cochera incluida:', `Plaza ${g.resourceNumber}${patente} · ${pesos(parseFloat(g.totalPrice || 0))}`);
+  });
+  pasesPagos.forEach((g) => {
+    const nombres = Array.isArray(g.paseNombres) && g.paseNombres.length ? `${g.paseNombres.join(', ')} · ` : '';
+    lineaIncluido('Pileta paga:', `${nombres}${pesos(parseFloat(g.totalPrice || 0))}`);
+  });
+  if (conMonto.length > 0) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...grayText);
+    doc.text('Total de la cuenta:', leftMargin, yPos);
+    doc.setTextColor(...primaryColor);
+    doc.text(pesos(totalCuenta), rightMargin, yPos, { align: 'right' });
     yPos += 4;
   }
   
@@ -274,7 +290,7 @@ export function generateReceipt(reservation, establishment) {
   doc.setFontSize(11);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(255, 255, 255);
-  const paidAmount = parseFloat(reservation.paidAmount || 0);
+  const paidAmount = parseFloat(reservation.paidAmount || 0) + pagadoAsociado;
   doc.text('MONTO PAGADO:', leftMargin + 5, yPos + 7);
   doc.setFontSize(12);
   doc.text(pesos(paidAmount), rightMargin - 5, yPos + 7, { align: 'right' });
@@ -299,7 +315,7 @@ export function generateReceipt(reservation, establishment) {
   doc.text('Total a Pagar:', leftMargin, yPos);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...primaryColor);
-  doc.text(pesos(totalPrice), rightMargin, yPos, { align: 'right' });
+  doc.text(pesos(totalCuenta), rightMargin, yPos, { align: 'right' });
   yPos += 5;
   
   // Historial de Pagos
@@ -330,7 +346,7 @@ export function generateReceipt(reservation, establishment) {
   yPos += 1;
   
   // Total Pagado
-  const balance = totalPrice - paidAmount;
+  const balance = totalCuenta - paidAmount;
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...grayText);

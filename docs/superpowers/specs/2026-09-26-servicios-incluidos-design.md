@@ -1,215 +1,318 @@
-# Servicios incluidos en la carpa o sombrilla (pileta y cochera)
+# Servicios incluidos en la carpa (pileta y cochera)
 
-**Estado:** idea en discusión. No hay nada implementado ni aprobado.
+**Fecha:** 2026-09-26
+**Estado:** decisiones cerradas, pendiente de aprobación del spec.
+**Alcance:** tres etapas (ver "Etapas"). Reemplaza al borrador "pileta incluida" del mismo día.
 
-> Este spec empezó como "pileta incluida". Se amplió porque la cochera ya se puede incluir al vender una carpa, pero está resuelta con el enfoque que acá se desaconseja (dos altas desde el navegador, sin vínculo). Las dos cosas se resuelven con el mismo mecanismo.
+---
 
-## El pedido
+## 1. Qué se quiere
 
-Al vender una carpa o una sombrilla, el operador puede sumarle:
+Al vender una carpa o una sombrilla, el operador le puede sumar **pileta** y **cochera**. Los servicios incluidos son reservas de verdad, que aparecen en sus secciones y calendarios, pero **nacen, se mueven y se cancelan con la carpa**.
 
-- **Pileta:** que el sistema cree solo el pase, en vez de cargarlo aparte en la sección Pileta. (Nuevo.)
-- **Cochera:** ya existe el tilde "Incluir estacionamiento". Lo que falta es que la cochera quede **vinculada** a la carpa y la acompañe cuando la carpa se cancela o cambia de fechas. (Rehacer lo que hay.)
+La cochera ya se puede incluir hoy, pero está resuelta con dos altas desde el navegador y sin vínculo. Se rehace con el mismo mecanismo que la pileta.
 
-En los dos casos el servicio incluido es una reserva de verdad, con su precio y sus pagos, pero **nace, se mueve y se cancela con la carpa**.
+### Decisiones de negocio
 
-## Lo que dice el contrato del balneario (temporada 2026-2027)
+**Generales**
 
-El contrato de "unidad de sombra" que firma el cliente aclara varias cosas sobre la pileta:
+- En el modal de la carpa se usan dos tildes: **"Incluye estacionamiento"** (como hoy) e **"Incluye pileta"**.
+- **O se guarda todo o no se guarda nada.** Si un incluido no se puede crear (por ejemplo, la plaza está ocupada), la carpa tampoco se guarda. El modal queda abierto con el motivo ("La plaza 45 está ocupada en esas fechas") y el operador corrige.
+- **Los incluidos tienen siempre las mismas fechas que la carpa.** Si se cancela la carpa, se cancelan; si cambian sus fechas, se mueven.
+- **Con incluidos, la carpa exige cliente guardado** (en las dos APIs). Para no frenar el mostrador, el modal permite **crear un cliente nuevo ahí mismo**.
+- **Nada frena el mostrador.** Los datos de las personas se pueden cargar al vender o después, y todo es editable.
+- **Máximo 6 personas por unidad de sombra.** Lo dice el contrato, así que **se bloquea**, no solo se avisa.
 
-- **La pileta tiene costo adicional** (punto 8): *"El uso de la misma tiene un costo adicional por temporada o por día"*. O sea, "incluye pileta" no quiere decir gratis: el cliente contrata la pileta **además** de la carpa, y se cobra aparte.
-- **Se cobra por temporada o por día.** Hoy el sistema solo tiene precio por día (por adulto y por niño). Falta un precio de pileta **por temporada**.
-- **La temporada va del 15/12 al 15/03.** La pileta abre de 13:30 a 19:30.
-- **Máximo 6 personas por unidad de sombra** (punto 1). Si se pasan, tienen que contratar otra unidad.
-- **La nómina lista hasta 6 personas con nombre y DNI:** el titular más 5 acompañantes. Aparece también "Menor de hasta 4-5 años", sin aclarar la regla.
+**Pileta**
 
-La cochera tiene tarifa propia en `docs/tarifas-temporada-2026-2027.md` (con sombra $700.000, descubierta $600.000 por temporada) y ya pasa por el módulo de tarifas.
+- **Cada carpa incluye 4 pases de pileta, dentro del precio de la carpa.** No suman nada al total ni llevan pagos propios.
+- **Solo las carpas incluyen pases; las sombrillas no.** A confirmar con el balneario, así que la cantidad es un ajuste del establecimiento y no va fija en el código.
+- **Los pases son con nombre.** Cada pase se asigna a una persona de la carpa, que puede ser o no el titular. Para tener pase, la persona necesita **nombre, DNI y edad**. Las personas sin pase siguen necesitando solo el nombre, como hoy.
+- **Si hay más de 4 personas, el operador elige quiénes tienen pase.** Por defecto se asignan los primeros con datos completos; el operador lo cambia.
+- **Los que quedan sin pase pueden comprar uno pago.** Queda asociado a la carpa pero se muestra distinto: **"Pase pago · Carpa 12"** frente a **"Incluido en Carpa 12"**. También es con nombre.
+- **El pase pago no se toca solo** si se cancela la carpa o cambian sus fechas, porque tiene plata de por medio. El sistema avisa y el operador decide.
 
-## Cómo funciona hoy
+**Cochera**
 
-### Pileta
+- **Se pueden incluir varias cocheras** por carpa, todas opcionales. Cada una lleva su plaza, patente, precio y pago.
+- Si no se elige plaza, **el servidor asigna la primera libre** y el modal muestra cuál quedó.
+- Desde la cochera se editan **plaza y patente**. Fechas y cancelación, solo desde la carpa.
+- Las cocheras cargadas hasta hoy son datos de prueba: **no hay nada que migrar ni vincular.**
 
-- **El pase de pileta es una reserva más.** Es una fila de `reservation_groups` con `service_type = 'pileta'` y `resource_number = 1` fijo. Guarda cantidad de personas (`adults_count` / `children_count`) y precio por adulto y por niño por día (`pool_adult_price_per_day` / `pool_child_price_per_day`). El total es `(adultos × precio adulto + niños × precio niño) × días`.
-- **La pileta no pasa por tarifas.** Los precios por persona se tipean en `PoolPassModal` cada vez. El módulo `api/_tarifas/` solo cubre carpa, sombrilla y estacionamiento.
-- **Las carpas y sombrillas ya guardan adultos y menores**, en las mismas columnas `adults_count` / `children_count` (spec de personas por reserva, 22/09). Es decir, el dato "cuántas personas" ya está en la reserva de la carpa.
-- **El aforo de la pileta (`pool_max_occupancy`) no se controla en ningún lado.** Se configura y se usa en el reporte de ocupación, pero la API deja crear pases de más.
-- **Diferencia entre APIs:** `backend/src/index.js` exige cliente guardado para un pase (`pool_client_required`); `api/index.js` no. Hoy un pase sin cliente anda en producción y falla en local.
+### Contexto del contrato (temporada 2026-2027)
 
-### Cochera
+- La pileta tiene "costo adicional por temporada o por día" (punto 8). Con lo decidido, eso aplica a los pases **pagos**; los 4 incluidos van dentro del precio de la carpa.
+- Temporada del 15/12 al 15/03; pileta de 13:30 a 19:30.
+- Máximo 6 personas por unidad de sombra (punto 1). La nómina lista al titular y 5 acompañantes, con nombre y DNI.
+- Aparece "Menor de hasta 4-5 años" sin aclarar la regla (ver sección 7).
 
-- **El tilde "Incluir estacionamiento" está en los modales de carpa y de sombrilla** (`CarpaReservationModal`, `SombrillaReservationModal`), con plaza, precio de tarifa (`precioCochera`), pago inicial y medio de pago propios, y la patente.
-- **Se guarda con dos altas desde el navegador.** `handleSaveCarpaReservationRange` (`App.jsx`, ~línea 818) y su par de sombrilla (~línea 1217): después de crear la carpa, si `includeParking` está tildado, elige una plaza con `findAvailableParkingSpotForRange` y llama a `handleSaveParkingReservationRange`, que hace su propio POST.
-- **Problemas de ese esquema:**
-  - **No es atómico.** Si el segundo POST falla, o no quedó plaza, la carpa queda creada sin cochera y solo aparece un aviso.
-  - **No hay vínculo.** En la base la cochera es una reserva suelta; lo único que la une a la carpa es el `client_id`. Cancelar la carpa o cambiarle las fechas no toca la cochera.
-  - **La plaza la elige el navegador** con el estado que tiene cargado. Si dos operadores cargan a la vez, la API rechaza la segunda cochera por superposición, pero la carpa ya se creó.
+---
 
-### Común
+## 2. Cómo funciona hoy
 
-- **No hay ningún vínculo entre reservas.** Cada `reservation_group` está suelto.
-- **Cancelar** es un `PATCH` con `status: 'cancelled'`. No hay borrado.
-- **No hay transacciones en ninguna de las dos APIs.** Ni `api/index.js` ni `backend/src/index.js` usan `BEGIN` / `COMMIT`. En `api/index.js`, además, `db.query` crea y cierra un `Pool` por consulta, así que dos `db.query` seguidos no comparten conexión. El patrón transaccional hay que crearlo (ver Riesgos).
-- **El pago inicial también es un POST aparte**, tanto para la carpa como para la cochera. Eso queda fuera de este cambio: un pago que falla deja la reserva sin ese pago, que se carga a mano, y no rompe la consistencia entre reservas.
+- **Todas las reservas están en `reservation_groups`**, sueltas: lo único que puede unir dos reservas es el `client_id`. Cancelar es un `PATCH` con `status: 'cancelled'`.
+- **Pase de pileta:** es una fila con `service_type = 'pileta'` y `resource_number = 1`. Guarda cantidades (`adults_count` / `children_count`) y precio por adulto y por menor por día. No pasa por tarifas. El reporte de ocupación suma `adults_count + children_count` (`api/_handlers/reports/occupancy.js`). El aforo (`pool_max_occupancy`) no se controla.
+- **Personas:** el modal de alta solo pide cantidades (`PersonasFields`). Los datos de cada persona se cargan en el detalle de la reserva (`PersonasReserva`, tabla `reservation_guests`, solo `full_name` obligatorio). Son los acompañantes; el titular es el cliente y sus datos están en su ficha (`clients.document_number`, `clients.birth_date`).
+- **Cochera incluida:** los modales de carpa y sombrilla tienen "Incluir estacionamiento" (plaza, patente, precio de tarifa, pago inicial). Al guardar, `handleSaveCarpaReservationRange` (`App.jsx`, ~línea 818) y su par de sombrilla (~línea 1217) crean la carpa y **después** disparan un segundo POST para la cochera, con una plaza elegida en el navegador (`findAvailableParkingSpotForRange`). No es atómico, no hay vínculo y cancelar la carpa no toca la cochera.
+- **Cliente en el modal:** se elige uno existente (`ClientSearchInput`) o se escribe un nombre suelto. No se puede crear un cliente desde ahí.
+- **No hay transacciones en ninguna API.** En `api/index.js`, `db.query` crea y cierra un `Pool` por consulta.
+- **El control de superposición es un `SELECT` sin bloqueo** (`api/index.js`, ~línea 1084): dos altas simultáneas de la misma unidad pueden pasar las dos.
+- **Diferencia entre APIs:** local exige cliente para un pase de pileta (`pool_client_required`) y producción no.
 
-## Qué debería pasar
+---
 
-1. En la reserva de carpa o sombrilla hay dos tildes: **"Incluye pileta"** y **"Incluye estacionamiento"** (este ya existe).
-2. Al guardar, **el servidor** crea la carpa y los servicios incluidos **en una sola transacción**: se crean todos o ninguno.
-   - El pase toma las mismas fechas, cliente y personas que la carpa.
-   - La cochera toma las mismas fechas y cliente, más su plaza y su patente.
-3. Cada servicio incluido aparece en su sección como cualquier otro, con la marca **"Incluido en Carpa 12"**.
-4. Si se cancela la carpa, se cancelan los incluidos. Si cambian las fechas, los incluidos se mueven. Si cambian las personas, el pase se ajusta (la cochera no depende de las personas).
+## 3. Enfoque
 
-## Enfoques posibles
+Cada servicio incluido es una **reserva real** (`reservation_groups`) con una columna que apunta a la carpa. El servidor crea y sincroniza todo **en una transacción**.
 
-### A — Reserva real vinculada a la carpa (recomendado)
+Descartados:
 
-Cada servicio incluido es una fila más de `reservation_groups` con una columna nueva `incluida_en_reserva_id` que apunta a la reserva de la carpa.
+- **Flags en la carpa, sin reservas aparte.** No sirve para la cochera: la plaza tiene que ocupar el calendario y chocar con otras reservas.
+- **Seguir con varios POST desde el navegador**, como hoy la cochera. No es atómico y no propaga cancelaciones.
 
-- **A favor:** las secciones Pileta y Estacionamiento, los calendarios, los reportes y el comprobante siguen funcionando sin cambios, porque el pase y la cochera son reservas de verdad. El vínculo deja sincronizar cancelaciones y cambios de fecha. Un solo mecanismo sirve para los dos servicios (y para uno futuro).
-- **En contra:** hay que mantener filas sincronizadas, y se escribe en las dos APIs.
+---
 
-### B — Solo flags en la carpa
+## 4. Diseño
 
-Se agregan `incluye_pileta` / `incluye_cochera` a la carpa y no se crea ninguna reserva aparte.
+### 4.1 Datos
 
-- **A favor:** una sola fila, nada que sincronizar.
-- **En contra:** no sirve para la cochera: la plaza tiene que aparecer ocupada en el calendario de estacionamiento y chocar con otras reservas, y eso lo resuelve una reserva real. Para la pileta obligaría a que todo lo que lista pases lea dos fuentes.
-
-### C — Que el frontend haga varios POST
-
-Es lo que hace hoy la cochera.
-
-- **A favor:** no toca las APIs.
-- **En contra:** no es atómico, no hay vínculo y la cancelación no se propaga. Es justamente lo que este spec quiere reemplazar.
-
-**Recomendación: A**, con la creación de los incluidos **en el servidor**, dentro del mismo POST de la carpa y en una transacción.
-
-## Diseño con el enfoque A
-
-### Datos
+Migración nueva `backend/migrate-servicios-incluidos.sql`, idempotente, reflejada en `backend/schema.sql`.
 
 ```sql
+-- Vinculo de un servicio con la carpa o sombrilla que lo incluye.
 ALTER TABLE reservation_groups
   ADD COLUMN IF NOT EXISTS incluida_en_reserva_id INTEGER
-    REFERENCES reservation_groups(id) ON DELETE CASCADE;
+    REFERENCES reservation_groups(id) ON DELETE CASCADE,
+  ADD COLUMN IF NOT EXISTS vinculo VARCHAR(10);
+-- vinculo: 'incluido'  -> nace, se mueve y se cancela con la carpa (pileta o cochera).
+--          'adicional' -> pase de pileta pago, asociado solo para mostrarlo con la carpa.
+-- CHECK de valores y "vinculo lleno si y solo si incluida_en_reserva_id lleno":
+-- bloque DO $$ que consulta pg_constraint.
 
--- Como mucho un servicio incluido de cada tipo por carpa.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_servicio_incluido_unico
-  ON reservation_groups(incluida_en_reserva_id, service_type)
-  WHERE incluida_en_reserva_id IS NOT NULL;
+-- Un solo pase de pileta incluido por carpa. Cocheras incluidas puede haber varias.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pileta_incluida_unica
+  ON reservation_groups(incluida_en_reserva_id)
+  WHERE vinculo = 'incluido' AND service_type = 'pileta';
+
+-- Personas que tiene cada pase de pileta con nombre.
+CREATE TABLE IF NOT EXISTS pase_pileta_personas (
+  id SERIAL PRIMARY KEY,
+  establishment_id INTEGER NOT NULL REFERENCES establishments(id) ON DELETE CASCADE,
+  pase_id INTEGER NOT NULL REFERENCES reservation_groups(id) ON DELETE CASCADE,
+  guest_id INTEGER REFERENCES reservation_guests(id) ON DELETE CASCADE,
+  client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT pase_persona_una_sola CHECK ((guest_id IS NULL) <> (client_id IS NULL))
+);
+-- Un acompañante tiene como mucho un pase (incluido o pago).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pase_persona_guest
+  ON pase_pileta_personas(guest_id) WHERE guest_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pase_persona_client
+  ON pase_pileta_personas(pase_id, client_id) WHERE client_id IS NOT NULL;
+
+-- Ajustes del establecimiento.
+ALTER TABLE establishments
+  ADD COLUMN IF NOT EXISTS pases_pileta_por_carpa INTEGER NOT NULL DEFAULT 4,
+  ADD COLUMN IF NOT EXISTS pases_pileta_por_sombrilla INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS max_personas_por_unidad INTEGER NOT NULL DEFAULT 6;
 ```
 
-- La columna solo se llena en reservas `pileta` y `parking`, y solo apunta a una `carpa` o `sombrilla` (lo valida la API).
-- El índice único es por `(carpa, tipo de servicio)`: una carpa puede tener un pase **y** una cochera, pero no dos cocheras (ver decisión C2).
-- Migración nueva `backend/migrate-servicios-incluidos.sql`, idempotente, y reflejarla en `backend/schema.sql`.
-- **Cocheras ya cargadas junto con una carpa no se vinculan solas** (ver decisión C4).
+- **Una persona del pase es un acompañante (`guest_id`) o el titular (`client_id`)**, nunca las dos cosas. Nombre, DNI y edad se leen de `reservation_guests` o de `clients` y no se copian: si se corrige un DNI, el pase lo refleja.
+- **Que el titular no tenga dos pases de la misma carpa** (incluido y pago) lo valida la API, porque el titular no pertenece a una sola reserva.
+- **El pase incluido** tiene `daily_price = 0`, `total_price = 0` y precios de pileta en `NULL`.
+- **`adults_count` / `children_count` del pase con nombre** se recalculan desde las personas asignadas, para que el reporte de ocupación siga sumando bien sin cambios. Para separar adultos de menores se usa **menor = menos de 18 años**. En el pase incluido esa división es informativa; en el pago, ver 4.3.
+- **La edad de una persona:** si tiene fecha de nacimiento, se calcula de ahí; si no, vale la edad cargada. Mismo criterio que `reservation_guests`. El titular solo tiene `birth_date` en la ficha, así que para asignarle pase su ficha necesita DNI y fecha de nacimiento.
 
-### API (las dos: `api/index.js` y `backend/src/index.js`)
+### 4.2 API (las dos: `api/index.js` y `backend/src/index.js`)
 
-**POST `/reservation-groups`** de una carpa o sombrilla acepta un objeto `incluidos`:
+**Infraestructura común**
+
+- **Helper `withTransaction(fn)` en cada API.** Pide un cliente (`pool.connect()`), corre `BEGIN` / `COMMIT` / `ROLLBACK` y lo libera en `finally`. En `api/index.js` no se puede usar `db.query` dentro de la transacción.
+- **La superposición de una unidad se verifica bloqueando**, con `SELECT id ... FOR UPDATE` sobre las reservas activas de esa unidad dentro de la transacción, o con un advisory lock por `(establecimiento, tipo, unidad)` (convención del equipo: `FOR UPDATE` sobre un `COUNT(*)` no bloquea). Aplica a la carpa y a cada cochera.
+
+**Tope de personas** (carpa y sombrilla, en POST y PATCH)
+
+- Si `adults_count + children_count` supera `max_personas_por_unidad`, se rechaza con **400 `too_many_people`**. La cantidad incluye al titular.
+- `POST /reservation-groups/:id/guests` rechaza con el mismo error si la reserva ya tiene tantas personas cargadas como el tope.
+
+**POST `/reservation-groups`** (carpa o sombrilla) acepta `incluidos`:
 
 ```json
 {
   "serviceType": "carpa",
   "resourceNumber": 12,
+  "clientId": 34,
   "...": "resto de los campos de hoy",
   "incluidos": {
-    "pileta": { "precioAdultoPorDia": 5000, "precioMenorPorDia": 3000 },
-    "parking": { "plaza": 45, "vehiclePlate": "AB123CD", "precio": { "cobrado": 700000, "motivoAjuste": null } }
+    "pileta": true,
+    "cocheras": [
+      { "plaza": 45, "vehiclePlate": "AB123CD", "precio": { "cobrado": 700000, "motivoAjuste": null } },
+      { "plaza": null, "vehiclePlate": "AC456EF", "precio": { "cobrado": 600000, "motivoAjuste": null } }
+    ]
   }
 }
 ```
 
-- `pileta` solo si el establecimiento tiene `has_pileta`; `parking` solo si tiene `has_parking`.
-- Dentro de una transacción: valida y crea la carpa, después cada incluido con `incluida_en_reserva_id` = id de la carpa.
-- **La cochera pasa por las mismas validaciones que una reserva de estacionamiento suelta:** patente obligatoria y normalizada (`vehicle_plate_required`), superposición de plaza (`resource_conflict`) y precio de tarifa con `api/_tarifas/` (si difiere, `motivoAjuste`).
-- **Si `plaza` no viene, el servidor elige la primera libre** para el rango, dentro de la transacción. Así la elección no depende del estado que tenga cargado el navegador.
-- **Si no hay plaza, falla todo** con `parking_unavailable`, y no se crea la carpa. El modal muestra el error y el operador decide: elegir otra plaza o destildar la cochera.
-- Devuelve la carpa y los incluidos creados.
+- Con `incluidos` no vacío, `clientId` es obligatorio: **400 `client_required`**.
+- `pileta: true` solo si el establecimiento tiene `has_pileta` y la cantidad de pases para ese tipo de unidad es mayor que 0. Si no, **400 `pileta_no_incluible`**.
+- `cocheras` solo si tiene `has_parking`. Cada cochera pasa por las mismas validaciones que una reserva de estacionamiento suelta: patente obligatoria y normalizada (`vehicle_plate_required`), superposición (`resource_conflict`) y tarifa con `api/_tarifas/` (si difiere, `motivoAjuste`). Con `plaza: null`, el servidor elige la primera libre del rango que no esté ya pedida en el mismo request.
+- Sin plaza libre: **409 `parking_unavailable`**. Con plaza ocupada: **409 `resource_conflict`**, y el `message` dice cuál (la carpa o la cochera en la plaza 45).
+- Todo en una transacción: carpa, pase incluido (si va) y cocheras. **Si algo falla, no queda nada.**
+- **Si la pileta va y el titular tiene DNI y fecha de nacimiento**, se le asigna un pase de entrada. Si no, el pase queda con 0 asignados.
+- Responde con la carpa y sus incluidos (con la plaza de cada cochera, para que el modal muestre las que asignó el servidor).
 
-**PATCH de la carpa:**
+**PATCH de la carpa**
 
-- `status: 'cancelled'` → cancela también sus incluidos.
-- Cambio de fechas → mueve los incluidos a las mismas fechas. Para la cochera se revalida la superposición de su plaza: si choca, falla todo con `resource_conflict` y el mensaje dice que es la cochera la que choca.
-- Cambio de personas → actualiza el pase (no la cochera).
-- `incluidos.pileta` / `incluidos.parking` con datos o `null` → agrega o cancela ese servicio en una reserva ya creada.
+- **`status: 'cancelled'`** → cancela sus incluidos (`vinculo = 'incluido'`). Los pases pagos asociados no se tocan; la respuesta trae `adicionalesAsociados: n` para que el frontend avise.
+- **Cambio de fechas** → mueve los incluidos a las mismas fechas, revalidando la superposición de cada cochera (misma respuesta 409 con el detalle). Los pagos asociados no se mueven; mismo aviso.
+- **Cambio de personas** → valida el tope. Si la cantidad baja por debajo de los pases asignados, no se desasigna nada solo; el detalle lo muestra.
+- **`incluidos.pileta: true | false`** → agrega el pase incluido o lo cancela.
+- **`incluidos.cocherasNuevas: [...]`** → agrega cocheras, con el mismo formato y validaciones que en el POST.
+- **`incluidos.cocherasCanceladas: [id, ...]`** → cancela esas cocheras (tienen que ser incluidas de esta carpa).
 - Todo en transacción.
 
-**PATCH de un incluido:**
+**PATCH de un incluido**
 
-- **Pase de pileta:** se rechaza con `servicio_incluido_no_editable`. Se edita desde la carpa.
-- **Cochera:** se permite cambiar **plaza y patente** (el auto puede cambiar a mitad de temporada, y mover de plaza es operativo). Fechas, estado y cliente se rechazan con `servicio_incluido_no_editable`: se cambian desde la carpa. (Ver decisión C3.)
+- **Pase de pileta incluido:** se rechaza con **409 `servicio_incluido_no_editable`**. Las personas se asignan con el endpoint de abajo; lo demás, desde la carpa.
+- **Cochera incluida:** acepta solo `resourceNumber` (plaza) y `vehiclePlate`, con las validaciones de siempre. Fechas, estado o cliente se rechazan con `servicio_incluido_no_editable`.
+- **Pase pago asociado:** se edita como cualquier pase.
 
-**GET** devuelve `incluidaEnReservaId` en cada reserva, y en la carpa un resumen `incluidos: { pileta: {id}, parking: {id, plaza} }` calculado.
+**Personas de un pase: `PUT /reservation-groups/:paseId/pase-personas`**
 
-### Pantallas
+```json
+{ "guestIds": [101, 102, 104], "incluyeTitular": true }
+```
 
-- **Modales de nueva reserva y de edición** (carpa y sombrilla):
-  - Tilde "Incluye pileta", visible solo si el establecimiento tiene pileta. Debajo: "Pase para 2 adultos y 1 menor, del 10/01 al 20/01", tomado de los campos que ya existen.
-  - Tilde "Incluye estacionamiento": el mismo de hoy, con plaza, patente, precio y pago. Lo que cambia es que se manda dentro de `incluidos` en vez de disparar un segundo POST, y que también aparece en el modal de **edición**.
-- **`App.jsx`:** sacar la segunda alta de `handleSaveCarpaReservationRange` y de `handleSaveSombrillaReservationRange`, y el uso de `findAvailableParkingSpotForRange` en ese flujo. Por el tamaño de `App.jsx`, el armado del objeto `incluidos` va en un helper aparte (por ejemplo `frontend/src/lib/incluidos.js`) con sus tests.
-- **Secciones Pileta y Estacionamiento, y sus calendarios:** la reserva incluida lleva la marca "Incluido en Carpa 12" y ofrece "Ir a la reserva".
-- **Detalle de la carpa y comprobante:** líneas "Incluye pileta: 2 adultos, 1 menor" e "Incluye cochera: plaza 45, AB123CD".
+- Reemplaza la lista de personas del pase. En el router de producción va con `segments[3] === 'pase-personas'`, como `payments`.
+- Cada `guestId` tiene que ser una persona de **la carpa** asociada al pase. `incluyeTitular` usa el cliente de la carpa.
+- Cada persona tiene que tener nombre, DNI y edad: si no, **400 `persona_incompleta`**, con la lista de quiénes faltan.
+- Pase incluido: como mucho la cantidad del ajuste (4 en carpas): si no, **400 `demasiados_pases`**.
+- Una persona que ya tiene otro pase de la misma carpa: **409 `persona_con_pase`**.
+- Recalcula `adults_count` / `children_count` del pase. En transacción, con `FOR UPDATE` sobre la fila del pase.
+- `GET` en la misma ruta devuelve las personas con nombre, DNI y edad.
 
-### Pagos y reportes
+**Asignación por defecto**
 
-- Cada incluido tiene **su propio precio y sus propios pagos**, como hoy la cochera. El pago inicial sigue siendo un POST aparte por reserva (fuera de alcance).
-- **Pileta:** el contrato dice que se cobra aparte, así que el pase lleva su propio precio (por día o por temporada).
-- **Ocupación:** el pase cuenta en la ocupación de la pileta y la cochera en la del estacionamiento, igual que una reserva suelta.
-- **Saldo del cliente:** como son reservas separadas, el saldo de la carpa no incluye el de la cochera o el pase. Queda por decidir si el detalle de la carpa muestra además un "saldo total" que sume los incluidos (decisión G2).
+- Al agregar un acompañante con nombre, DNI y edad a una carpa cuyo pase incluido tiene lugar, el servidor se lo asigna (en la misma transacción que el alta). Al completar el DNI o la edad de alguien que no los tenía, lo mismo. El operador puede desasignarlo.
+- Al borrar un acompañante, su lugar en el pase se libera solo (`ON DELETE CASCADE`).
 
-## Decisiones abiertas
+**Pase pago asociado**
 
-Hay que definirlas antes de pasar a un plan.
+- Es el `POST` de pase de siempre con `incluidaEnReservaId` (la carpa) y `vinculo: 'adicional'`. Después se le asignan personas con `pase-personas`, sin tope salvo el de la carpa.
+- Sus fechas por defecto son las de la carpa, pero se pueden cambiar (la regla de "mismas fechas" es solo para los incluidos).
 
-### Generales
+**Establecimiento:** `GET` y `PUT /establishment` leen y guardan `pasesPiletaPorCarpa`, `pasesPiletaPorSombrilla` y `maxPersonasPorUnidad`.
 
-- **G1. ¿Los incluidos se deciden en cada venta o vienen de la tarifa?** Ejemplo: "las carpas del sector Premium siempre incluyen pileta". Propuesta: tilde manual en cada venta; más adelante, si hace falta, una tarifa puede traerlo tildado por defecto.
-- **G2. Cobro en el mostrador.** ¿Se cobra todo junto (un pago que se reparte entre carpa y servicios) o cada uno por su lado, como hoy la cochera? Propuesta: cada uno por su lado, más un "saldo total" informativo en el detalle de la carpa.
-- **G3. Siempre las mismas fechas.** Ejemplo: carpa por todo enero y pileta o cochera solo una semana. Propuesta: mismas fechas; el caso raro se resuelve con una reserva suelta, como hoy.
-- **G4. Cliente obligatorio.** Si la carpa no tiene cliente guardado, ¿se pueden crear los incluidos? Hay que unificar el criterio entre las dos APIs (hoy local exige cliente para la pileta y producción no).
+**GET de reservas:** cada reserva trae `incluidaEnReservaId` y `vinculo`. La carpa trae un resumen:
 
-### Pileta
+```json
+"incluidos": {
+  "pileta": { "id": 501, "pases": 4, "asignados": 3 },
+  "cocheras": [{ "id": 502, "plaza": 45, "vehiclePlate": "AB123CD" }],
+  "pasesPagos": [{ "id": 503, "personas": 2 }]
+}
+```
 
-- **P1. Precio de temporada.** El contrato ya confirmó que es un costo adicional. ¿La pileta se suma al módulo de tarifas (por día y por temporada, adulto y menor) o se sigue tipeando en el modal? Propuesta: sumarla a tarifas, porque el precio de temporada es fijo y se repite en cada venta. Puede ir en un cambio previo o posterior a este.
-- **P2. ¿Qué es "Menor de hasta 4-5 años"?** ¿No cuenta para el máximo de 6? ¿No paga pileta? Hay que preguntárselo al balneario.
-- **P3. ~~¿El pase cubre a todas las personas de la carpa?~~ Resuelta (26/09):** la reserva incluye **4 pases de pileta**. Hacen falta los datos de todos los acompañantes, y si la carpa tiene más de 4 personas, el operador elige cuáles 4 tienen pase; el resto queda sin pileta. Esto convierte el pase en **nominal (por persona)**, no en una cantidad de adultos y menores. Preguntas que se desprenden:
-  - **P3a.** ¿Los 4 pases están dentro del precio de la carpa, o se cobran aparte? El contrato dice "costo adicional".
-  - **P3b.** ¿El número 4 es igual para carpas y sombrillas, o depende del tipo o del sector?
-  - **P3c.** Los que quedan sin pase, ¿pueden comprar uno aparte (pase suelto) y queda asociado a la carpa?
-  - **P3d.** Cómo se guarda: marca "con pileta" en cada persona de la reserva (`reservation_guests`) o personas propias del pase.
-- **P4. Aforo.** Hoy no se controla para ningún pase. Propuesta: aviso sin bloqueo, y hacerlo para todos los pases a la vez, fuera de este cambio.
+### 4.3 Pantallas
 
-### Cochera
+**Modal de nueva reserva y de edición (carpa y sombrilla)**
 
-- **C1. Plaza elegida por el servidor.** Si el operador no elige plaza, ¿está bien que el servidor asigne la primera libre? Propuesta: sí, y el modal muestra cuál quedó.
-- **C2. ¿Una sola cochera por carpa?** Una familia puede venir con dos autos. Propuesta: una incluida; la segunda se carga suelta. El índice único lo garantiza.
-- **C3. ¿Qué se puede editar desde la cochera?** Propuesta: plaza y patente sí; fechas, estado y cliente solo desde la carpa.
-- **C4. Cocheras ya cargadas junto con una carpa.** Hoy no tienen vínculo. ¿Se vinculan con un script (mismo cliente y mismas fechas que una carpa) o se dejan sueltas? Propuesta: dejarlas sueltas; como la temporada 2026-2027 todavía no empezó, hay pocas, y se pueden vincular a mano desde la edición de la carpa.
-- **C5. ¿Qué pasa si falla la cochera al crear?** Propuesta: falla todo (ver API). Es un cambio de comportamiento: hoy la carpa se crea igual y solo avisa. En discusión (26/09).
+- **Cliente:** junto al buscador, un botón **"+ Nuevo cliente"** que abre la ficha de cliente de siempre (`ClientFormModal`) y, al guardarla, deja el cliente elegido en la reserva. Si hay algún incluido tildado y no hay cliente elegido, el modal no deja guardar y lo dice.
+- **Personas:** si adultos + menores supera el tope, el modal no deja guardar: "Máximo 6 personas por unidad".
+- **"Incluye pileta":** visible si el establecimiento tiene pileta y ese tipo de unidad da pases. Debajo: "4 pases de pileta incluidos. Se asignan a las personas desde el detalle de la reserva."
+- **"Incluye estacionamiento":** el de hoy, más **"+ Agregar otra cochera"**. Cada cochera tiene plaza (opcional), patente, precio y pago inicial. En la edición lista las cocheras incluidas, con opción de quitar y de agregar.
+- **Al guardar se manda todo en un solo request.** Se saca la segunda alta de `handleSaveCarpaReservationRange` y de `handleSaveSombrillaReservationRange`, y el uso de `findAvailableParkingSpotForRange` en ese flujo. El armado de `incluidos` va en un helper aparte (`frontend/src/lib/incluidos.js`) con tests, no en `App.jsx`.
+- Si el servidor responde 409, el modal queda abierto con el mensaje. Si el servidor asignó plazas, el aviso de éxito dice cuáles.
 
-### Pantallas: confirmado
+**Detalle de la carpa (`ReservationDetailsModal` / `PersonasReserva`)**
 
-- **26/09:** los tildes "Incluye estacionamiento" (como hoy) e "Incluye pileta" en el modal de la carpa quedan como forma de uso.
+- **Personas:** el titular aparece primero, con los datos de su ficha. Cada persona tiene un tilde **"Pileta"**, con un contador "3 de 4 pases asignados". El tilde está deshabilitado para quien no tiene DNI o edad ("Completá DNI y edad para darle pase") y cuando no quedan pases. Una persona con pase pago muestra "Pase pago" en lugar del tilde.
+- **Servicios incluidos:** pileta (pases asignados) y cocheras (plaza y patente).
+- **Pases pagos asociados**, con sus personas y su saldo.
+- **Botón "Vender pase de pileta":** abre `PoolPassModal` con las fechas y el cliente de la carpa, y la lista de personas de la carpa **sin pase** para marcar. Adultos y menores se precargan según la edad (menor = menos de 18) y se pueden corregir, porque el precio del pase pago sale de esas cantidades, como hoy.
+- **Al cancelar o cambiar fechas** de una carpa con pases pagos asociados: "Esta carpa tiene 1 pase pago asociado. Revisalo."
 
-## Riesgos
+**Secciones Pileta y Estacionamiento, y sus calendarios**
 
-- **Olvidarse de una de las dos APIs.** Es la trampa conocida del repo. Los tests en `api/` cubren producción; en local conviene probar a mano los flujos de "Cómo verificarlo".
-- **Transacciones nuevas.** No hay ningún endpoint con transacción para copiar el patrón. En `api/index.js` hay que pedir un cliente explícito (`pool.connect()`, `BEGIN` / `COMMIT` / `ROLLBACK`, y liberarlo en `finally`) en vez de usar `db.query`. Conviene un helper `withTransaction(fn)` en cada API. Los tests mockean `pg` sembrando `require.cache` (`api/test/pg-mock.js`): el mock tiene que soportar `connect()` y un cliente con `query` y `release`.
-- **Carrera en la superposición.** El control de superposición es un `SELECT` sin bloqueo: dos altas simultáneas de la misma plaza pueden pasar las dos. Dentro de la transacción, bloquear con `SELECT id ... FOR UPDATE` sobre las reservas activas de esa unidad (o un advisory lock por unidad), según la convención del equipo. Aplica también a la carpa.
-- **Incluidos huérfanos** si la sincronización falla a mitad de camino. La transacción lo evita tanto al crear como en el PATCH.
-- **Doble alta durante la transición.** Si el backend nuevo sale antes que el frontend nuevo, o al revés, la cochera podría crearse dos veces o ninguna. Salen juntos, en el mismo deploy.
+- Pase incluido: marca **"Incluido en Carpa 12"**, con los nombres. En vez de editar, **"Ir a la reserva"**.
+- Pase pago asociado: **"Pase pago · Carpa 12"**. Se edita como cualquier pase.
+- Cochera incluida: **"Incluida en Carpa 12"**. Permite editar plaza y patente; para lo demás, "Ir a la reserva".
 
-## Cómo verificarlo
+**Comprobante (`generateReceipt`):** líneas "Pileta incluida: 4 pases (Juan Pérez, Ana Pérez, …)" y "Cochera incluida: plaza 45, AB123CD".
 
-1. Crear la Carpa 12 del 10/01 al 20/01, con 2 adultos y 1 menor, con pileta y con cochera en la plaza 45. Aparecen el pase en Pileta y la cochera en Estacionamiento, con esas fechas, marcados "Incluido en Carpa 12", cada uno con su precio.
-2. Crear otra carpa con cochera en la plaza 45 en fechas que se superponen. Falla todo y la carpa no queda creada.
-3. Crear una carpa con cochera sin elegir plaza. El servidor asigna una libre y el modal la muestra.
-4. Cambiar las fechas de la Carpa 12. El pase y la cochera se mueven.
-5. Cambiar las personas de la Carpa 12. El pase se ajusta; la cochera no cambia.
-6. Cambiar la patente y la plaza desde la cochera. Deja. Cambiar sus fechas desde la cochera: no deja y ofrece ir a la carpa.
-7. Cancelar la Carpa 12. El pase y la cochera quedan cancelados.
-8. Agregar pileta y cochera a una carpa ya creada desde el modal de edición.
-9. Todo lo anterior también con una sombrilla.
-10. Todo lo anterior en local (puerto 9000) y en Vercel.
+**Configuración del establecimiento (`EstablishmentConfigForm`):** tres campos nuevos: pases de pileta por carpa, pases por sombrilla y máximo de personas por unidad.
+
+### 4.4 Pagos y reportes
+
+- **Pase incluido:** precio 0, sin pagos. No aparece en ingresos.
+- **Cocheras:** su propio precio de tarifa y sus propios pagos, como hoy. El pago inicial de cada una sigue siendo un POST aparte después de crear todo: si falla, la reserva queda sin ese pago y se carga a mano, sin romper la consistencia entre reservas.
+- **Pase pago:** precio y pagos propios, como cualquier pase.
+- **Ocupación:** sin cambios en el reporte. El pase con nombre mantiene `adults_count` / `children_count` iguales a sus personas asignadas; cada cochera cuenta como una plaza.
+
+---
+
+## 5. Etapas
+
+Cada etapa se puede mergear y probar por separado.
+
+1. **Base y cochera.** Transacciones y bloqueo de superposición en las dos APIs. Columnas de vínculo. Cocheras incluidas del lado del servidor (varias), con su pantalla. "+ Nuevo cliente" en el modal. Cliente obligatorio con incluidos. Tope de personas y ajustes del establecimiento.
+2. **Pileta incluida.** Pase incluido al vender y al editar. Tabla `pase_pileta_personas`, endpoint `pase-personas`, asignación por defecto, tilde "Pileta" en el detalle, marcas en la sección Pileta.
+3. **Pase pago asociado.** "Vender pase de pileta" desde la carpa, marca "Pase pago", avisos al cancelar o mover la carpa.
+
+## 6. Fuera de alcance
+
+- **Precio de pileta en el módulo de tarifas** (por día y por temporada). Se hace en un cambio aparte; hasta entonces, el precio del pase pago se sigue tipeando.
+- **Usuarios múltiples y roles**, y después el **control de acceso a la pileta desde el celular**, con el aforo. Van en specs propios. Este spec deja lo que esos necesitan: cada pase dice quiénes pueden entrar, con nombre y DNI.
+- **Pases sueltos (sin carpa) con nombre.** Siguen con cantidades hasta el spec de control de acceso.
+- **Tarifas que traigan los incluidos tildados por defecto** (por ejemplo, "el sector Premium siempre incluye pileta").
+
+## 7. Para consultar con el balneario
+
+- **¿Las sombrillas incluyen pases de pileta?** Por ahora no (ajuste en 0).
+- **"Menor de hasta 4-5 años":** ¿cuenta para el máximo de 6? ¿Necesita pase? Por ahora cuenta como una persona más.
+- **Edad de corte entre adulto y menor** para el precio de pileta. Se usa menos de 18 como precarga editable.
+
+## 8. Riesgos
+
+- **Olvidarse de una de las dos APIs.** Es la trampa conocida del repo. Los tests en `api/` cubren producción; en local, los flujos de la sección 9 se prueban a mano.
+- **Transacciones nuevas.** No hay un patrón previo. El mock de `pg` de los tests (`api/test/pg-mock.js`, sembrado en `require.cache`) tiene que soportar `connect()` y un cliente con `query` y `release`.
+- **Frontend y backend salen juntos.** Si sale uno solo, la cochera se crea dos veces o ninguna.
+- **Tope de personas en reservas existentes.** Una reserva con más de 6 no se podrá editar sin bajar la cantidad. Hoy son datos de prueba.
+- **Cambio de comportamiento visible:** una carpa con cochera ya no se guarda si la cochera falla. Avisar al operador en el manual de uso.
+
+## 9. Cómo verificarlo
+
+1. Crear la Carpa 12 del 10/01 al 20/01, con 3 adultos y 2 menores, con pileta y dos cocheras (una en la plaza 45 y otra sin plaza). Aparecen el pase en Pileta ("Incluido en Carpa 12") y las dos cocheras en Estacionamiento; el aviso dice qué plaza asignó el servidor.
+2. Crear otra carpa con cochera en la plaza 45 en fechas superpuestas. No se guarda nada y el modal dice que la plaza 45 está ocupada.
+3. Crear una carpa con 7 personas. No deja.
+4. Crear una carpa con incluidos sin cliente. No deja; crear el cliente con "+ Nuevo cliente" desde el modal y guardar.
+5. En el detalle de la Carpa 12, cargar 5 acompañantes, 4 con DNI y edad. Los pases se asignan solos hasta completar 4; el que no tiene datos no se puede tildar. Cambiar a mano quién tiene pase.
+6. Vender un pase pago al quinto acompañante desde la carpa. Aparece "Pase pago · Carpa 12" con su precio.
+7. Cambiar las fechas de la Carpa 12. El pase incluido y las cocheras se mueven; el pase pago no, y aparece el aviso.
+8. Cambiar la patente y la plaza desde una cochera. Deja. Cambiar sus fechas desde la cochera: no deja y ofrece ir a la carpa.
+9. Quitar una cochera desde la edición de la carpa. Queda cancelada.
+10. Cancelar la Carpa 12. El pase incluido y las cocheras quedan cancelados; el pase pago no, con aviso.
+11. Una sombrilla no muestra el tilde de pileta (ajuste en 0), pero sí el de cochera.
+12. El reporte de ocupación de la pileta cuenta las personas asignadas.
+13. Todo lo anterior en local (puerto 9000) y en Vercel.
+
+---
+
+## 10. Ampliaciones posteriores a la aprobación
+
+### 10.1 Personas en el alta (30/09)
+
+El modal de alta de carpa y sombrilla muestra una fila por persona (adultos + menores, sin pasar el tope). El titular va primero con los datos de su ficha; el DNI y la fecha de nacimiento que se completen ahí **se guardan en la ficha del cliente**. Los acompañantes (nombre, DNI, edad) son **de esa reserva**, no del cliente. Con "Incluye pileta", cada fila tiene un botón para darle o sacarle el pase; por defecto lo tienen los primeros con datos completos, hasta la cantidad de pases. Todo viaja en el POST de la carpa (`personas`, `titular`) y se guarda en su transacción (`completarAlta`).
+
+### 10.2 Cuenta única (06/10)
+
+Reemplaza la decisión G2 ("cada servicio se cobra por su lado").
+
+- **Pases pagos desde el alta.** Cada fila de persona tiene dos botones excluyentes: "Incluido" (hasta la cantidad de pases) y "Pase pago". Los dos piden DNI y edad. El pase pago no depende de que la carpa incluya pileta, solo de que el balneario tenga pileta.
+- **Precio del pase pago:** por día, uno para adulto y otro para menor (menor = menos de 18, por la edad de la fila). Total = (adultos × precio adulto + menores × precio menor) × días de la carpa. Cuando la pileta entre en tarifas, esos precios se cargan solos.
+- **Resumen de la cuenta** al final del modal: subtotal de la carpa, de la pileta paga y de cada cochera, y el total.
+- **Un solo pago**, parcial o total, por toda la cuenta. No puede superar el total.
+- **Reparto:** el pago se imputa en orden: la carpa, después las cocheras (por orden de alta) y al final la pileta paga. Cada parte queda como un pago de su reserva (`reservation_payments`), así los reportes por rubro no cambian.
+- **En el servidor:** el POST acepta `pasePago: { precioAdultoPorDia, precioMenorPorDia }`, `personas[].pasePago`, `titular.pasePago` y `pagoInicial: { monto, metodo }`. La carpa, sus servicios, el pase pago con sus personas y el pago van en la misma transacción.
+- **Pagos posteriores:** `POST /reservation-groups/:id/pago-cuenta` cobra contra el saldo total de la carpa con todo lo suyo y lo reparte en el mismo orden. El detalle de la carpa muestra ese saldo total. Las cocheras y los pases se siguen pudiendo pagar por separado.
+- **Columna del medio de pago:** local guarda `method` y producción `payment_method`. El reparto vive en `_incluidos` y cada API le pasa su propia función para insertar el pago.

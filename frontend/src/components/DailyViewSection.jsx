@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { addDays } from 'date-fns';
 import { format } from '../lib/dates';
 import { ServiceIcon } from './icons';
-import { diasOcupadaDesde, reservaEnFecha, proximaReserva, estacionamientoVinculado } from '../lib/reservas';
+import { diasOcupadaDesde, reservaEnFecha, proximaReserva, estacionamientoVinculado, cuentaDe } from '../lib/reservas';
 import { numerosDeUnidades } from '../lib/unidades';
 import { PLANO_ACTIVO } from '../config/planoZeus';
 import PlanoBalneario from './PlanoBalneario';
@@ -238,6 +238,7 @@ function DailyViewSection({
           reserva={reserva}
           proxima={reserva ? null : proximaReserva(reservationGroups, serviceType, numero, currentDateStr)}
           estacionamiento={reserva && serviceType !== 'parking' ? estacionamientoVinculado(reservationGroups, reserva) : null}
+          cuenta={reserva ? cuentaDe(reservationGroups, reserva) : null}
           diasLibre={dias ?? 0}
           lookahead={quickViewLookaheadDays}
         />

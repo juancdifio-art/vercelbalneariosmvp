@@ -37,6 +37,12 @@ Una ruta nueva es un `if (first === 'auth' && second === 'xxx')`. Y para pegarle
 
 **Ni `vi.mock('pg')` ni un alias de Vite lo interceptan** — se probaron los dos y el test termina pegándole al `pg` real. La forma que funciona es sembrar el `require.cache` antes de importar `index.js`: ver `api/test/pg-mock.js`.
 
+### El medio de pago se guarda en columnas distintas
+
+En `reservation_payments`, la base local tiene la columna `method` (y `client_id`); `api/index.js` (producción) escribe y lee `payment_method`. Un `INSERT` de pagos escrito para una no anda en la otra.
+
+Por eso el código compartido no inserta pagos por su cuenta: `_incluidos/servicio.js` recibe una función `insertarPago` que define cada API. Antes de desplegar algo que toque pagos, confirmar en Supabase qué columnas tiene la tabla.
+
 ## Entornos
 
 **Local:** backend en 9000 (`cd backend && npm start`), frontend en 9001 (`cd frontend && npm run dev`). Postgres local, base `balnearios_mvp`.
@@ -56,11 +62,19 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 118 tests del router serverless
-cd frontend && npm test   # 209 tests de componentes y utilidades
+cd api && npm test        # 217 tests del router serverless y de _incluidos / _tarifas
+cd frontend && npm test   # 303 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
+
+`api/incluidos-integracion.test.js` prueba el SQL de `_incluidos` contra la base local y **no corre con `npm test`** (queda en skipped). Hace todo en una transacción y la deshace:
+
+```bash
+cd api && DB_INTEGRACION=1 npx vitest run incluidos-integracion.test.js
+```
+
+**Transacciones en los tests de `api/`:** `test/pg-mock.js` hace que `BEGIN`, `COMMIT`, `ROLLBACK` y `pg_advisory_xact_lock` no consuman respuestas de `queryMock` (van a `txMock`). Al preparar un test se mockean solo las consultas de datos, en orden.
 
 ## Convenciones propias
 
@@ -69,9 +83,24 @@ cd frontend && npm test   # 209 tests de componentes y utilidades
 - **Grillas de ocupación:** son `table-fixed`, así que **el ancho de columna lo define el `<th>`, no el `<td>`**. Ensanchar el `td` no hace nada.
 - **Plano del balneario:** `frontend/src/config/planoZeus.js` es la fuente de verdad de qué carpas y sombrillas existen y dónde van. Con el plano activo, las listas de unidades salen de `numerosDeUnidades` (`frontend/src/lib/unidades.js`) y **no de 1..capacidad**: las carpas son 117 pero numeradas hasta la 134, con huecos (4-11, 26, 27, 77-83). Cualquier lista nueva de carpas o sombrillas tiene que usar ese helper. La capacidad configurada queda fija en lo que dice el plano. `docs/plano-zeus.html` es la versión suelta del mismo plano, con sus datos duplicados en `docs/plano-zeus.js`: si se corrige una unidad, corregirla en los dos.
 - **Patente obligatoria en estacionamiento:** toda reserva `parking` lleva `vehicle_plate`. Las dos APIs la exigen (`vehicle_plate_required`) y la guardan normalizada (`AB123CD`), y los formularios no dejan guardar sin ella. Va en la reserva, no solo en la ficha del cliente, porque el mismo cliente puede venir con otro auto; la ficha solo sirve para completarla sola. Columna nueva: `backend/migrate-reservation-vehicle-plate.sql`.
+- **Mostrar datos crudos:** montos con `formatPesos` (`lib/money.js`); medio de pago, fechas `YYYY-MM-DD` y nombre de la unidad con `lib/formato.js`. Nada de `toFixed` ni de `cash`/`transfer` en pantalla.
+- **Manual de uso:** la fuente es `docs/manual/manual.html` con capturas en `docs/manual/img/`; el PDF se imprime con Edge headless (`msedge --headless=new --no-pdf-header-footer --print-to-pdf=...`). Si cambia una pantalla que sale en el manual, rehacer su captura.
 - **Calendarios de Carpas y Sombrillas:** los dos usan `CalendarioOcupacion.jsx`. Un cambio en la grilla se hace ahí, no en las secciones.
 - **`App.jsx` tiene ~2800 líneas.** Al agregar una sección, crear un componente aparte y pasarle las props agrupadas en un objeto en vez de sueltas.
 - **Tarifas:** el precio de carpas, sombrillas y estacionamiento lo calcula el servidor con `api/_tarifas/` (`calculo.js` y `validaciones.js` puros, `servicio.js` con las consultas). Es el único código compartido por las dos APIs: `backend/src/index.js` lo requiere desde `../../api/_tarifas/servicio`, así que **un cambio de tarifas se hace ahí y no en cada API**. Lo que manda el navegador solo cuenta como "cobrado"; si difiere del precio de tarifa hace falta `motivoAjuste`. La reserva guarda el snapshot (`precio_tarifa`, `desglose`, `motivo_ajuste`) y no se recalcula si cambia una tarifa, salvo que se editen sus fechas o su unidad. Pileta no pasa por tarifas. Migración: `backend/migrate-tarifas.sql`.
+
+## Servicios incluidos (pileta y cocheras de una carpa)
+
+Spec: `docs/superpowers/specs/2026-09-26-servicios-incluidos-design.md`.
+
+- **La lógica vive en `api/_incluidos/`**, compartida por las dos APIs igual que `_tarifas`: `reglas.js` (puro), `servicio.js` (recibe `query`) y `transaccion.js`. Un cambio de incluidos se hace ahí, no en cada API.
+- **Un incluido es una reserva más** con `incluida_en_reserva_id` (la carpa) y `vinculo`: `'incluido'` se mueve y se cancela con la carpa; `'adicional'` (pase de pileta pago) solo se muestra junto a ella y no se toca solo. Los pases con nombre están en `pase_pileta_personas`. Migración: `backend/migrate-servicios-incluidos.sql`.
+- **El alta y el PATCH de carpa, sombrilla y estacionamiento corren en una transacción** con `pg_advisory_xact_lock` por unidad (`bloquearUnidad`): el control de superposición sin bloqueo dejaba pasar dos altas simultáneas. En `api/index.js` la transacción usa `conTransaccion()` (cliente propio), nunca `db.query`, que abre un pool por consulta.
+- **El pase de pileta incluido y la cochera incluida no se editan por su cuenta**: la API responde 409 `servicio_incluido_no_editable` (la cochera acepta plaza y patente).
+- **Frontend:** `lib/incluidos.js` arma y valida lo que se manda; `ServiciosIncluidosFields` es el bloque de pileta y cocheras de los modales de carpa y sombrilla. Después de un cambio que toca varias reservas, `refrescarDatos()` en `App.jsx` vuelve a pedir grillas y listas.
+- **Personas en el alta:** el modal de carpa y sombrilla carga una fila por persona. Los acompañantes van a `reservation_guests` de **esa reserva**; solo el DNI y la fecha de nacimiento del titular vuelven a la ficha del cliente.
+- **Cuenta única:** la carpa y todo lo suyo (cocheras, pase de pileta pago) se cobran con **un solo pago**, que `cobrarCuenta` reparte en orden (la carpa, las cocheras, la pileta paga) y guarda como un pago por reserva, así los reportes por rubro no cambian. En el alta va en `pagoInicial`, dentro de la transacción; después, por `POST /reservation-groups/:id/pago-cuenta`. El pase pago se vende en el alta con precio por día de adulto y de menor (`pasePago`).
+- **Tope de personas y pases por unidad** son ajustes del establecimiento (`pases_pileta_por_carpa` 4, `pases_pileta_por_sombrilla` 0, `max_personas_por_unidad` 6).
 
 ## Seguridad
 

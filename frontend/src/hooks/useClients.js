@@ -197,6 +197,7 @@ function useClients({ authToken, setError, setSuccess, setIsAuthenticated }) {
       handleResetClientForm();
       setClientFormOpen(false);
       if (setSuccess) setSuccess('Cliente guardado correctamente.');
+      return data.client;
     } catch (err) {
       console.error('Error saving client', err);
       if (setError) setError('No se pudo guardar el cliente.');

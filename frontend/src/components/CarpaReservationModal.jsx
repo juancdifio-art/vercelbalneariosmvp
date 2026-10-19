@@ -4,38 +4,14 @@ import ClientSearchInput from './ClientSearchInput';
 import useUnidadesOcupadas from '../hooks/useUnidadesOcupadas';
 import PersonasFields from './PersonasFields';
 import { numerosDeUnidades } from '../lib/unidades';
-import { normalizarPatente } from '../lib/patente';
-import PatenteField from './PatenteField';
 import PrecioReserva from './PrecioReserva';
-import { PRECIO_VACIO, aNumero, faltaMotivoAjuste } from '../lib/tarifas';
-
-// Función para formatear montos con separadores de miles (formato argentino)
-const formatCurrency = (value) => {
-  if (value === null || value === undefined || Number.isNaN(value)) return '0,00';
-  return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-};
-
-// Función para formatear el valor del input con separadores de miles (versión optimizada)
-const formatInputValue = (value) => {
-  if (!value && value !== 0) return '';
-  const numStr = String(value).replace(/\D/g, '');
-  if (!numStr) return '';
-  // Agregar puntos como separadores de miles manualmente (más rápido que toLocaleString)
-  let result = '';
-  for (let i = numStr.length - 1, count = 0; i >= 0; i--, count++) {
-    if (count > 0 && count % 3 === 0) {
-      result = '.' + result;
-    }
-    result = numStr[i] + result;
-  }
-  return result;
-};
-
-// Función para parsear el valor formateado a número
-const parseInputValue = (formattedValue) => {
-  if (!formattedValue) return '';
-  return formattedValue.replace(/\./g, '');
-};
+import ServiciosIncluidosFields from './ServiciosIncluidosFields';
+import useCocherasIncluidas from '../hooks/useCocherasIncluidas';
+import { PRECIO_VACIO, faltaMotivoAjuste } from '../lib/tarifas';
+import { maxPersonasPara, superaTope, armarPersonasAlta, pasesIncluidosPara, cuentaDelAlta } from '../lib/incluidos';
+import PersonasAltaFields, { filasDelAlta } from './PersonasAltaFields';
+import CuentaReserva, { montoDelPago } from './CuentaReserva';
+import { normalizarPatente } from '../lib/patente';
 
 function CarpaReservationModal({
   form,
@@ -47,7 +23,8 @@ function CarpaReservationModal({
   onSaveRange,
   onReleaseRange,
   onClose,
-  reservationGroups
+  reservationGroups,
+  onNuevoCliente
 }) {
   if (!form) return null;
 
@@ -62,25 +39,16 @@ function CarpaReservationModal({
     customerPhone,
     adultsCount,
     childrenCount,
-    includeParking,
-    parkingSpotNumber,
+    incluyePileta,
     initialPaymentAmount,
-    initialPaymentMethod,
-    parkingInitialPaymentAmount,
-    parkingInitialPaymentMethod,
-    vehiclePlate
+    initialPaymentMethod
   } = form;
+  const cocheras = Array.isArray(form.cocheras) ? form.cocheras : [];
 
   const precio = form.precio ?? PRECIO_VACIO;
-  const precioCochera = form.precioCochera ?? PRECIO_VACIO;
   const cambiarPrecio = (campo) => (patch) =>
     onChangeForm((prev) => (prev ? { ...prev, [campo]: { ...(prev[campo] ?? PRECIO_VACIO), ...patch } } : prev));
 
-  const hasParking = establishment?.hasParking;
-  const parkingCapacity = hasParking
-    ? Number.parseInt(establishment?.parkingCapacity ?? '0', 10) || 0
-    : 0;
-  const parkingUnits = parkingCapacity > 0 ? Array.from({ length: parkingCapacity }, (_, i) => i + 1) : [];
 
   // Calcular carpas disponibles para el rango de fechas seleccionado
   // Con el plano, la numeracion tiene huecos: la lista sale de ahi y no de 1..capacidad.
@@ -95,16 +63,10 @@ function CarpaReservationModal({
   // y solo los 30 dias de la grilla: ninguna plaza figuraba ocupada y, en una
   // estadia larga, una carpa tomada despues del dia 30 aparecia libre.
   const principal = useUnidadesOcupadas('carpa', startStr, endStr, !isReserved);
-  const estacionamiento = useUnidadesOcupadas('parking', startStr, endStr, !isReserved && Boolean(includeParking));
-
-  // Sin plaza elegida, la que asignaria el sistema: asi se cotiza (y se
-  // guarda) la misma plaza, en vez de cotizar sin numero y asignar otra al guardar.
-  const plazaEfectiva = parkingSpotNumber || (estacionamiento.verificando ? null : parkingUnits.find((n) => !estacionamiento.ocupadas.has(n)) ?? null);
-  const mensajePlaza = parkingSpotNumber || estacionamiento.verificando
-    ? null
-    : plazaEfectiva
-      ? `Se asigna la plaza ${plazaEfectiva}.`
-      : 'No hay plazas libres en esas fechas.';
+  // Pileta y cocheras incluidas: disponibilidad de plazas y validacion.
+  const cocherasIncluidas = useCocherasIncluidas({ establishment, cocheras, desde: startStr, hasta: endStr, activo: !isReserved });
+  const { analisis: cocherasAnalisis, estacionamiento } = cocherasIncluidas;
+  const clienteElegido = (clients || []).find((c) => c.id === clientId) || null;
 
   const startDateObj = parseLocalDateFromInput(startStr);
   const endDateObj = parseLocalDateFromInput(endStr);
@@ -116,47 +78,38 @@ function CarpaReservationModal({
     daysCount = Math.floor(diffMs / msPerDay) + 1;
   }
 
-  // El total sale del recuadro de precio: la tarifa, o lo que cargo el encargado.
-  const totalPreview = aNumero(precio.cobrado);
-  const parkingTotalPreview = includeParking ? aNumero(precioCochera.cobrado) : null;
+  const hayCocheras = cocheras.length > 0;
 
-  const combinedTotalPreview = (() => {
-    const base = totalPreview !== null ? totalPreview : 0;
-    const parking = includeParking && parkingTotalPreview !== null ? parkingTotalPreview : 0;
-    const sum = base + parking;
-    return Number.isFinite(sum) && sum > 0 ? sum : null;
-  })();
-
-  // Validación de pagos que no excedan el total
-  const paymentExceedsTotal = initialPaymentAmount && totalPreview !== null &&
-    Number.parseFloat(initialPaymentAmount) > totalPreview;
-
-  const parkingPaymentExceedsTotal = parkingInitialPaymentAmount && parkingTotalPreview !== null &&
-    Number.parseFloat(parkingInitialPaymentAmount) > parkingTotalPreview;
-
-  // Validación de método de pago faltante
-  const paymentAmountNum = initialPaymentAmount ? Number.parseFloat(String(initialPaymentAmount).replace(',', '.')) : 0;
-  const paymentMissingMethod = paymentAmountNum > 0 && !initialPaymentMethod;
-
-  const parkingPaymentAmountNum = parkingInitialPaymentAmount ? Number.parseFloat(String(parkingInitialPaymentAmount).replace(',', '.')) : 0;
-  const parkingPaymentMissingMethod = includeParking && parkingPaymentAmountNum > 0 && !parkingInitialPaymentMethod;
-
-  const hasPaymentError = paymentExceedsTotal || (includeParking && parkingPaymentExceedsTotal) || paymentMissingMethod || parkingPaymentMissingMethod;
+  // La cuenta de la reserva: la unidad, la pileta paga y cada cochera. Se
+  // cobra con un solo pago, que el servidor reparte en orden.
+  const filasPersonas = isReserved ? [] : filasDelAlta({ form, cliente: clienteElegido, establishment, serviceType: 'carpa' });
+  const pasesDeLaUnidad = pasesIncluidosPara(establishment, 'carpa');
+  const cuenta = cuentaDelAlta({
+    etiquetaUnidad: `Carpa ${carpaNumero}`,
+    totalUnidad: precio.cobrado,
+    filas: filasPersonas,
+    pasesIncluidos: incluyePileta ? pasesDeLaUnidad : 0,
+    precios: form.pasePagoPrecios || {},
+    dias: daysCount,
+    cocheras: cocheras.map((c, i) => ({ plaza: cocherasAnalisis.efectivas[i], total: c.precio?.cobrado }))
+  });
+  const pagoAhora = montoDelPago(initialPaymentAmount);
+  const hasPaymentError = pagoAhora > cuenta.total || (pagoAhora > 0 && !initialPaymentMethod);
 
   // Una unidad ya elegida que choca con otra reserva en algun dia del periodo
   // no se guarda: antes, con estacionamiento, App la cambiaba por otra plaza
   // sin avisar.
   const conflictoPrincipal = !isReserved && principal.ocupadas.has(Number(carpaNumero));
-  const conflictoEstacionamiento = Boolean(
-    !isReserved && includeParking && parkingSpotNumber && estacionamiento.ocupadas.has(Number(parkingSpotNumber))
-  );
-  const verificandoDisponibilidad = principal.verificando || Boolean(includeParking && estacionamiento.verificando);
-  // Sin patente no hay estacionamiento: es un dato obligatorio.
-  const faltaPatente = Boolean(includeParking) && !normalizarPatente(vehiclePlate);
-  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || conflictoEstacionamiento || verificandoDisponibilidad || faltaPatente ||
-    faltaMotivoAjuste(precio) || (Boolean(includeParking) && faltaMotivoAjuste(precioCochera)) ||
+  const verificandoDisponibilidad = principal.verificando;
+  // Tope de personas por unidad: lo fija el contrato, se bloquea.
+  const excedeTope = !isReserved && superaTope(establishment, adultsCount, childrenCount);
+  // Los servicios incluidos quedan a nombre de un cliente guardado.
+  const faltaCliente = !isReserved && (Boolean(incluyePileta) || hayCocheras) && !clientId;
+  const bloqueaGuardar = hasPaymentError || conflictoPrincipal || verificandoDisponibilidad ||
+    cocherasAnalisis.bloquea || excedeTope || faltaCliente || faltaMotivoAjuste(precio) ||
+    cuenta.pasePago.faltaPrecio ||
     // Sin la cotizacion de las fechas actuales se guardaria el precio de las anteriores.
-    Boolean(precio.cotizando) || (Boolean(includeParking) && Boolean(precioCochera.cotizando));
+    Boolean(precio.cotizando);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -238,6 +191,17 @@ function CarpaReservationModal({
                 <span>Información del cliente</span>
               </h3>
               <div className="space-y-3">
+                {onNuevoCliente && (
+                  <div className="flex justify-end -mb-2">
+                    <button
+                      type="button"
+                      className="text-[11px] font-semibold text-cyan-700 hover:underline"
+                      onClick={onNuevoCliente}
+                    >
+                      + Nuevo cliente
+                    </button>
+                  </div>
+                )}
                 <label className="flex flex-col gap-1">
                   <span className="text-[11px] font-semibold text-slate-700">Buscar cliente guardado</span>
                   <ClientSearchInput
@@ -251,8 +215,10 @@ function CarpaReservationModal({
                             clientId: client ? client.id : null,
                             customerName: client ? client.fullName : '',
                             customerPhone: client ? client.phone || '' : '',
-                            // Si la ficha tiene patente, se completa sola (se puede cambiar).
-                            vehiclePlate: prev.vehiclePlate || (client && client.vehiclePlate) || ''
+                            // Si la ficha tiene patente, la primera cochera la toma (se puede cambiar).
+                            cocheras: (prev.cocheras || []).map((c, i) =>
+                              i === 0 && !c.vehiclePlate && client && client.vehiclePlate ? { ...c, vehiclePlate: client.vehiclePlate } : c
+                            )
                           }
                           : prev
                       );
@@ -368,6 +334,16 @@ function CarpaReservationModal({
             />
           )}
 
+          {!isReserved && (
+            <PersonasAltaFields
+              form={form}
+              onChangeForm={onChangeForm}
+              cliente={clienteElegido}
+              establishment={establishment}
+              serviceType="carpa"
+            />
+          )}
+
           {!isReserved && error && (
             <div className="mb-4 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
               <p className="text-xs text-red-700 flex items-center gap-2">
@@ -381,7 +357,7 @@ function CarpaReservationModal({
             <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
                 <span>💰</span>
-                <span>Precio y pago de carpa</span>
+                <span>Precio de la carpa</span>
               </h3>
               <div className="space-y-3">
                 <PrecioReserva
@@ -393,225 +369,31 @@ function CarpaReservationModal({
                   onChange={cambiarPrecio('precio')}
                   titulo="Precio de la carpa"
                 />
-                <div className="border-t border-slate-200 pt-3 space-y-3">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Monto a pagar ahora por carpa (ARS)</span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      value={formatInputValue(initialPaymentAmount)}
-                      onChange={(e) => {
-                        const rawValue = parseInputValue(e.target.value);
-                        onChangeForm((prev) =>
-                          prev
-                            ? {
-                              ...prev,
-                              initialPaymentAmount: rawValue
-                            }
-                            : prev
-                        );
-                      }}
-                      className={`rounded-lg border bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${paymentExceedsTotal ? 'border-red-500 bg-red-50' : 'border-slate-300'
-                        }`}
-                      placeholder="0"
-                    />
-                    {paymentExceedsTotal && (
-                      <p className="text-[10px] text-red-600 bg-red-50 rounded px-2 py-1">
-                        ⚠️ El pago no puede exceder el total de ${formatCurrency(totalPreview)}
-                      </p>
-                    )}
-                    {initialPaymentAmount && totalPreview !== null && !paymentExceedsTotal && Number.parseFloat(initialPaymentAmount) > 0 && (
-                      <p className="text-[10px] text-emerald-600 bg-emerald-50 rounded px-2 py-1">
-                        ✅ Pendiente: ${formatCurrency(totalPreview - Number.parseFloat(initialPaymentAmount || 0))}
-                      </p>
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Método de pago carpa</span>
-                    <select
-                      value={initialPaymentMethod || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        onChangeForm((prev) =>
-                          prev
-                            ? {
-                              ...prev,
-                              initialPaymentMethod: value
-                            }
-                            : prev
-                        );
-                      }}
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    >
-                      <option value="">Sin pago ahora</option>
-                      <option value="cash">Efectivo</option>
-                      <option value="transfer">Transferencia</option>
-                      <option value="card">Tarjeta de crédito</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </label>
-                </div>
               </div>
             </div>
           )}
 
-          {!isReserved && hasParking && parkingUnits.length > 0 && (
-            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
-              <div className="flex items-center gap-2 mb-3">
-                <input
-                  type="checkbox"
-                  id="includeParking"
-                  className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-2 focus:ring-cyan-500"
-                  checked={!!includeParking}
-                  onChange={(e) => {
-                    const checked = e.target.checked;
-                    onChangeForm((prev) =>
-                      prev
-                        ? {
-                          ...prev,
-                          includeParking: checked
-                        }
-                        : prev
-                    );
-                  }}
-                />
-                <label htmlFor="includeParking" className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1 cursor-pointer">
-                  <span>🚗</span>
-                  <span>Incluir estacionamiento</span>
-                </label>
-              </div>
-
-              {includeParking && (
-                <div className="space-y-3 pl-6">
-                  <label className="flex flex-col gap-1">
-                    <span className="text-[11px] font-semibold text-slate-700">Plaza de estacionamiento</span>
-                    <select
-                      className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      value={parkingSpotNumber || ''}
-                      onChange={(e) => {
-                        const value = e.target.value ? Number.parseInt(e.target.value, 10) : null;
-                        onChangeForm((prev) =>
-                          prev
-                            ? {
-                              ...prev,
-                              parkingSpotNumber: value
-                            }
-                            : prev
-                        );
-                      }}
-                    >
-                      <option value="">Seleccionar plaza...</option>
-                      {parkingUnits.map((num) => {
-                        const isOccupied = estacionamiento.ocupadas.has(num);
-                        return (
-                          <option
-                            key={num}
-                            value={num}
-                            disabled={isOccupied && num !== Number(parkingSpotNumber)}
-                          >
-                            Plaza {num}{isOccupied ? ' (ocupada)' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                    {mensajePlaza && (
-                      <span className="text-[10px] text-slate-600">{mensajePlaza}</span>
-                    )}
-                  </label>
-                  <PatenteField
-                    value={vehiclePlate}
-                    onChange={(value) =>
-                      onChangeForm((prev) => (prev ? { ...prev, vehiclePlate: value } : prev))
-                    }
-                  />
-                  <PrecioReserva
-                    serviceType="parking"
-                    resourceNumber={plazaEfectiva}
-                    desde={startStr}
-                    hasta={endStr}
-                    valor={precioCochera}
-                    onChange={cambiarPrecio('precioCochera')}
-                    titulo="Precio del estacionamiento"
-                  />
-
-                  <div className="border-t border-slate-200 pt-3 space-y-3">
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[11px] font-semibold text-slate-700">
-                        Monto a pagar ahora por estacionamiento (ARS)
-                      </span>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        value={formatInputValue(parkingInitialPaymentAmount)}
-                        onChange={(e) => {
-                          const rawValue = parseInputValue(e.target.value);
-                          onChangeForm((prev) =>
-                            prev
-                              ? {
-                                ...prev,
-                                parkingInitialPaymentAmount: rawValue
-                              }
-                              : prev
-                          );
-                        }}
-                        className={`rounded-lg border bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${parkingPaymentExceedsTotal ? 'border-red-500 bg-red-50' : 'border-slate-300'
-                          }`}
-                        placeholder="0"
-                      />
-                      {parkingPaymentExceedsTotal && (
-                        <p className="text-[10px] text-red-600 bg-red-50 rounded px-2 py-1">
-                          ⚠️ El pago no puede exceder el total de ${formatCurrency(parkingTotalPreview)}
-                        </p>
-                      )}
-                      {parkingInitialPaymentAmount && parkingTotalPreview !== null && !parkingPaymentExceedsTotal && Number.parseFloat(parkingInitialPaymentAmount) > 0 && (
-                        <p className="text-[10px] text-emerald-600 bg-emerald-50 rounded px-2 py-1">
-                          ✅ Pendiente: ${formatCurrency(parkingTotalPreview - Number.parseFloat(parkingInitialPaymentAmount || 0))}
-                        </p>
-                      )}
-                    </label>
-                    <label className="flex flex-col gap-1">
-                      <span className="text-[11px] font-semibold text-slate-700">Método de pago estacionamiento</span>
-                      <select
-                        value={parkingInitialPaymentMethod || ''}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          onChangeForm((prev) =>
-                            prev
-                              ? {
-                                ...prev,
-                                parkingInitialPaymentMethod: value
-                              }
-                              : prev
-                          );
-                        }}
-                        className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                      >
-                        <option value="">Sin pago ahora</option>
-                        <option value="cash">Efectivo</option>
-                        <option value="transfer">Transferencia</option>
-                        <option value="card">Tarjeta de crédito</option>
-                        <option value="other">Otro</option>
-                      </select>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
+          {!isReserved && (
+            <ServiciosIncluidosFields
+              establishment={establishment}
+              serviceType="carpa"
+              desde={startStr}
+              hasta={endStr}
+              incluyePileta={incluyePileta}
+              cocheras={cocheras}
+              cocherasIncluidas={cocherasIncluidas}
+              patenteSugerida={clienteElegido?.vehiclePlate || ''}
+              onChangeForm={onChangeForm}
+            />
           )}
 
-          {daysCount > 0 && combinedTotalPreview !== null && (
-            <div className="bg-gradient-to-r from-emerald-50 to-cyan-50 rounded-xl border-2 border-emerald-200 p-4 mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">💰 Monto total</span>
-                <span className="text-2xl font-bold text-emerald-700">${formatCurrency(combinedTotalPreview)}</span>
-              </div>
-              {includeParking && (
-                <div className="mt-2 pt-2 border-t border-emerald-200 text-[10px] text-slate-600 space-y-0.5">
-                  <p>🏖️ Carpa: ${totalPreview !== null ? formatCurrency(totalPreview) : '0,00'}</p>
-                  <p>🚗 Estacionamiento: ${parkingTotalPreview !== null ? formatCurrency(parkingTotalPreview) : '0,00'}</p>
-                </div>
-              )}
-            </div>
+          {!isReserved && (
+            <CuentaReserva
+              cuenta={cuenta}
+              monto={initialPaymentAmount}
+              metodo={initialPaymentMethod}
+              onChangeForm={onChangeForm}
+            />
           )}
 
           {/* Disponibilidad */}
@@ -620,31 +402,30 @@ function CarpaReservationModal({
               ⚠️ La carpa {carpaNumero} está ocupada en alguno de esos días. Elegí otra o cambiá las fechas.
             </div>
           )}
-          {conflictoEstacionamiento && (
-            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
-              ⚠️ La plaza {parkingSpotNumber} está ocupada en alguno de esos días. Elegí otra.
-            </div>
-          )}
-          {(principal.fallo || estacionamiento.fallo) && (
+          {(principal.fallo || (hayCocheras && estacionamiento.fallo)) && (
             <div className="bg-amber-50 text-amber-800 text-xs p-3 rounded-lg border border-amber-200 mb-4">
               No se pudo verificar la disponibilidad. Al guardar, el sistema igual controla que no se superponga con otra reserva.
             </div>
           )}
 
-          {/* Mensajes de error de pago */}
-          {paymentMissingMethod && (
+          {cuenta.pasePago.faltaPrecio && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
-              ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para la carpa.
+              ⚠️ Cargá el precio por día de los pases de pileta pagos.
             </div>
           )}
-          {faltaPatente && (
+          {excedeTope && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Máximo {maxPersonasPara(establishment)} personas por unidad.
+            </div>
+          )}
+          {faltaCliente && (
+            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
+              ⚠️ Para incluir pileta o cochera, elegí un cliente o creá uno nuevo.
+            </div>
+          )}
+          {hayCocheras && cocherasAnalisis.faltaPatente && (
             <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
               ⚠️ Falta la patente del vehículo: es obligatoria para usar el estacionamiento.
-            </div>
-          )}
-          {parkingPaymentMissingMethod && (
-            <div className="bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200 mb-4">
-              ⚠️ Ingresaste un monto de pago pero no seleccionaste el método de pago para el estacionamiento.
             </div>
           )}
 
@@ -667,15 +448,17 @@ function CarpaReservationModal({
                     adultsCount,
                     childrenCount,
                     precio,
-                    includeParking,
-                    // La plaza que se cotizo arriba: asi lo cotizado es lo que se guarda.
-                    parkingSpotNumber: plazaEfectiva,
-                    precioCochera,
-                    initialPaymentAmount,
-                    initialPaymentMethod,
-                    parkingInitialPaymentAmount,
-                    parkingInitialPaymentMethod,
-                    vehiclePlate: normalizarPatente(vehiclePlate)
+                    incluyePileta: Boolean(incluyePileta),
+                    // Cada cochera con la plaza que se cotizo: lo cotizado es lo que se guarda.
+                    cocheras: cocheras.map((c, i) => ({ ...c, plaza: cocherasAnalisis.efectivas[i], vehiclePlate: normalizarPatente(c.vehiclePlate) })),
+                    // Un solo pago por toda la cuenta.
+                    pagoInicial: pagoAhora > 0 ? { monto: initialPaymentAmount, metodo: initialPaymentMethod } : undefined,
+                    // Precio por dia de los pases de pileta pagos, si se vendio alguno.
+                    pasePago: cuenta.pasePago.cantidad > 0
+                      ? { precioAdultoPorDia: form.pasePagoPrecios?.adulto || '', precioMenorPorDia: form.pasePagoPrecios?.menor || '' }
+                      : undefined,
+                    // Personas de esta reserva y datos del titular (van a su ficha).
+                    ...armarPersonasAlta(filasPersonas)
                   });
 
                   if (ok) {

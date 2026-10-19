@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { format } from '../lib/dates';
+import { formatPesos } from '../lib/money';
+import { etiquetaMetodo, fechaCorta, nombreUnidad } from '../lib/formato';
 import { getApiBaseUrl } from '../apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -210,7 +212,7 @@ function ReportsPaymentsSection({ authToken }) {
       return [
         payment.paymentDate || '',
         Number(payment.amount || 0).toFixed(0),
-        payment.method || '',
+        etiquetaMetodo(payment.method),
         payment.serviceType || '',
         payment.resourceNumber || '',
         customerName,
@@ -357,7 +359,7 @@ function ReportsPaymentsSection({ authToken }) {
                   Total cobrado
                 </div>
                 <div className="mt-1 text-lg font-bold text-emerald-900">
-                  ${totalsSummary.totalAmount.toFixed(0)}
+                  {formatPesos(totalsSummary.totalAmount, 0)}
                 </div>
               </div>
               <div className="rounded-lg bg-sky-50 border border-sky-200 px-3 py-2">
@@ -414,10 +416,10 @@ function ReportsPaymentsSection({ authToken }) {
                       {reportData.totalsByDate.map((item) => (
                         <tr key={item.date} className="border-b border-slate-100">
                           <td className="px-3 py-2 align-top text-slate-800">
-                            {item.date}
+                            {fechaCorta(item.date)}
                           </td>
                           <td className="px-3 py-2 align-top text-emerald-700 font-semibold">
-                            ${Number(item.totalAmount || 0).toFixed(0)}
+                            {formatPesos(item.totalAmount, 0)}
                           </td>
                           <td className="px-3 py-2 align-top text-slate-700">
                             {item.count}
@@ -440,13 +442,13 @@ function ReportsPaymentsSection({ authToken }) {
                     <div key={payment.id} className="px-3 py-2 flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-semibold text-slate-900">
-                          {payment.paymentDate} · ${Number(payment.amount || 0).toFixed(0)}
+                          {fechaCorta(payment.paymentDate)} · {formatPesos(payment.amount, 0)}
                         </div>
                         <div className="text-[11px] text-slate-600 truncate">
-                          {(payment.customerName || payment.clientFullName || 'Sin nombre')} · {payment.serviceType} {payment.resourceNumber}
+                          {(payment.customerName || payment.clientFullName || 'Sin nombre')} · {nombreUnidad(payment.serviceType, payment.resourceNumber)}
                         </div>
                         <div className="text-[10px] text-slate-500">
-                          {payment.method || 'Sin método'}
+                          {etiquetaMetodo(payment.method)}
                           {payment.notes ? ` · ${payment.notes}` : ''}
                         </div>
                       </div>
@@ -497,7 +499,7 @@ function ReportsPaymentsSection({ authToken }) {
                         <div className="text-[11px] text-slate-800">
                           <span className="font-semibold">Pico de ocupación:</span>{' '}
                           {Math.round((svc.maxOccupancyPercent || 0) * 100)}%
-                          {svc.maxOccupancyDate ? ` (${svc.maxOccupancyDate})` : ''}
+                          {svc.maxOccupancyDate ? ` (${fechaCorta(svc.maxOccupancyDate)})` : ''}
                         </div>
                       </div>
                     ))}
@@ -531,7 +533,7 @@ function ReportsPaymentsSection({ authToken }) {
                           {occupancyRows.map((row) => (
                             <tr key={`${row.date}-${row.serviceType}`} className="border-b border-slate-100">
                               <td className="px-3 py-2 align-top text-slate-800">
-                                {row.date}
+                                {fechaCorta(row.date)}
                               </td>
                               <td className="px-3 py-2 align-top text-slate-800">
                                 {getServiceLabel(row.serviceType)}

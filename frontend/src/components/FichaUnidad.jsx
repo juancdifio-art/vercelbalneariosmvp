@@ -39,7 +39,7 @@ const TEXTO_ESTADO = {
   finalizada: 'Finalizada'
 };
 
-function FichaUnidad({ prefijo, numero, estado, fecha, reserva, proxima, estacionamiento, diasLibre, lookahead }) {
+function FichaUnidad({ prefijo, numero, estado, fecha, reserva, proxima, estacionamiento, cuenta, diasLibre, lookahead }) {
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-2">
@@ -52,7 +52,7 @@ function FichaUnidad({ prefijo, numero, estado, fecha, reserva, proxima, estacio
       </div>
 
       {reserva ? (
-        <FichaOcupada reserva={reserva} fecha={fecha} estacionamiento={estacionamiento} />
+        <FichaOcupada reserva={reserva} fecha={fecha} estacionamiento={estacionamiento} cuenta={cuenta} />
       ) : (
         <FichaLibre proxima={proxima} fecha={fecha} diasLibre={diasLibre} lookahead={lookahead} />
       )}
@@ -64,7 +64,7 @@ function FichaUnidad({ prefijo, numero, estado, fecha, reserva, proxima, estacio
   );
 }
 
-function FichaOcupada({ reserva, fecha, estacionamiento }) {
+function FichaOcupada({ reserva, fecha, estacionamiento, cuenta }) {
   const dias = diasInclusivos(reserva.startDate, reserva.endDate);
   const quedan = diasInclusivos(fecha, reserva.endDate);
 
@@ -85,8 +85,11 @@ function FichaOcupada({ reserva, fecha, estacionamiento }) {
     menores > 0 ? plural(menores, 'menor', 'menores') : null
   ].filter(Boolean);
 
-  const total = Number.parseFloat(reserva.totalPrice);
-  const saldo = saldoDe(reserva);
+  // Con cocheras o pases pagos asociados se muestra el saldo de toda la
+  // cuenta, que es lo que se cobra; si no, el de la reserva sola.
+  const conCuenta = Boolean(cuenta && cuenta.asociadas > 0);
+  const total = conCuenta ? cuenta.total : Number.parseFloat(reserva.totalPrice);
+  const saldo = conCuenta ? cuenta.saldo : saldoDe(reserva);
 
   return (
     <dl className="space-y-1.5">
@@ -107,6 +110,7 @@ function FichaOcupada({ reserva, fecha, estacionamiento }) {
             <span className="font-semibold text-emerald-700">Pagada</span>
           )}
           <span className="text-slate-500"> · total {formatPesos(total, 0)}</span>
+          {conCuenta && <span className="block text-[10px] text-slate-500">Toda la cuenta, con lo asociado</span>}
         </Fila>
       )}
       {estacionamiento && (

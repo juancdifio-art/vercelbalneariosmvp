@@ -1,0 +1,576 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Manual de uso - Balneario Zeus</title>
+<style>
+  @page {
+    size: A4;
+    margin: 18mm 17mm 20mm 17mm;
+    @bottom-left { content: "Balneario Zeus · Manual de uso"; font: 8.5pt "Segoe UI", Arial, sans-serif; color: #64748b; }
+    @bottom-right { content: counter(page) " / " counter(pages); font: 8.5pt "Segoe UI", Arial, sans-serif; color: #64748b; }
+  }
+  @page portada { margin: 0; @bottom-left { content: none; } @bottom-right { content: none; } }
+
+  :root { --navy: #0b2a45; --cyan: #0891b2; --cyan-claro: #ecfeff; --borde: #cbd5e1; --texto: #1e293b; --suave: #64748b; }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font: 10.5pt/1.5 "Segoe UI", Arial, sans-serif; color: var(--texto); background: #fff; }
+
+  /* Portada */
+  .portada { page: portada; height: 297mm; padding: 34mm 24mm; background: linear-gradient(160deg, #0b2a45 0%, #0e4a6e 55%, #0891b2 100%); color: #fff; display: flex; flex-direction: column; justify-content: space-between; }
+  .portada .marca { letter-spacing: .45em; font-size: 11pt; font-weight: 600; color: #67e8f9; }
+  .portada h1 { font-size: 34pt; line-height: 1.1; margin: 10mm 0 6mm; }
+  .portada .bajada { font-size: 13pt; color: #cffafe; max-width: 130mm; }
+  .portada .pie { font-size: 11pt; color: #a5f3fc; border-top: 1px solid rgba(255,255,255,.3); padding-top: 5mm; }
+  .portada img { width: 100%; border-radius: 3mm; box-shadow: 0 4mm 10mm rgba(0,0,0,.35); }
+
+  h1.cap { font-size: 20pt; color: var(--navy); margin: 0 0 4mm; padding-bottom: 2mm; border-bottom: 2px solid var(--cyan); break-after: avoid; }
+  h1.cap .n { display: inline-block; min-width: 10mm; color: var(--cyan); }
+  h2 { font-size: 13pt; color: var(--navy); margin: 6mm 0 2mm; break-after: avoid; }
+  h3 { font-size: 11pt; color: var(--navy); margin: 4mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 2.5mm; }
+  ul { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  b, strong { color: #0f172a; }
+  .capitulo { break-before: page; }
+  .tecla { display: inline-block; border: 1px solid var(--borde); border-bottom-width: 2px; border-radius: 1mm; padding: 0 1.5mm; font-size: 9pt; }
+
+  figure { margin: 3mm 0 4mm; break-inside: avoid; text-align: center; }
+  figure img { max-width: 100%; border: 1px solid var(--borde); border-radius: 2mm; }
+  figcaption { font-size: 8.5pt; color: var(--suave); margin-top: 1.5mm; font-style: italic; }
+  .w90 img { width: 90%; } .w80 img { width: 80%; } .w70 img { width: 70%; } .w60 img { width: 60%; } .w50 img { width: 50%; } .w40 img { width: 40%; }
+
+  .lado { display: flex; gap: 6mm; align-items: flex-start; margin: 2mm 0 4mm; break-inside: avoid; }
+  .lado > .texto { flex: 1; }
+  .lado > figure { margin: 0; flex: 0 0 auto; }
+  .lado > figure.f35 { width: 35%; } .lado > figure.f40 { width: 40%; } .lado > figure.f45 { width: 45%; } .lado > figure.f50 { width: 50%; } .lado > figure.f25 { width: 25%; }
+  .lado > figure img { width: 100%; }
+
+  .nota, .ojo, .ejemplo { border-radius: 2mm; padding: 3mm 4mm; margin: 3mm 0 4mm; break-inside: avoid; }
+  .nota { background: var(--cyan-claro); border-left: 3px solid var(--cyan); }
+  .ojo { background: #fffbeb; border-left: 3px solid #f59e0b; }
+  .ejemplo { background: #f1f5f9; border-left: 3px solid var(--navy); }
+  .nota p:last-child, .ojo p:last-child, .ejemplo p:last-child { margin-bottom: 0; }
+  .nota .t, .ojo .t, .ejemplo .t { font-weight: 700; display: block; margin-bottom: 1mm; color: var(--navy); }
+
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.5pt; break-inside: avoid; }
+  th { text-align: left; background: var(--navy); color: #fff; padding: 1.8mm 2.5mm; font-weight: 600; }
+  td { padding: 1.8mm 2.5mm; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  td:first-child { font-weight: 600; color: #0f172a; }
+
+  .indice { list-style: none; padding: 0; margin: 4mm 0 8mm; columns: 1; }
+  .indice li { display: flex; gap: 3mm; padding: 1mm 0; border-bottom: 1px dotted var(--borde); font-size: 10.5pt; }
+  .indice .n { color: var(--cyan); font-weight: 700; min-width: 8mm; }
+  .indice .nuevo { margin-left: auto; font-size: 8pt; color: #b45309; background: #fef3c7; border-radius: 1mm; padding: 0 1.5mm; align-self: center; }
+  .paso { display: inline-block; background: var(--cyan); color: #fff; border-radius: 1mm; padding: 0 2mm; font-size: 9pt; font-weight: 700; margin-right: 1.5mm; }
+</style>
+</head>
+<body>
+
+<!-- ============ PORTADA ============ -->
+<section class="portada">
+  <div>
+    <div class="marca">BALNEARIO ZEUS</div>
+    <h1>Manual de uso<br>del sistema</h1>
+    <p class="bajada">Reservas de carpas, sombrillas, estacionamiento y pileta, servicios incluidos, cobros, clientes, reportes y tarifas.</p>
+  </div>
+  <img src="img/03-vista-rapida.png" alt="">
+  <div class="pie">Versión octubre 2026 · Para el encargado del balneario</div>
+</section>
+
+<!-- ============ CONTENIDO ============ -->
+<section class="capitulo">
+  <h1 class="cap">Contenido</h1>
+  <ol class="indice">
+    <li><span class="n">1</span>Entrar al sistema</li>
+    <li><span class="n">2</span>El menú y la pantalla de Inicio</li>
+    <li><span class="n">3</span>Vista rápida: el plano del día</li>
+    <li><span class="n">4</span>Tomar una reserva paso a paso<span class="nuevo">con cambios</span></li>
+    <li><span class="n">5</span>El precio: tarifas, ajustes y avisos</li>
+    <li><span class="n">6</span>Ver, cobrar, editar y cancelar una reserva<span class="nuevo">con cambios</span></li>
+    <li><span class="n">7</span>Listado de reservas</li>
+    <li><span class="n">8</span>Clientes</li>
+    <li><span class="n">9</span>Estacionamiento</li>
+    <li><span class="n">10</span>Pileta<span class="nuevo">con cambios</span></li>
+    <li><span class="n">11</span>Reportes</li>
+    <li><span class="n">12</span>Tarifas: cómo cargar los precios</li>
+    <li><span class="n">13</span>Panel de usuario<span class="nuevo">con cambios</span></li>
+    <li><span class="n">14</span>Preguntas frecuentes</li>
+  </ol>
+
+  <h2>Cómo leer este manual</h2>
+  <p>Cada capítulo explica una parte del sistema con capturas de la pantalla real. Los nombres de botones y campos aparecen en <b>negrita</b>, tal como se ven en la pantalla.</p>
+  <p>Si recién empezás, leé en orden los capítulos 1 a 6: con eso ya podés atender el teléfono y el mostrador. Antes de la temporada, leé el capítulo 12 para cargar los precios.</p>
+  <p>El sistema funciona en el navegador (Chrome, Edge o Firefox), en la computadora o en el celular. No hay que instalar nada.</p>
+
+  <div class="nota">
+    <span class="t">Qué hay de nuevo en esta versión</span>
+    <ul>
+      <li><b>Pileta incluida en la carpa:</b> cada carpa trae 4 pases de pileta; elegís a quién le tocan.</li>
+      <li><b>Datos de cada persona</b> (nombre, DNI y edad) en el mismo formulario de la reserva.</li>
+      <li><b>Pases de pileta pagos</b> para quien no entra en los incluidos, vendidos en la misma reserva.</li>
+      <li><b>Cocheras incluidas:</b> el estacionamiento queda atado a la carpa y se mueve y se cancela con ella.</li>
+      <li><b>Cuenta de la reserva:</b> la carpa y todo lo suyo se cobran juntos, con un solo pago.</li>
+      <li><b>Avisos visibles</b> arriba a la derecha cuando algo sale bien o hay que revisar algo.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">1</span>Entrar al sistema</h1>
+  <p>Abrí la dirección del sistema en el navegador, escribí tu <b>Email</b> y tu <b>Contraseña</b> y tocá <b>Ingresar</b>.</p>
+  <figure class="w70"><img src="img/01-ingreso.png" alt=""><figcaption>Pantalla de ingreso.</figcaption></figure>
+
+  <h2>La sesión dura una hora</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>Por seguridad, la sesión se cierra sola una hora después de entrar. El sistema vuelve a la pantalla de ingreso con el aviso <b>“Tu sesión venció. Volvé a iniciar sesión.”</b> Volvé a entrar y seguí donde estabas.</p>
+      <div class="ojo"><p>Si estabas cargando una reserva cuando venció la sesión, esa reserva no se guardó. Volvé a cargarla.</p></div>
+      <p>Para salir antes, usá <b>Cerrar sesión</b>, abajo de todo en el menú. Hacelo siempre si la computadora la usan otras personas.</p>
+    </div>
+    <figure class="f45"><img src="img/01-sesion-vencida.png" alt=""><figcaption>Cuando la sesión vence, el sistema vuelve acá y avisa.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ 2 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">2</span>El menú y la pantalla de Inicio</h1>
+  <div class="lado">
+    <figure class="f25"><img src="img/02-menu.png" alt=""><figcaption>Menú lateral.</figcaption></figure>
+    <div class="texto">
+      <p>El menú de la izquierda está siempre a mano. En el celular se abre con el botón de las tres rayas.</p>
+      <table>
+        <tr><th>Sección</th><th>Para qué sirve</th></tr>
+        <tr><td>Inicio</td><td>Resumen del día: reservas en curso, ingresos, ocupación.</td></tr>
+        <tr><td>Vista rápida</td><td>El plano del balneario con lo ocupado de un día.</td></tr>
+        <tr><td>Reservas</td><td>Listado de todas las reservas, con filtros.</td></tr>
+        <tr><td>Carpas, Sombrillas, Estacionamiento</td><td>Calendarios de ocupación para reservar.</td></tr>
+        <tr><td>Pileta</td><td>Pases a la pileta: los incluidos en las carpas y los que se venden aparte.</td></tr>
+        <tr><td>Clientes</td><td>Fichas de clientes y deudas.</td></tr>
+        <tr><td>Reportes</td><td>Cobros y ocupación por fechas.</td></tr>
+        <tr><td>Tarifas</td><td>Temporadas, sectores y precios.</td></tr>
+        <tr><td>Panel de usuario</td><td>Tu email, tu contraseña, los datos del balneario y las reglas de las reservas.</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h2>Inicio</h2>
+  <p>Es lo primero que ves al entrar. Arriba, los números del día: <b>Activas hoy</b> (reservas en curso), <b>Ingresos</b> (lo cobrado), <b>Clientes</b> y <b>Ocupación</b>. Abajo, cuánto está ocupado cada servicio, las últimas reservas, los últimos pagos y las llegadas de los próximos 7 días.</p>
+  <figure class="w70"><img src="img/02-inicio.png" alt=""><figcaption>Resumen de hoy y estado de los servicios.</figcaption></figure>
+
+  <h2>Los avisos</h2>
+  <p>Cuando guardás algo o hay algo para revisar, aparece un aviso arriba a la derecha de la pantalla. Los avisos de que algo salió bien se van solos; los que piden revisar algo quedan hasta que los cerrás con la <b>×</b>.</p>
+  <figure class="w60"><img src="img/06-aviso.png" alt=""><figcaption>Aviso después de mover una carpa que tiene un pase de pileta pago.</figcaption></figure>
+</section>
+
+<!-- ============ 3 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">3</span>Vista rápida: el plano del día</h1>
+  <p>La <b>Vista rápida</b> muestra el plano del balneario con cada carpa y sombrilla pintada según su estado en el día elegido. Es la pantalla ideal para tener abierta en el mostrador.</p>
+  <figure><img src="img/03-barra.png" alt=""><figcaption>Barra de la Vista rápida.</figcaption></figure>
+  <ul>
+    <li><b>◀ Día anterior</b>, <b>Hoy</b> y <b>Día siguiente ▶</b> cambian el día que se muestra.</li>
+    <li>Las pestañas <b>Carpas</b>, <b>Sombrillas</b> y <b>Estacionamiento</b> eligen qué se ve.</li>
+    <li><b>Plano</b> o <b>Lista</b> cambian entre el dibujo y un listado de unidades.</li>
+    <li><b>Plano completo</b> abre el balneario entero a pantalla completa.</li>
+  </ul>
+  <table>
+    <tr><th>Color</th><th>Qué significa</th></tr>
+    <tr><td>Verde</td><td>Ocupada ese día.</td></tr>
+    <tr><td>Amarillo</td><td>Libre ese día, pero tiene una reserva que empieza pronto.</td></tr>
+    <tr><td>Blanco</td><td>Libre.</td></tr>
+  </table>
+
+  <h2>Pasar el mouse: la ficha de la unidad</h2>
+  <figure><img src="img/03-ficha.png" alt=""><figcaption>Ficha de la carpa 58 el 13 de octubre.</figcaption></figure>
+  <p>Al pasar el mouse por una carpa o sombrilla aparece al instante su ficha: <b>Cliente</b> y teléfono, <b>Estadía</b> (fechas y cuántos días le quedan), <b>Personas</b>, <b>Pago</b> y <b>Cochera</b> (plaza y patente, si tiene).</p>
+  <p>El <b>Pago</b> es el de <b>toda la cuenta</b>: la carpa más lo que tiene asociado (cocheras y pases de pileta pagos). Por eso dice “Toda la cuenta, con lo asociado”. En el ejemplo, Laura debe $30.000 de un total de $175.000.</p>
+  <p>Un clic en una unidad ocupada abre la reserva. Un clic en una unidad libre empieza una reserva nueva para ese día.</p>
+
+  <h2>Plano completo</h2>
+  <p>El botón <b>Plano completo</b> cubre toda la pantalla con el balneario entero: carpas, sombrillas, terrazas, pileta y servicios. Sirve para dar una vista general, por ejemplo cuando un cliente pregunta dónde está su carpa. Se cierra con <b>Cerrar plano</b> o con la tecla <span class="tecla">Esc</span>.</p>
+  <figure class="w70"><img src="img/03-plano-completo.png" alt=""><figcaption>Plano completo a pantalla entera.</figcaption></figure>
+</section>
+
+<!-- ============ 4 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">4</span>Tomar una reserva paso a paso</h1>
+  <div class="ejemplo">
+    <span class="t">El ejemplo de este capítulo</span>
+    <p>Llama <b>Laura Méndez</b>: quiere una carpa del <b>12 al 16 de octubre</b>. Vienen 5 personas: ella, Pablo, Mateo (16 años), Juana (12 años) y su mamá Marta (68 años). Viene en auto.</p>
+    <p>La carpa trae 4 pases de pileta: van para Laura, Pablo, Mateo y Juana. Marta también quiere pileta, así que le vendemos un pase pago. Laura deja una seña de $50.000 en efectivo.</p>
+  </div>
+
+  <h2><span class="paso">1</span>Buscar un lugar libre y marcar las fechas</h2>
+  <p>Entrá a <b>Carpas</b> en el menú. Cada fila es una carpa y cada columna un día. Los días ocupados tienen color y el nombre del cliente; los blancos están libres. Con <b>◀ 10 días</b> y <b>10 días ▶</b> te movés en el calendario.</p>
+  <p>Apretá sobre el día de entrada en la fila de la carpa elegida y, sin soltar, arrastrá hasta el día de salida. Mientras arrastrás, el tramo se pinta y un cartelito dice cuántos días son. Al soltar se abre el formulario con las fechas ya cargadas.</p>
+  <figure class="w90"><img src="img/04-arrastre.png" alt=""><figcaption>Arrastrando sobre la carpa 58 del 12/10 al 16/10.</figcaption></figure>
+  <p>Si el tramo pasa por un día ocupado, se pinta de rojo y al soltar no deja cargar: elegí otra carpa u otras fechas. Si te equivocaste mientras arrastrás, apretá <span class="tecla">Esc</span> para cancelar. También podés hacer un clic en un día libre: se abre el formulario con esa fecha de entrada y completás la de salida a mano.</p>
+
+  <h2><span class="paso">2</span>El cliente</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>En <b>Buscar cliente guardado</b> escribí parte del nombre, el teléfono o el DNI y elegilo de la lista: se completan solos el nombre, el teléfono y la patente.</p>
+      <p>Si es la primera vez que viene, tocá <b>+ Nuevo cliente</b>: se abre la ficha de cliente, la completás y al guardarla queda elegida en la reserva.</p>
+    </div>
+    <figure class="f50"><img src="img/04-cliente.png" alt=""><figcaption>Cliente elegido de la base.</figcaption></figure>
+  </div>
+  <div class="ojo"><p>Para incluir pileta o cochera, la reserva tiene que tener un cliente guardado. Si solo escribís un nombre, el sistema avisa: “Para incluir pileta o cochera, elegí un cliente o creá uno nuevo.”</p></div>
+
+  <h2><span class="paso">3</span>Fechas y cantidad de personas</h2>
+  <p>Revisá las <b>Fechas de estadía</b>: se pueden corregir acá, y debajo se ve cuántos días son. En <b>Personas</b> cargá cuántos <b>Adultos</b> y cuántos <b>Menores</b> van. El máximo es de <b>6 personas por carpa o sombrilla</b>, contando al titular.</p>
+  <figure class="w60"><img src="img/04-personas-cantidad.png" alt=""><figcaption>3 adultos y 2 menores.</figcaption></figure>
+</section>
+
+<section>
+  <h2><span class="paso">4</span>Los datos de cada persona y la pileta</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>Al cargar la cantidad aparece <b>Datos de las personas</b>, con una fila por persona. La primera es el <b>Titular</b> (el cliente): completá su <b>DNI</b> y su <b>Fecha de nacimiento</b>, que quedan guardados en su ficha. Para cada acompañante, escribí <b>Nombre</b>, <b>DNI</b> y <b>Edad</b>.</p>
+      <p>A la derecha de cada fila hay dos botones:</p>
+      <ul>
+        <li><b>🏊 Incluido</b>: le da uno de los 4 pases de pileta que trae la carpa. Arriba se ve la cuenta (“4 de 4 pases elegidos”). Con los 4 elegidos, no se puede marcar a nadie más.</li>
+        <li><b>💲 Pago</b>: le vende un pase de pileta aparte, que se suma a la cuenta.</li>
+      </ul>
+      <p>Si marcás algún pase pago, aparece abajo dónde poner el precio por día de <b>Adulto</b> y de <b>Menor</b>. Menor es quien tiene menos de 18 años.</p>
+      <p>Los datos son opcionales: lo que falte se completa después desde el detalle de la reserva. Pero para dar un pase de pileta hacen falta el DNI y la edad de esa persona.</p>
+    </div>
+    <figure class="f50"><img src="img/04-personas.png" alt=""><figcaption>Cuatro pases incluidos y uno pago para Marta.</figcaption></figure>
+  </div>
+  <div class="nota">
+    <span class="t">Los acompañantes son de esta reserva</span>
+    <p>Los acompañantes quedan guardados solo en esta reserva, no en la ficha del cliente. Si Laura vuelve otro fin de semana con otra gente, se cargan de nuevo. Lo único que pasa a la ficha son el DNI y la fecha de nacimiento del titular.</p>
+  </div>
+
+  <h2><span class="paso">5</span>El precio de la carpa</h2>
+  <p>El sistema calcula solo el precio con las tarifas cargadas y muestra el detalle: cuántos días de cada temporada y a qué precio. El <b>Total cobrado</b> ya viene con el precio de la tarifa. Se explica en detalle en el capítulo 5.</p>
+  <figure class="w60"><img src="img/04-precio.png" alt=""><figcaption>5 días de Temporada baja a $20.000: $100.000.</figcaption></figure>
+
+  <h2><span class="paso">6</span>Incluye pileta</h2>
+  <p>La casilla <b>Incluye pileta</b> viene marcada en las carpas: el precio de la carpa incluye 4 pases de pileta. Si el cliente no los quiere, desmarcala. Las sombrillas no traen pileta incluida, pero se les puede vender pases pagos.</p>
+  <figure class="w70"><img src="img/04-pileta.png" alt=""><figcaption>Los pases se reparten con el botón Incluido de cada persona.</figcaption></figure>
+</section>
+
+<section>
+  <h2><span class="paso">7</span>La cochera</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>Si el cliente viene en auto, tildá <b>Incluir estacionamiento</b>. Podés elegir la plaza en la lista, o dejarla vacía y el sistema asigna la primera libre en esas fechas (lo avisa: “Se asigna la plaza 1.”).</p>
+      <p>La <b>Patente del vehículo</b> es obligatoria. Escribila como te la digan: el sistema la pasa a mayúsculas. Si el cliente ya tenía una patente en su ficha, aparece sola.</p>
+      <p>La cochera tiene su propio precio, calculado con las tarifas de estacionamiento. Si viene con dos autos, tocá <b>+ Agregar otra cochera</b>.</p>
+      <p>La cochera queda <b>incluida en la carpa</b>: si después cambiás las fechas de la carpa, la cochera se mueve con ella; si la cancelás, se cancela también.</p>
+    </div>
+    <figure class="f50"><img src="img/04-cochera.png" alt=""><figcaption>Plaza asignada sola y patente cargada.</figcaption></figure>
+  </div>
+
+  <h2><span class="paso">8</span>La cuenta de la reserva y la seña</h2>
+  <div class="lado">
+    <figure class="f50"><img src="img/04-cuenta.png" alt=""><figcaption>Todo lo de Laura en una sola cuenta.</figcaption></figure>
+    <div class="texto">
+      <p>Al final del formulario está la <b>Cuenta de la reserva</b>: cada cosa con su precio (la carpa, la pileta incluida, la pileta paga y cada cochera) y el <b>Total</b>.</p>
+      <p>El cliente paga todo junto. Si deja una seña, cargala en <b>Monto a pagar ahora</b> y elegí el <b>Medio de pago</b>. Debajo se ve el saldo que queda.</p>
+      <p>Ese único pago se reparte solo: primero cubre la carpa, después las cocheras y al final la pileta paga. No hace falta hacer nada más.</p>
+    </div>
+  </div>
+
+  <h2><span class="paso">9</span>Guardar</h2>
+  <p>Tocá <b>Guardar reserva</b>. La reserva aparece en el calendario con el nombre del cliente, y en la Vista rápida la carpa se pinta de verde esos días. La cochera y los pases de pileta quedan cargados al mismo tiempo.</p>
+  <p>Si el sistema no deja guardar, revisá lo que marca en rojo: la patente de la cochera, el motivo de un ajuste de precio, una seña mayor que el total, más de 6 personas, o una unidad que ya está ocupada en esas fechas.</p>
+
+  <h2>Sombrillas</h2>
+  <p>Las sombrillas se reservan igual, desde <b>Sombrillas</b>. La diferencia es que no traen pases de pileta incluidos: en cada persona aparece solo el botón <b>💲 Pago</b>, por si alguien quiere pileta. Pueden llevar cochera igual que una carpa.</p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">5</span>El precio: tarifas, ajustes y avisos</h1>
+  <h2>De dónde sale el precio</h2>
+  <p>El precio lo calcula el sistema con las tarifas del capítulo 12, día por día. Si una estadía cruza de una temporada a otra, cada día se cobra al precio de su temporada, y el detalle lo muestra por tramos (por ejemplo: “3 días Temporada baja × $20.000 + 3 días Temporada alta × $45.000”).</p>
+  <p>Si la estadía entra en una tarifa por estadía (una quincena, la media temporada o la temporada completa), se cobra esa tarifa en lugar de sumar los días.</p>
+
+  <h2>Cobrar distinto a la tarifa</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>Podés cambiar el <b>Total cobrado</b>, por ejemplo por un descuento a un cliente de años o un redondeo. En ese caso el sistema muestra la diferencia y pide el <b>Motivo del ajuste</b>, que es obligatorio.</p>
+      <p>La reserva guarda el precio de la tarifa, lo cobrado y el motivo. Así el dueño puede ver después cada descuento hecho.</p>
+      <p>Lo mismo vale para la cochera: tiene su propio Total cobrado y, si lo cambiás, su propio motivo.</p>
+    </div>
+    <figure class="f50"><img src="img/05-ajuste.png" alt=""><figcaption>Cobrado $90.000 en vez de $100.000, con motivo.</figcaption></figure>
+  </div>
+
+  <h2>Cuando no hay precio: “Consultar precio”</h2>
+  <p>Si faltan tarifas para algunos días, el recuadro avisa en amarillo: “Consultar precio: faltan tarifas para el 14/03 y 15/03. Cargá el total a mano o completá los precios en Tarifas → Precios.” Si el servicio no tiene ninguna tarifa, avisa: “No hay tarifas cargadas para el estacionamiento…”.</p>
+  <p>En los dos casos podés escribir el total a mano y guardar igual, sin motivo. Para que no vuelva a pasar, completá los precios en <b>Tarifas</b>.</p>
+
+  <h2>La pileta paga no usa tarifas</h2>
+  <p>El precio de los pases de pileta pagos se escribe en cada reserva (precio por día de adulto y de menor). El sistema multiplica por la cantidad de personas y de días.</p>
+
+  <div class="nota"><p>Si después cambiás una tarifa, las reservas ya hechas no cambian de precio. Solo se recalcula una reserva si le cambiás las fechas o la unidad.</p></div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">6</span>Ver, cobrar, editar y cancelar una reserva</h1>
+  <p>Una reserva se abre con un clic sobre ella en el calendario, en la Vista rápida o con el botón ⓘ del listado de <b>Reservas</b>.</p>
+  <div class="lado">
+    <figure class="f45"><img src="img/06-detalle.png" alt=""><figcaption>Detalle de la carpa de Laura.</figcaption></figure>
+    <div class="texto">
+      <p>El detalle tiene, de arriba hacia abajo:</p>
+      <ul>
+        <li><b>Información</b>: fechas, duración, cliente (con <b>Ver ficha del cliente</b>), teléfono y personas.</li>
+        <li><b>Resumen financiero</b> de la carpa sola: el detalle del precio, lo pagado y el saldo de la carpa.</li>
+        <li><b>Otras reservas activas</b> del mismo cliente, si tiene.</li>
+        <li><b>Servicios incluidos</b>: el saldo de toda la cuenta y cada cosa asociada.</li>
+        <li><b>Personas</b>: el titular y los acompañantes, con sus pases de pileta.</li>
+        <li><b>Historial de pagos</b> de la carpa.</li>
+        <li>Abajo, los botones <b>Editar</b>, <b>Cancelar reserva</b>, <b>Descargar comprobante</b> y <b>Cerrar</b>.</li>
+      </ul>
+      <div class="nota"><p>El <b>Resumen financiero</b> muestra solo la carpa. Lo que debe el cliente en total está en <b>Saldo de la cuenta</b>, dentro de Servicios incluidos.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Servicios incluidos y el saldo de la cuenta</h2>
+  <figure class="w80"><img src="img/06-incluidos.png" alt=""><figcaption>La cuenta de Laura: total $175.000, pagado $145.000.</figcaption></figure>
+  <ul>
+    <li><b>Saldo de la cuenta</b>: lo que falta pagar de todo junto (carpa, cocheras y pases pagos).</li>
+    <li><b>Pileta incluida</b>: cuántos pases trae la carpa y cuántos están asignados.</li>
+    <li>Cada <b>cochera</b>, con su plaza y patente, y cada <b>Pase pago</b>, con a quién es. Al lado, si está pagado o cuánto debe.</li>
+  </ul>
+  <p>Un clic en una cochera o un pase abre su propia reserva. Desde ahí, <b>Ir a la reserva</b> te trae de vuelta a la carpa.</p>
+
+  <h2>Personas y pases de pileta</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>En <b>Personas</b> está la lista de quienes vienen, con el titular primero. Con <b>+ Agregar persona</b> sumás a alguien, con el lápiz corregís sus datos y con la cruz lo sacás. El tope es de 6 personas contando al titular.</p>
+      <p>La casilla <b>Pileta</b> de cada persona le da o le saca uno de los pases incluidos. Arriba se ve cuántos están asignados (“4 de 4 pases asignados”). Quien no tiene DNI o edad cargados no se puede tildar: el sistema pide “Completá DNI y edad”.</p>
+      <p>Quien tiene un pase vendido aparte muestra <b>Pase pago</b> en lugar de la casilla.</p>
+    </div>
+    <figure class="f50"><img src="img/06-personas.png" alt=""><figcaption>4 pases incluidos y 2 pagos.</figcaption></figure>
+  </div>
+
+  <h2>Vender un pase de pileta</h2>
+  <div class="lado">
+    <figure class="f40"><img src="img/06-vender-pase.png" alt=""><figcaption>Pase pago para Nico, que llegó después.</figcaption></figure>
+    <div class="texto">
+      <p>Si alguien de la carpa quiere pileta y ya no quedan pases incluidos, tocá <b>Vender pase de pileta</b> en Servicios incluidos.</p>
+      <p>Arriba, en <b>Personas sin pase</b>, tildá a quién es: el sistema completa solo cuántos adultos y niños son. El cliente y las fechas ya vienen de la carpa.</p>
+      <p>Escribí el <b>Precio por adulto por día</b> y el <b>Precio por niño por día</b>; el total se calcula solo. Si paga en el momento, cargá el <b>Pago inicial</b>.</p>
+      <p>Al tocar <b>Guardar pase</b> (o <b>Cerrar</b>) volvés al detalle de la carpa, con el pase nuevo en la cuenta.</p>
+      <div class="ojo"><p>El pase pago se cobra aparte: no es uno de los incluidos y no se mueve solo si la carpa cambia de fechas. Si la movés, el sistema avisa que lo revises.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>Registrar un pago</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>En <b>Historial de pagos</b> tocá <b>+ Agendar pago</b>. Si la carpa tiene cosas asociadas, el pago es <b>de toda la cuenta</b>: el formulario muestra el total de la cuenta, lo ya pagado y el <b>Saldo de la cuenta</b>, y el monto viene con ese saldo.</p>
+      <p>Completá el <b>Monto del pago</b>, la <b>Fecha del pago</b> y el <b>Método de pago</b>, y tocá <b>Guardar pago</b>. Volvés al detalle con el saldo actualizado.</p>
+      <p>Como en la seña, el pago se reparte solo en orden: la carpa, las cocheras y la pileta paga.</p>
+    </div>
+    <figure class="f45"><img src="img/06-agendar-pago.png" alt=""><figcaption>Pago contra el saldo de la cuenta.</figcaption></figure>
+  </div>
+  <figure class="w70"><img src="img/06-pagos.png" alt=""><figcaption>Historial de pagos de la carpa.</figcaption></figure>
+  <div class="nota"><p>El <b>Historial de pagos</b> del detalle muestra la parte de cada pago que le tocó a la carpa. Si un pago cubrió también la cochera, esa parte aparece en la cochera. El comprobante, en cambio, muestra cada pago entero.</p></div>
+
+  <h2>Descargar el comprobante</h2>
+  <p><b>Descargar comprobante</b> genera un PDF para darle al cliente. Es el comprobante de <b>toda la cuenta</b>: la carpa, la pileta incluida con los nombres, cada cochera, cada pase pago, el <b>Total de la cuenta</b>, cada pago como lo hizo el cliente y el <b>saldo</b>.</p>
+
+  <h2>Los botones del pie</h2>
+  <figure class="w80"><img src="img/06-botones.png" alt=""></figure>
+</section>
+
+<section>
+  <h2>Editar una reserva</h2>
+  <div class="lado">
+    <figure class="f45"><img src="img/06-editar.png" alt=""><figcaption>Edición de la carpa de Laura.</figcaption></figure>
+    <div class="texto">
+      <p>Desde <b>Editar</b> podés cambiar la unidad (<b>Número de carpa</b>), las fechas, el nombre y teléfono del cliente, el total cobrado y las notas.</p>
+      <ul>
+        <li>Si cambiás solo datos (nombre, teléfono, notas), el precio queda igual.</li>
+        <li>Si cambiás las fechas o la unidad, el sistema vuelve a calcular el precio con las tarifas de las fechas nuevas y lo muestra antes de guardar.</li>
+        <li>Si el total queda distinto al de la tarifa, también acá hace falta el motivo del ajuste.</li>
+      </ul>
+      <p>Acá también se manejan los servicios incluidos:</p>
+      <ul>
+        <li><b>Cocheras incluidas</b>: cada una con su plaza y patente, y <b>Quitar</b> para sacarla.</li>
+        <li><b>Incluye pileta</b>: marcar o desmarcar los pases incluidos.</li>
+        <li><b>Agregar otra cochera incluida</b>.</li>
+      </ul>
+      <p>Cuando cambiás las fechas de la carpa, la pileta incluida y las cocheras se mueven con ella. Los pases pagos no se mueven: el sistema avisa para que los revises.</p>
+      <p>Tocá <b>Guardar cambios</b> para confirmar o <b>Cancelar</b> para salir sin cambiar nada. En los dos casos volvés al detalle de la reserva.</p>
+    </div>
+  </div>
+  <div class="ojo"><p>El pase de pileta incluido y la cochera incluida no se editan por su cuenta: se cambian desde la carpa. Si abrís uno de ellos y querés cambiarlo, tocá <b>Ir a la reserva</b> para volver a la carpa.</p></div>
+
+  <h2>Cancelar una reserva</h2>
+  <p><b>Cancelar reserva</b> pide confirmación y libera la unidad. La reserva queda en el historial como cancelada. Si es una carpa con pileta incluida o cocheras incluidas, esas también se cancelan. Los pases pagos quedan como están, para que decidas qué hacer con ellos.</p>
+</section>
+
+<!-- ============ 7 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">7</span>Listado de reservas</h1>
+  <p>En <b>Reservas</b> están todas las reservas del balneario en una tabla. Se puede filtrar por:</p>
+  <ul>
+    <li><b>Buscar por nombre</b> del cliente.</li>
+    <li><b>Servicio</b>: carpa, sombrilla, estacionamiento o pileta.</li>
+    <li><b>Estado</b>: activas hoy, reservadas (futuras), finalizadas o canceladas.</li>
+    <li><b>Pagos</b>: pagado completo o pago pendiente.</li>
+    <li><b>Rango de fechas</b>.</li>
+  </ul>
+  <p><b>Limpiar filtros</b> vuelve a mostrar todo. En cada fila, el botón ⓘ abre el detalle y el botón verde registra un pago. La columna <b>Pagos</b> muestra lo pagado: en verde si está pagada y en rojo si debe.</p>
+  <p>La pileta incluida y las cocheras de una carpa aparecen como filas propias, con las mismas fechas que la carpa.</p>
+  <figure class="w90"><img src="img/07-reservas.png" alt=""><figcaption>Listado de reservas activas hoy.</figcaption></figure>
+</section>
+
+<!-- ============ 8 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">8</span>Clientes</h1>
+  <p>En <b>Clientes</b> está la base de clientes: nombre, DNI, teléfono, email, dirección y datos del vehículo. Con <b>Nuevo Cliente</b> se carga uno; con <b>Ver</b>, <b>Editar</b> y <b>Eliminar</b> se maneja cada ficha.</p>
+  <p>El buscador encuentra por nombre, teléfono, email, documento o patente. La casilla <b>Solo con deuda de reservas terminadas</b> muestra a quienes se fueron sin pagar todo, con el monto en rojo (“Debe $120.000”).</p>
+  <figure class="w90"><img src="img/08-clientes.png" alt=""><figcaption>Clientes, con el aviso de deuda.</figcaption></figure>
+  <div class="lado">
+    <div class="texto">
+      <h3>La ficha del cliente</h3>
+      <p><b>Ver</b> abre la ficha: datos personales, contacto, vehículo y el <b>Historial de reservas</b> con el total reservado, lo pagado y el saldo pendiente.</p>
+      <p>Debajo están todas sus reservas (la carpa, la cochera y cada pase de pileta por separado) y la lista de <b>Pagos</b>, cada uno con la fecha, la unidad y el medio de pago.</p>
+      <p>Un clic en una reserva de la lista la abre.</p>
+    </div>
+    <figure class="f40"><img src="img/08-ficha-cliente.png" alt=""><figcaption>Ficha de Laura Méndez.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">9</span>Estacionamiento</h1>
+  <p>En <b>Estacionamiento</b> está el calendario de las plazas: cada fila es una plaza y cada columna un día, igual que en Carpas. Muestra todas las reservas de estacionamiento, también las cocheras incluidas en una carpa.</p>
+  <p>Para reservar una cochera suelta (sin carpa), hacé un clic en el día de entrada sobre la fila de la plaza: se abre el formulario con esa fecha y completás la de salida. La patente es obligatoria. Un clic sobre un día ocupado abre esa reserva.</p>
+  <figure class="w80"><img src="img/09-estacionamiento.png" alt=""><figcaption>La plaza 1, de Laura, del 12 al 16 de octubre.</figcaption></figure>
+  <div class="nota"><p>La patente va en cada reserva, no solo en la ficha del cliente: el mismo cliente puede venir con otro auto. La ficha solo sirve para que se complete sola.</p></div>
+</section>
+
+<!-- ============ 10 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">10</span>Pileta</h1>
+  <p>En <b>Pileta</b> están todos los pases a la pileta. Arriba se ve la <b>Ocupación actual</b> (personas con pase hoy sobre el máximo permitido), el porcentaje y el día de referencia.</p>
+  <p>Hay tres clases de pases, y cada uno lo dice debajo del nombre del cliente:</p>
+  <table>
+    <tr><th>Cómo aparece</th><th>Qué es</th></tr>
+    <tr><td>Incluido en Carpa 58</td><td>Los pases que trae la carpa, con los nombres de quienes los tienen. No se cobran aparte.</td></tr>
+    <tr><td>Pase pago · Carpa 58</td><td>Un pase vendido a alguien de esa carpa, que se suma a su cuenta.</td></tr>
+    <tr><td>(sin etiqueta)</td><td>Un pase suelto, para alguien que viene solo a la pileta.</td></tr>
+  </table>
+  <p>Con <b>Nuevo Pase</b> vendés un pase suelto: elegís el cliente (obligatorio), las fechas, cuántos adultos y niños, y el precio por adulto y por niño por día. El sistema calcula el total. <b>Ver Detalle</b> abre el pase para cobrarlo o editarlo.</p>
+  <figure class="w60"><img src="img/10-pileta.png" alt=""><figcaption>Gestión de Pileta, con pases incluidos en carpas.</figcaption></figure>
+  <p>La pileta no usa las tarifas del capítulo 12: el precio por persona se carga en cada pase.</p>
+</section>
+
+<!-- ============ 11 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">11</span>Reportes</h1>
+  <p>En <b>Reportes</b> hay dos vistas, <b>Pagos</b> y <b>Ocupación</b>. En las dos elegís el rango de fechas con <b>Desde</b> y <b>Hasta</b>, y podés filtrar por servicio.</p>
+  <h2>Pagos</h2>
+  <p>Muestra el <b>Total cobrado</b> en el período, los <b>Días con pagos</b> y la <b>Cantidad de pagos</b>, con el total de cada día y el detalle de cada pago debajo. Se puede filtrar por <b>Método de pago</b> (por ejemplo, solo efectivo para hacer la caja). <b>Exportar a Excel</b> baja el listado.</p>
+  <figure class="w60"><img src="img/11-reportes-pagos.png" alt=""><figcaption>Reporte de pagos del día.</figcaption></figure>
+  <div class="nota"><p>Un pago de la cuenta que cubrió la carpa y la cochera aparece en el reporte en dos renglones, uno por cada una. Así el total por servicio (carpas, estacionamiento, pileta) da bien.</p></div>
+  <h2>Ocupación</h2>
+  <p>Muestra, por servicio, la ocupación promedio y el día de más ocupación, y debajo la ocupación de cada día.</p>
+  <figure class="w50"><img src="img/11-reportes-ocupacion.png" alt=""><figcaption>Reporte de ocupación.</figcaption></figure>
+</section>
+
+<!-- ============ 12 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">12</span>Tarifas: cómo cargar los precios</h1>
+  <p>En <b>Tarifas</b> se cargan los precios que el sistema usa para calcular cada reserva de carpa, sombrilla y estacionamiento. Se carga una vez y sirve para todas las temporadas: las fechas no tienen año. Hay tres pestañas, que conviene completar en orden: <b>Períodos</b>, <b>Sectores</b> y <b>Precios</b>.</p>
+  <h2>1 · Períodos (las temporadas)</h2>
+  <p>Un período es un tramo del año con precio propio: “Temporada alta” del 15/12 al 15/03, “Temporada baja” del 16/03 al 14/12. Para cargarlo, escribí el <b>Nombre del período</b>, <b>Desde</b> y <b>Hasta</b> como día/mes (15/12), y la <b>Prioridad</b>, y tocá <b>Agregar período</b>.</p>
+  <figure class="w80"><img src="img/13-tarifas-periodos.png" alt=""><figcaption>La tira del año y los períodos cargados.</figcaption></figure>
+  <p>La prioridad resuelve los períodos que se pisan. Si “Enero” (prioridad 5) está dentro de “Temporada alta” (prioridad 1), los días de enero usan el precio de Enero. Dos períodos que se pisan no pueden tener la misma prioridad. La tira del año pinta qué período rige cada día; los días sin período se marcan en rojo: esos días saldrían “Consultar precio”.</p>
+</section>
+
+<section>
+  <h2>2 · Sectores (unidades con precio propio)</h2>
+  <p>Un sector agrupa unidades que se cobran distinto: la Terraza, las carpas con vista al mar, la primera fila de sombrillas. Elegí el <b>Servicio</b>, tocá <b>Nuevo sector</b>, poné el nombre y un color, y tocá las unidades en el plano para sumarlas o sacarlas. Tocá <b>Guardar sector</b>.</p>
+  <figure class="w80"><img src="img/13-tarifas-sectores.png" alt=""><figcaption>El sector Terraza sobre el plano.</figcaption></figure>
+  <p>Cada unidad puede estar en un solo sector. En estacionamiento, que no está en el plano, las plazas se eligen de una lista.</p>
+
+  <h2>3 · Precios por fecha</h2>
+  <p>En la pestaña <b>Precios</b>, elegí el servicio. La grilla tiene una fila por alcance (Todas las carpas, cada sector y cada unidad con precio propio) y una columna por período. Escribí el precio por día en cada celda: se guarda solo al salir de la celda. Los centavos van con coma (18000,50).</p>
+  <p>Una celda vacía en un sector significa “usa el precio general”: solo hace falta cargar lo que cambia. Para darle precio propio a una sola unidad, escribí su número en <b>Número de unidad</b> y tocá <b>Agregar unidad</b>. Solo acepta unidades que existen en el plano.</p>
+</section>
+
+<section>
+  <h2>4 · Precios por estadía</h2>
+  <p>Sirven para las estadías largas: quincena, media temporada o temporada completa. Si la cantidad de días de la reserva entra en el rango, se cobra esta tarifa en lugar de sumar los días.</p>
+  <figure class="w80"><img src="img/13-tarifas-precios.png" alt=""><figcaption>Grilla de precios por día de las carpas, tarifas por estadía y el formulario para agregar otra.</figcaption></figure>
+  <ul>
+    <li><b>Desde (días)</b> y <b>Hasta (días)</b>: el rango. Hasta vacío significa “sin tope”.</li>
+    <li><b>Cómo se cobra</b>: <b>Precio cerrado</b> (un monto por todo el paquete) o <b>Por día</b> (un precio diario más barato).</li>
+    <li><b>Solo si entra en</b>: el período en el que tiene que empezar la estadía.</li>
+    <li><b>Aplica a</b>: todas las unidades, un sector o una unidad.</li>
+  </ul>
+  <h3>Ejemplo completo</h3>
+  <table>
+    <tr><th>Qué reserva</th><th>Qué cobra el sistema</th></tr>
+    <tr><td>Carpa, 3 días de octubre</td><td>3 × $20.000 (Temporada baja) = $60.000</td></tr>
+    <tr><td>Carpa del 12/12 al 17/12</td><td>3 días de baja × $20.000 + 3 días de alta × $45.000 = $195.000</td></tr>
+    <tr><td>Carpa de la Terraza, 3 días en enero</td><td>3 × $75.000 (precio de la Terraza en Enero) = $225.000</td></tr>
+    <tr><td>Carpa, 20 días desde el 5/1</td><td>Quincena: 20 × $42.000 = $840.000</td></tr>
+    <tr><td>Carpa, temporada completa</td><td>Precio cerrado: $3.800.000</td></tr>
+  </table>
+  <p>Cuál gana si varias aplican: una tarifa de la unidad gana sobre la del sector, y la del sector sobre la general. Entre dos tarifas por estadía, gana la atada a un período.</p>
+</section>
+
+<!-- ============ 13 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">13</span>Panel de usuario</h1>
+  <p>En <b>Panel de usuario</b> hay dos pestañas.</p>
+  <h2>Perfil</h2>
+  <p>Tu email de ingreso. Con <b>Cambiar email</b> y <b>Cambiar contraseña</b> los actualizás; siempre pide la contraseña actual. La contraseña nueva tiene que tener al menos 8 caracteres.</p>
+  <figure class="w70"><img src="img/12-perfil.png" alt=""><figcaption>Pestaña Perfil.</figcaption></figure>
+  <h2>Establecimiento</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>El nombre del balneario, qué servicios tiene y la capacidad de cada uno. La cantidad de carpas (117) y de sombrillas (220) está fijada por el plano del balneario.</p>
+      <p>Abajo están las <b>Reglas de las reservas</b>:</p>
+      <ul>
+        <li><b>Pases de pileta por carpa</b>: cuántos pases trae incluidos cada carpa (4).</li>
+        <li><b>Pases de pileta por sombrilla</b>: lo mismo para las sombrillas (0, no traen).</li>
+        <li><b>Máximo de personas por unidad</b>: el tope de personas en una carpa o sombrilla, contando al titular (6).</li>
+      </ul>
+      <p>Tocá <b>Guardar cambios</b> para aplicar. Las reglas nuevas valen para las reservas que se carguen o editen desde ese momento.</p>
+    </div>
+    <figure class="f50"><img src="img/12-establecimiento.png" alt=""><figcaption>Servicios, capacidad y reglas de las reservas.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ============ 14 ============ -->
+<section class="capitulo">
+  <h1 class="cap"><span class="n">14</span>Preguntas frecuentes</h1>
+  <table>
+    <tr><th style="width:42%">Qué pasa</th><th>Qué hacer</th></tr>
+    <tr><td>No me deja guardar la reserva.</td><td>Falta algo y está marcado en rojo: la patente de la cochera, el motivo si cambiaste el precio, una seña mayor que el total, más de 6 personas, o la unidad está ocupada en esas fechas.</td></tr>
+    <tr><td>No me deja tildar Incluye pileta o Incluir estacionamiento.</td><td>La reserva necesita un cliente guardado. Elegilo en Buscar cliente guardado o crealo con + Nuevo cliente.</td></tr>
+    <tr><td>No puedo darle el pase de pileta a una persona.</td><td>Le faltan el DNI o la edad. Completalos con el lápiz en la lista de personas del detalle. Si ya están los 4 pases asignados, sacale el tilde a otra persona o vendele un pase pago.</td></tr>
+    <tr><td>Vienen 7 personas a una carpa.</td><td>El tope es de 6 contando al titular. La séptima no entra en esa carpa: hace falta otra unidad.</td></tr>
+    <tr><td>El cliente quiere pagar todo junto.</td><td>Agendá un solo pago desde el detalle de la carpa: se reparte solo entre la carpa, las cocheras y la pileta paga.</td></tr>
+    <tr><td>Moví una carpa y la cochera se movió sola.</td><td>Es así: la cochera y la pileta incluidas acompañan a la carpa. Los pases pagos no: el aviso te pide que los revises.</td></tr>
+    <tr><td>Quiero cambiar la cochera incluida de plaza.</td><td>Desde Editar en la carpa, o abriendo la cochera: acepta otra plaza y otra patente, pero no otras fechas.</td></tr>
+    <tr><td>Al arrastrar, el tramo se pone rojo.</td><td>Hay días ocupados en ese tramo. Elegí otra unidad u otras fechas.</td></tr>
+    <tr><td>El precio dice “Consultar precio”.</td><td>Faltan tarifas para esos días o para ese servicio. Cargá el total a mano, o completá los precios en Tarifas → Precios.</td></tr>
+    <tr><td>Cambié una tarifa y una reserva vieja no cambió.</td><td>Es así a propósito: la reserva conserva el precio con que se hizo. Solo se recalcula si le cambiás las fechas o la unidad.</td></tr>
+    <tr><td>Me sacó del sistema: “Tu sesión venció”.</td><td>Pasó una hora desde que entraste. Volvé a ingresar. Si estabas cargando una reserva, cargala de nuevo.</td></tr>
+    <tr><td>Un cliente viene con otro auto.</td><td>Escribí la patente nueva en la reserva: la patente va en cada reserva, no solo en la ficha del cliente.</td></tr>
+    <tr><td>Quiero saber cuánto se cobró hoy en efectivo.</td><td>Reportes → Pagos, con la fecha de hoy y el método Efectivo.</td></tr>
+    <tr><td>Quiero ver quién se fue debiendo plata.</td><td>Clientes, tildando Solo con deuda de reservas terminadas.</td></tr>
+  </table>
+</section>
+
+</body>
+</html>

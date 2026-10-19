@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { contarPorEdad, personaCompletaParaPase } from '../lib/incluidos';
 import { format } from '../lib/dates';
 import ClientSearchInput from './ClientSearchInput';
 
@@ -54,6 +55,20 @@ function PoolPassModal({
     initialPaymentAmount,
     initialPaymentMethod
   } = form;
+
+  // Pase pago asociado a una carpa: se eligen las personas de la carpa que
+  // no tienen pase, y adultos y menores se precargan segun la edad.
+  const personasDisponibles = Array.isArray(form.personasDisponibles) ? form.personasDisponibles : null;
+  const personasElegidas = Array.isArray(form.personasElegidas) ? form.personasElegidas : [];
+  const alternarPersona = (key) =>
+    onChangeForm((prev) => {
+      if (!prev) return prev;
+      const actuales = Array.isArray(prev.personasElegidas) ? prev.personasElegidas : [];
+      const elegidas = actuales.includes(key) ? actuales.filter((k) => k !== key) : [...actuales, key];
+      const seleccion = (prev.personasDisponibles || []).filter((p) => elegidas.includes(p.key));
+      const { adults, children } = contarPorEdad(seleccion);
+      return { ...prev, personasElegidas: elegidas, poolAdultsCount: String(adults), poolChildrenCount: String(children) };
+    });
 
   const startStr = startDate || format(new Date(), 'yyyy-MM-dd');
   const endStr = endDate || startStr;
@@ -122,6 +137,42 @@ function PoolPassModal({
         </div>
 
         <div className="px-5 py-4 overflow-y-auto flex-1">
+          {form.carpaEtiqueta && (
+            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-900">
+              Pase pago · {form.carpaEtiqueta}. Se cobra aparte: no es uno de los pases incluidos.
+            </p>
+          )}
+
+          {personasDisponibles && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">Personas sin pase</h3>
+              {personasDisponibles.length === 0 && (
+                <p className="text-[11px] text-slate-500">Todas las personas cargadas en la carpa ya tienen pase.</p>
+              )}
+              <ul className="space-y-1.5">
+                {personasDisponibles.map((persona) => {
+                  const completa = personaCompletaParaPase(persona);
+                  return (
+                    <li key={persona.key} className="flex items-center justify-between gap-2 text-xs">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          aria-label={`Vender pase a ${persona.fullName}`}
+                          checked={personasElegidas.includes(persona.key)}
+                          disabled={!completa}
+                          onChange={() => alternarPersona(persona.key)}
+                          className="h-4 w-4 rounded border-slate-300 text-cyan-600 focus:ring-2 focus:ring-cyan-500"
+                        />
+                        <span className="text-slate-900">{persona.fullName}</span>
+                      </label>
+                      {!completa && <span className="text-[10px] text-amber-700">Falta DNI o edad</span>}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
           {/* Cliente */}
           <div className="bg-white rounded-xl border border-slate-200 p-4 mb-4">
             <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3 flex items-center gap-1">
@@ -267,6 +318,7 @@ function PoolPassModal({
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold text-slate-700">Cantidad de adultos</span>
                 <input
+                  aria-label="Cantidad de adultos"
                   type="number"
                   min="0"
                   value={poolAdultsCount || ''}
@@ -287,6 +339,7 @@ function PoolPassModal({
               <label className="flex flex-col gap-1">
                 <span className="text-[11px] font-semibold text-slate-700">Cantidad de niños (2 a 12 años)</span>
                 <input
+                  aria-label="Cantidad de niños (2 a 12 años)"
                   type="number"
                   min="0"
                   value={poolChildrenCount || ''}

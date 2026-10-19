@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { formatPesos } from '../lib/money';
 
 function ReservasSection({
   reservationGroups,
@@ -442,9 +443,7 @@ function ReservasSection({
                     </td>
                     <td className="px-4 py-3 align-top">
                       <span className={`text-xs font-semibold ${paidAmountNum + 0.01 < totalPriceNum ? 'text-red-600' : 'text-emerald-600'}`}>
-                        ${paidAmountNum !== null && !Number.isNaN(paidAmountNum)
-                          ? paidAmountNum.toFixed(2)
-                          : '0.00'}
+                        {formatPesos(paidAmountNum, 0)}
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top">
