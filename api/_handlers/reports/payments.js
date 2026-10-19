@@ -56,8 +56,10 @@ module.exports = async (req, res) => {
       paramIndex += 1;
     }
 
+    // Produccion guarda el medio en payment_method (method queda vacio); los
+    // pagos viejos o los de la base local lo tienen en method.
     if (method) {
-      methodClause = ` AND p.method = $${paramIndex}`;
+      methodClause = ` AND COALESCE(p.payment_method, p.method) = $${paramIndex}`;
       params.push(method);
       paramIndex += 1;
     }
@@ -67,7 +69,7 @@ module.exports = async (req, res) => {
         p.id,
         p.amount,
         p.payment_date,
-        p.method,
+        COALESCE(p.payment_method, p.method) AS method,
         p.notes,
         p.client_id,
         rg.id AS reservation_group_id,
