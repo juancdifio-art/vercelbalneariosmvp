@@ -1173,6 +1173,12 @@ module.exports = async (req, res) => {
           asociadaA = carpa.id;
         }
 
+        // Igual que el backend local: un pase de pileta siempre queda a nombre
+        // de un cliente guardado.
+        if (serviceType === 'pileta' && !clientId) {
+          return responder(res, 400, { error: 'pool_client_required' });
+        }
+
         const insertar = async (query, precio) => {
           const insertResult = await query(
             `INSERT INTO reservation_groups (establishment_id, service_type, resource_number, start_date, end_date, customer_name, customer_phone, daily_price, total_price, notes, status, client_id, adults_count, children_count, pool_adult_price_per_day, pool_child_price_per_day, vehicle_plate, precio_tarifa, desglose, motivo_ajuste, incluida_en_reserva_id, vinculo) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22) RETURNING *`,
