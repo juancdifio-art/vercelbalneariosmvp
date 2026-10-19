@@ -92,7 +92,18 @@ function Sidebar({
                   )}
                   <NavIcon sectionId={item.id} className="h-[18px] w-[18px] shrink-0" />
                   {!sidebarCollapsed && (
-                    <span className="truncate text-[13px]">{item.label}</span>
+                    <span className="flex-1 truncate text-[13px]">{item.label}</span>
+                  )}
+                  {item.badge > 0 && (
+                    <span
+                      aria-label={`${item.badge} sin leer`}
+                      className={
+                        'rounded-full bg-cyan-400 px-1.5 text-[10px] font-bold leading-4 text-sky-950 ' +
+                        (sidebarCollapsed ? 'absolute right-1 top-0.5' : '')
+                      }
+                    >
+                      {item.badge}
+                    </span>
                   )}
                 </button>
               );

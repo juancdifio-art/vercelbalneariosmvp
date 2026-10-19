@@ -250,3 +250,7 @@ CREATE TABLE IF NOT EXISTS soporte_mensajes (
 
 CREATE INDEX IF NOT EXISTS idx_soporte_mensajes_establecimiento
   ON soporte_mensajes(establishment_id, created_at);
+
+-- Acceso a la bandeja para cuentas con balneario (migrate-soporte-acceso.sql).
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS atiende_soporte BOOLEAN NOT NULL DEFAULT FALSE;

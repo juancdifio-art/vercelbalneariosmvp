@@ -12,8 +12,10 @@ process.env.DATABASE_URL = 'postgres://test';
 const handler = (await import('./index.js')).default;
 const token = `Bearer ${jwt.sign({ userId: 2, email: 'a@b.c' }, 'test-secret', { expiresIn: '1h' })}`;
 
-const ENCARGADO = { role: 'admin', establishment_id: 1 };
-const SOPORTE = { role: 'soporte', establishment_id: null };
+const ENCARGADO = { role: 'admin', atiende_soporte: false, establishment_id: 1 };
+const SOPORTE = { role: 'soporte', atiende_soporte: false, establishment_id: null };
+// Cuenta de balneario que ademas atiende la bandeja (la de Juan).
+const ADMIN_QUE_ATIENDE = { role: 'admin', atiende_soporte: true, establishment_id: 1 };
 const soy = (yo) => queryMock.mockResolvedValueOnce({ rows: [yo] });
 const sqlDe = (patron) => queryMock.mock.calls.find(([sql]) => patron.test(sql));
 
@@ -111,7 +113,7 @@ describe('el establecimiento en /api/soporte', () => {
     const res = await request(handler).get('/?route=soporte/no-leidos').set('Authorization', token);
 
     expect(res.status).toBe(200);
-    expect(res.body.noLeidos).toBe(2);
+    expect(res.body).toEqual({ noLeidos: 2 });
     expect(queryMock.mock.calls[1][1]).toEqual([1]);
   });
 
@@ -207,7 +209,7 @@ describe('soporte en /api/soporte/bandeja', () => {
 
     const res = await request(handler).get('/?route=soporte/no-leidos').set('Authorization', token);
 
-    expect(res.body.noLeidos).toBe(5);
+    expect(res.body).toEqual({ noLeidos: 0, bandeja: 5 });
     expect(queryMock.mock.calls[1][1]).toBeUndefined();
   });
 
@@ -216,6 +218,36 @@ describe('soporte en /api/soporte/bandeja', () => {
     const res = await request(handler).get('/?route=soporte/mensajes').set('Authorization', token);
     expect(res.status).toBe(404);
     expect(res.body.error).toBe('establishment_not_found');
+  });
+});
+
+describe('una cuenta de balneario que ademas atiende soporte', () => {
+  it('recibe los dos contadores: el de su hilo y el de la bandeja', async () => {
+    soy(ADMIN_QUE_ATIENDE);
+    queryMock.mockResolvedValueOnce({ rows: [{ n: 1 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ n: 4 }] });
+
+    const res = await request(handler).get('/?route=soporte/no-leidos').set('Authorization', token);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ noLeidos: 1, bandeja: 4 });
+  });
+
+  it('entra a la bandeja y responde a otro balneario', async () => {
+    soy(ADMIN_QUE_ATIENDE);
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 2, name: 'Poseidon', ultimo_texto: 'Hola', ultimo_de_soporte: false, ultimo: '2026-10-19T12:00:00.000Z', no_leidos: 1 }] });
+    const lista = await request(handler).get('/?route=soporte/bandeja').set('Authorization', token);
+    expect(lista.status).toBe(200);
+    expect(lista.body.establecimientos[0].nombre).toBe('Poseidon');
+
+    queryMock.mockReset();
+    soy(ADMIN_QUE_ATIENDE);
+    queryMock.mockResolvedValueOnce({ rows: [{ id: 2 }] });
+    queryMock.mockResolvedValueOnce({ rows: [{ n: 0 }] });
+    queryMock.mockResolvedValueOnce({ rows: [fila({ id: 13, establishment_id: 2, de_soporte: true, tipo: null, pantalla: null })] });
+    const respuesta = await request(handler).post('/?route=soporte/bandeja/2').set('Authorization', token).send({ texto: 'Ya lo vemos' });
+    expect(respuesta.status).toBe(201);
+    expect(sqlDe(/INSERT INTO soporte_mensajes/)[1]).toEqual([2, 2, true, null, 'Ya lo vemos', null]);
   });
 });
 

@@ -21,7 +21,8 @@ import {
   X,
   TriangleAlert,
   Tags,
-  MessageCircle
+  MessageCircle,
+  Inbox
 } from 'lucide-react';
 
 /**
@@ -102,7 +103,8 @@ const POR_SECCION = {
   clientes: conTrazo(Users),
   reportes: conTrazo(BarChart3),
   tarifas: conTrazo(Tags),
-  'panel-usuario': conTrazo(User)
+  'panel-usuario': conTrazo(User),
+  'bandeja-soporte': conTrazo(Inbox)
 };
 
 export const SalirIcon = conTrazo(LogOut);

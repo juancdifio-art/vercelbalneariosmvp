@@ -1,9 +1,13 @@
 import React, { useCallback, useState } from 'react';
 import Sidebar from './Sidebar';
 import SoportePanel from './soporte/SoportePanel';
+import BandejaSoporte from './soporte/BandejaSoporte';
 import { isWideSection, DEFAULT_MAX_WIDTH, groupNavItems } from '../config/sections';
 import { NavIcon, SalirIcon, SoporteIcon } from './icons';
 import { useNoLeidosSoporte } from '../hooks/useSoporte';
+
+// Seccion que el shell suma por su cuenta (no la arma App.jsx).
+const SECCION_BANDEJA = 'bandeja-soporte';
 
 function AuthenticatedShell({
   establishment,
@@ -21,9 +25,21 @@ function AuthenticatedShell({
   // Las grillas operativas usan todo el monitor; el resto mantiene linea corta.
   const contentWidthClass = isWideSection(activeSection) ? 'max-w-none' : DEFAULT_MAX_WIDTH;
 
+  // Contadores de soporte. `bandeja` solo llega si la cuenta atiende soporte:
+  // entonces el menu suma la Bandeja de soporte, con sus no leidos.
+  const {
+    noLeidos: soporteNoLeidos,
+    bandeja: bandejaNoLeidos,
+    refrescar: refrescarSoporte
+  } = useNoLeidosSoporte(true);
+  const atiendeSoporte = bandejaNoLeidos !== null;
+  const itemsMenu = atiendeSoporte
+    ? [...(navItems || []), { id: SECCION_BANDEJA, label: 'Bandeja de soporte', group: 'admin', badge: bandejaNoLeidos }]
+    : navItems;
+
   // Misma fuente que el menu de escritorio: antes este menu repetia a mano
   // los items de configuracion y habia que tocar dos archivos por seccion.
-  const grupos = groupNavItems(navItems);
+  const grupos = groupNavItems(itemsMenu);
 
   const handleSectionChange = (sectionId) => {
     onChangeSection(sectionId);
@@ -33,8 +49,7 @@ function AuthenticatedShell({
   // Chat de soporte: se abre encima de la pantalla actual, que viaja con cada
   // mensaje para saber desde donde escribieron.
   const [soporteAbierto, setSoporteAbierto] = useState(false);
-  const { noLeidos: soporteNoLeidos, refrescar: refrescarSoporte } = useNoLeidosSoporte(true);
-  const pantallaActual = (navItems || []).find((item) => item.id === activeSection)?.label || activeSection;
+  const pantallaActual = (itemsMenu || []).find((item) => item.id === activeSection)?.label || activeSection;
   const abrirSoporte = () => {
     setSoporteAbierto(true);
     setMobileMenuOpen(false);
@@ -102,7 +117,10 @@ function AuthenticatedShell({
                         <span className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r bg-cyan-400" aria-hidden="true" />
                       )}
                       <NavIcon sectionId={item.id} className="h-[18px] w-[18px] shrink-0" />
-                      <span className="truncate">{item.label}</span>
+                      <span className="flex-1 truncate">{item.label}</span>
+                      {item.badge > 0 && (
+                        <span className="rounded-full bg-cyan-400 px-1.5 text-[10px] font-bold leading-4 text-sky-950">{item.badge}</span>
+                      )}
                     </button>
                   );
                 })}
@@ -153,7 +171,7 @@ function AuthenticatedShell({
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={onToggleSidebar}
         onLogout={onLogout}
-        navItems={navItems}
+        navItems={itemsMenu}
         onAbrirSoporte={abrirSoporte}
         soporteNoLeidos={soporteNoLeidos}
       />
@@ -161,7 +179,9 @@ function AuthenticatedShell({
       {/* Main content */}
       <main className="flex-1 flex justify-center px-4 lg:px-6 py-6 md:py-8 mt-14 md:mt-0 overflow-x-hidden">
         <div className={`w-full ${contentWidthClass}`}>
-          {children}
+          {atiendeSoporte && activeSection === SECCION_BANDEJA
+            ? <BandejaSoporte embebida userEmail={userEmail} onCambio={refrescarSoporte} />
+            : children}
         </div>
       </main>
 

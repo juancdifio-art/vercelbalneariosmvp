@@ -2,8 +2,10 @@
 // sugerencia o consulta) y respondemos desde la bandeja de soporte. Un hilo por
 // establecimiento, en la misma base. No importa pg: recibe la funcion query,
 // asi lo comparten api/index.js y backend/src/index.js.
-// El rol se lee de la base en cada pedido: el token no lo trae, y asi quitarle
-// el rol a alguien corta su acceso en el acto.
+// El permiso se lee de la base en cada pedido: el token no lo trae, y asi
+// quitarselo a alguien corta su acceso en el acto. Atiende la bandeja quien
+// tiene el rol 'soporte' (cuenta que solo atiende) o users.atiende_soporte
+// (una cuenta de balneario que ademas atiende).
 
 const TIPOS = ['error', 'sugerencia', 'consulta'];
 const MAX_TEXTO = 2000;
@@ -45,11 +47,13 @@ function validarMensaje(body, { delEstablecimiento }) {
 
 async function quienEs(query, userId) {
   const r = await query(
-    'SELECT u.role, e.id AS establishment_id FROM users u LEFT JOIN establishments e ON e.user_id = u.id WHERE u.id = $1',
+    'SELECT u.role, u.atiende_soporte, e.id AS establishment_id FROM users u LEFT JOIN establishments e ON e.user_id = u.id WHERE u.id = $1',
     [userId]
   );
   return r.rows[0] || null;
 }
+
+const atiende = (yo) => yo.role === 'soporte' || yo.atiende_soporte === true;
 
 async function hilo(query, estId) {
   const r = await query(
@@ -116,27 +120,34 @@ async function bandeja(query) {
     );
 }
 
+// noLeidos: respuestas de soporte sin leer en el hilo propio (0 sin balneario).
+// bandeja: mensajes de los balnearios sin leer; solo viene si la cuenta
+// atiende, y es lo que le dice al frontend que muestre la bandeja en el menu.
 async function noLeidos(query, yo) {
-  if (yo.role === 'soporte') {
-    const r = await query('SELECT COUNT(*)::int AS n FROM soporte_mensajes WHERE NOT de_soporte AND leido_at IS NULL');
-    return ok({ noLeidos: r.rows[0].n });
+  if (!yo.establishment_id && !atiende(yo)) return falla(404, 'establishment_not_found');
+  const body = { noLeidos: 0 };
+  if (yo.establishment_id) {
+    const r = await query(
+      'SELECT COUNT(*)::int AS n FROM soporte_mensajes WHERE establishment_id = $1 AND de_soporte AND leido_at IS NULL',
+      [yo.establishment_id]
+    );
+    body.noLeidos = r.rows[0].n;
   }
-  if (!yo.establishment_id) return falla(404, 'establishment_not_found');
-  const r = await query(
-    'SELECT COUNT(*)::int AS n FROM soporte_mensajes WHERE establishment_id = $1 AND de_soporte AND leido_at IS NULL',
-    [yo.establishment_id]
-  );
-  return ok({ noLeidos: r.rows[0].n });
+  if (atiende(yo)) {
+    const r = await query('SELECT COUNT(*)::int AS n FROM soporte_mensajes WHERE NOT de_soporte AND leido_at IS NULL');
+    body.bandeja = r.rows[0].n;
+  }
+  return ok(body);
 }
 
 /**
  * Rutas bajo /api/soporte:
- *   GET  no-leidos           los dos roles: cuantos mensajes del otro lado esperan
+ *   GET  no-leidos           todos: { noLeidos, bandeja? } (ver noLeidos)
  *   GET  mensajes            el establecimiento: su hilo (marca leidas las respuestas)
  *   POST mensajes            el establecimiento: { texto, tipo?, pantalla? }
- *   GET  bandeja             soporte: todos los establecimientos
- *   GET  bandeja/:estId      soporte: el hilo de uno (marca leidos sus mensajes)
- *   POST bandeja/:estId      soporte: { texto }
+ *   GET  bandeja             quien atiende: todos los establecimientos
+ *   GET  bandeja/:estId      quien atiende: el hilo de uno (marca leidos sus mensajes)
+ *   POST bandeja/:estId      quien atiende: { texto }
  * Devuelve { status, body }; cada API solo lo traduce. `transaccion` es el
  * conTransaccion de la API (los envios cuentan y escriben bajo bloqueo).
  */
@@ -163,7 +174,7 @@ async function rutearSoporte(query, userId, { method, partes, body, transaccion 
   }
 
   if (recurso === 'bandeja') {
-    if (yo.role !== 'soporte') return falla(403, 'solo_soporte');
+    if (!atiende(yo)) return falla(403, 'solo_soporte');
     if (!idTexto) {
       if (method === 'GET') return ok({ establecimientos: await bandeja(query) });
       return falla(404, 'not_found');
