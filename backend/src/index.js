@@ -2318,7 +2318,8 @@ app.all(/^\/api\/soporte(\/.*)?$/, authenticateToken, async (req, res) => {
     const r = await soporte.rutearSoporte(queryTarifas, req.user.id, {
       method: req.method,
       partes: req.path.split('/').filter(Boolean).slice(2),
-      body: req.body || {}
+      body: req.body || {},
+      transaccion: conTransaccion
     });
     return res.status(r.status).json(r.body);
   } catch (error) {

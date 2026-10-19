@@ -1,6 +1,11 @@
 -- Chat de soporte: el establecimiento nos escribe desde la app (errores,
 -- sugerencias, consultas) y respondemos desde la bandeja de soporte.
 -- Un hilo por establecimiento. Corre igual en local y en Supabase. Es idempotente.
+-- Va entera en una transaccion: si el ADD de la constraint fallara, el DROP
+-- se vuelve atras y users no queda sin control de rol.
+-- Requiere migrate-user-role.sql (la columna users.role): el login ahora la lee.
+
+BEGIN;
 
 -- Rol nuevo para quien atiende la bandeja. Drop + add deja la migracion
 -- idempotente aunque la constraint ya exista con la lista vieja.
@@ -25,3 +30,5 @@ CREATE TABLE IF NOT EXISTS soporte_mensajes (
 
 CREATE INDEX IF NOT EXISTS idx_soporte_mensajes_establecimiento
   ON soporte_mensajes(establishment_id, created_at);
+
+COMMIT;

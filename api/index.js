@@ -1923,7 +1923,7 @@ module.exports = async (req, res) => {
 
       try {
         const body = method === 'POST' ? await parseJsonBody(req) : {};
-        const r = await soporte.rutearSoporte(db.query, user.id, { method, partes: segments.slice(2), body });
+        const r = await soporte.rutearSoporte(db.query, user.id, { method, partes: segments.slice(2), body, transaccion: conTransaccion });
         return responder(res, r.status, r.body);
       } catch (error) {
         console.error('Error en soporte:', error);

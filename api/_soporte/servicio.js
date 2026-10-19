@@ -8,9 +8,15 @@
 const TIPOS = ['error', 'sugerencia', 'consulta'];
 const MAX_TEXTO = 2000;
 const MAX_PANTALLA = 60;
-// Freno contra un envio en loop. Es aproximado (dos pedidos simultaneos pueden
-// pasar los dos): no protege un saldo, alcanza con que corte el abuso.
+// Freno contra el envio en loop: se cuenta y se inserta bajo un bloqueo por
+// establecimiento, asi pedidos en paralelo no pasan todos el conteo.
 const MAX_POR_MINUTO = 10;
+// El hilo devuelve los ultimos mensajes, no todos: se pide cada 15 segundos.
+const MAX_HILO = 200;
+const MAX_ID = 2147483647; // INTEGER de Postgres
+
+// Postgres rechaza el byte 0 en un TEXT: se quita antes de validar.
+const limpio = (v) => String(v ?? '').replace(/\u0000/g, '').trim();
 
 const ok = (body, status = 200) => ({ status, body });
 const falla = (status, error) => ({ status, body: { error } });
@@ -27,13 +33,13 @@ const mapMensaje = (r) => ({
 
 // tipo y pantalla solo los manda el establecimiento.
 function validarMensaje(body, { delEstablecimiento }) {
-  const texto = String(body?.texto ?? '').trim();
+  const texto = limpio(body?.texto);
   if (!texto) return { error: 'texto_requerido' };
   if (texto.length > MAX_TEXTO) return { error: 'texto_largo' };
   if (!delEstablecimiento) return { texto, tipo: null, pantalla: null };
   const tipo = body?.tipo == null || body.tipo === '' ? null : body.tipo;
   if (tipo !== null && !TIPOS.includes(tipo)) return { error: 'tipo_invalido' };
-  const pantalla = String(body?.pantalla ?? '').trim().slice(0, MAX_PANTALLA) || null;
+  const pantalla = limpio(body?.pantalla).slice(0, MAX_PANTALLA) || null;
   return { texto, tipo, pantalla };
 }
 
@@ -47,7 +53,9 @@ async function quienEs(query, userId) {
 
 async function hilo(query, estId) {
   const r = await query(
-    'SELECT * FROM soporte_mensajes WHERE establishment_id = $1 ORDER BY created_at, id',
+    `SELECT * FROM (
+       SELECT * FROM soporte_mensajes WHERE establishment_id = $1 ORDER BY created_at DESC, id DESC LIMIT ${MAX_HILO}
+     ) ultimos ORDER BY created_at, id`,
     [estId]
   );
   return r.rows.map(mapMensaje);
@@ -61,17 +69,22 @@ async function marcarLeidos(query, estId, delOtroLadoEsSoporte) {
   );
 }
 
-async function escribir(query, estId, userId, deSoporte, m) {
-  const recientes = await query(
-    "SELECT COUNT(*)::int AS n FROM soporte_mensajes WHERE establishment_id = $1 AND de_soporte = $2 AND created_at > NOW() - INTERVAL '1 minute'",
-    [estId, deSoporte]
-  );
-  if (recientes.rows[0].n >= MAX_POR_MINUTO) return falla(429, 'demasiados_mensajes');
-  const r = await query(
-    'INSERT INTO soporte_mensajes (establishment_id, user_id, de_soporte, tipo, texto, pantalla) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-    [estId, userId, deSoporte, m.tipo, m.texto, m.pantalla]
-  );
-  return ok({ mensaje: mapMensaje(r.rows[0]) }, 201);
+// `transaccion` es el conTransaccion de cada API: el conteo y el INSERT van
+// juntos bajo el bloqueo (la clave no choca con la de bloquearUnidad).
+async function escribir(transaccion, estId, userId, deSoporte, m) {
+  return transaccion(async (q) => {
+    await q('SELECT pg_advisory_xact_lock(hashtext($1))', [`soporte:${estId}:${deSoporte}`]);
+    const recientes = await q(
+      "SELECT COUNT(*)::int AS n FROM soporte_mensajes WHERE establishment_id = $1 AND de_soporte = $2 AND created_at > NOW() - INTERVAL '1 minute'",
+      [estId, deSoporte]
+    );
+    if (recientes.rows[0].n >= MAX_POR_MINUTO) return falla(429, 'demasiados_mensajes');
+    const r = await q(
+      'INSERT INTO soporte_mensajes (establishment_id, user_id, de_soporte, tipo, texto, pantalla) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [estId, userId, deSoporte, m.tipo, m.texto, m.pantalla]
+    );
+    return ok({ mensaje: mapMensaje(r.rows[0]) }, 201);
+  });
 }
 
 // Todos los establecimientos, con su ultimo mensaje y los no leidos: primero
@@ -124,9 +137,10 @@ async function noLeidos(query, yo) {
  *   GET  bandeja             soporte: todos los establecimientos
  *   GET  bandeja/:estId      soporte: el hilo de uno (marca leidos sus mensajes)
  *   POST bandeja/:estId      soporte: { texto }
- * Devuelve { status, body }; cada API solo lo traduce.
+ * Devuelve { status, body }; cada API solo lo traduce. `transaccion` es el
+ * conTransaccion de la API (los envios cuentan y escriben bajo bloqueo).
  */
-async function rutearSoporte(query, userId, { method, partes, body }) {
+async function rutearSoporte(query, userId, { method, partes, body, transaccion }) {
   const yo = await quienEs(query, userId);
   if (!yo) return falla(401, 'user_not_found');
   const [recurso = '', idTexto, sobra] = partes;
@@ -144,7 +158,7 @@ async function rutearSoporte(query, userId, { method, partes, body }) {
     if (method === 'POST') {
       const m = validarMensaje(body, { delEstablecimiento: true });
       if (m.error) return falla(400, m.error);
-      return escribir(query, estId, userId, false, m);
+      return escribir(transaccion, estId, userId, false, m);
     }
   }
 
@@ -155,17 +169,19 @@ async function rutearSoporte(query, userId, { method, partes, body }) {
       return falla(404, 'not_found');
     }
     const estId = Number(idTexto);
-    if (!Number.isInteger(estId) || estId <= 0) return falla(400, 'id_invalido');
+    if (!Number.isInteger(estId) || estId <= 0 || estId > MAX_ID) return falla(400, 'id_invalido');
     const existe = await query('SELECT id FROM establishments WHERE id = $1', [estId]);
     if (!existe.rows.length) return falla(404, 'establishment_not_found');
     if (method === 'GET') {
+      // Rastro de que cuenta de soporte leyo que hilo (leido_at no dice quien).
+      console.info(JSON.stringify({ evento: 'soporte_lee_hilo', userId, establecimiento: estId }));
       await marcarLeidos(query, estId, false);
       return ok({ mensajes: await hilo(query, estId) });
     }
     if (method === 'POST') {
       const m = validarMensaje(body, { delEstablecimiento: false });
       if (m.error) return falla(400, m.error);
-      return escribir(query, estId, userId, true, m);
+      return escribir(transaccion, estId, userId, true, m);
     }
   }
 

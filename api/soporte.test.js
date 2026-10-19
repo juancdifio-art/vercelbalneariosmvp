@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { queryMock } from './test/pg-mock.js';
+import { queryMock, txMock } from './test/pg-mock.js';
 
 // Chat de soporte en el router serverless. La primera consulta de cada pedido
 // es quien hace el pedido (rol y establecimiento), leido de la base.
@@ -22,8 +22,12 @@ const fila = (extra = {}) => ({
   pantalla: 'Carpas', leido_at: null, created_at: '2026-10-19T15:00:00.000Z', ...extra
 });
 
+// BEGIN, COMMIT, ROLLBACK y el bloqueo van a txMock (ver test/pg-mock.js).
+const controles = () => txMock.mock.calls.map(([sql]) => String(sql).trim());
+
 beforeEach(() => {
   queryMock.mockReset();
+  txMock.mockClear();
 });
 
 describe('el establecimiento en /api/soporte', () => {
@@ -52,6 +56,25 @@ describe('el establecimiento en /api/soporte', () => {
     expect(res.status).toBe(201);
     expect(res.body.mensaje).toMatchObject({ id: 10, texto: 'No guarda la reserva' });
     expect(sqlDe(/INSERT INTO soporte_mensajes/)[1]).toEqual([1, 2, false, 'error', 'No guarda la reserva', 'Carpas']);
+    // El conteo y el INSERT van juntos, bajo el bloqueo del establecimiento.
+    const tx = controles();
+    expect(tx[0]).toBe('BEGIN');
+    expect(tx.some((sql) => /pg_advisory_xact_lock/.test(sql))).toBe(true);
+    expect(tx.at(-1)).toBe('COMMIT');
+    const bloqueo = txMock.mock.calls.find(([sql]) => /pg_advisory_xact_lock/.test(sql));
+    expect(bloqueo[1]).toEqual(['soporte:1:false']);
+  });
+
+  it('quita el byte nulo, que Postgres no acepta en un texto', async () => {
+    soy(ENCARGADO);
+    queryMock.mockResolvedValueOnce({ rows: [{ n: 0 }] });
+    queryMock.mockResolvedValueOnce({ rows: [fila()] });
+
+    const res = await request(handler).post('/?route=soporte/mensajes').set('Authorization', token)
+      .send({ texto: 'hola\u0000 mundo', pantalla: 'Car\u0000pas' });
+
+    expect(res.status).toBe(201);
+    expect(sqlDe(/INSERT INTO soporte_mensajes/)[1]).toEqual([1, 2, false, null, 'hola mundo', 'Carpas']);
   });
 
   it('rechaza un mensaje vacio, uno muy largo o con un tipo desconocido sin escribir nada', async () => {
@@ -78,6 +101,7 @@ describe('el establecimiento en /api/soporte', () => {
     expect(res.status).toBe(429);
     expect(res.body.error).toBe('demasiados_mensajes');
     expect(sqlDe(/INSERT INTO/)).toBeUndefined();
+    expect(controles().at(-1)).toBe('ROLLBACK');
   });
 
   it('cuenta las respuestas sin leer de su establecimiento', async () => {
@@ -162,6 +186,12 @@ describe('soporte en /api/soporte/bandeja', () => {
     const malo = await request(handler).get('/?route=soporte/bandeja/abc').set('Authorization', token);
     expect(malo.status).toBe(400);
     expect(malo.body.error).toBe('id_invalido');
+
+    queryMock.mockReset();
+    soy(SOPORTE);
+    const enorme = await request(handler).get('/?route=soporte/bandeja/99999999999').set('Authorization', token);
+    expect(enorme.status).toBe(400);
+    expect(queryMock).toHaveBeenCalledTimes(1);
 
     queryMock.mockReset();
     soy(SOPORTE);
