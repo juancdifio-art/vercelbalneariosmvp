@@ -44,7 +44,7 @@ function SoportePanel({ abierto, onCerrar, pantalla, seccion, pestanaInicial = '
     // Por encima de los avisos globales (z-[70]): si no, uno tapa la cruz de cerrar.
     <div className="fixed inset-0 z-[80] flex justify-end">
       <div className="absolute inset-0 bg-slate-900/30" onClick={onCerrar} aria-hidden="true" />
-      <aside role="dialog" aria-modal="true" aria-label="Soporte" className="relative flex h-full w-full max-w-md flex-col bg-slate-50 shadow-2xl">
+      <aside role="dialog" aria-modal="true" aria-label="Soporte" className="relative flex h-full w-full max-w-lg flex-col bg-slate-50 shadow-2xl">
         <header className="flex items-start justify-between gap-3 bg-sky-900 px-4 py-3 text-white">
           <div>
             <h2 className="text-base font-semibold">Soporte</h2>
