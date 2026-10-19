@@ -116,6 +116,8 @@ El balneario nos escribe desde la app (error, sugerencia o consulta) y respondem
 
 Antes de mergear cualquier feature que toque autenticación, autorización, upload de archivos u OAuth, pasar por `@security`.
 
+**El repo de GitHub es público.** Nada de claves, hashes de claves reales ni credenciales en el código, los tests o los docs. La clave `admin123` de `admin@balneario.com` quedó en el historial: esa cuenta tiene que tener otra clave en cualquier base que se use en serio.
+
 Pendientes conocidos, fuera del alcance de lo hecho hasta ahora:
 
 - `api/lib/auth.js` e `index.js` usan `process.env.JWT_SECRET || 'change_this_secret'`. El fallback hace que la app arranque sin secreto en vez de fallar ruidosamente.

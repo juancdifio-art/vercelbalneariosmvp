@@ -74,7 +74,7 @@ psql -U tu_usuario -d balnearios_mvp -f schema.sql
 Crear usuario administrador:
 
 ```bash
-node create-admin.js
+node create-admin.js <email> <clave>
 ```
 
 ### 4. Configurar Frontend
@@ -152,9 +152,9 @@ balneariosmvp/
 
 ## 🔑 Credenciales por Defecto
 
-Después de ejecutar `create-admin.js`, las credenciales por defecto son:
+No hay credenciales por defecto: `create-admin.js` recibe el email y la clave al correrlo.
 
-- **Email**: admin@balneario.com
+- **Email**: el que pases al script
 - **Contraseña**: La que definas durante la creación
 
 ⚠️ **Importante**: Cambiar estas credenciales en producción.
@@ -179,7 +179,7 @@ Después de ejecutar `create-admin.js`, las credenciales por defecto son:
 
 ```bash
 npm start              # Iniciar servidor
-node create-admin.js   # Crear usuario administrador
+node create-admin.js <email> <clave>   # Crear usuario administrador (clave de 16+ caracteres)
 ```
 
 ### Frontend

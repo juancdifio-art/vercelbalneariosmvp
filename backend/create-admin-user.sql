@@ -5,7 +5,7 @@
 
 -- Insertar usuario admin
 -- Email: admin@balneario.com
--- Password: admin123 (hash bcrypt con salt rounds = 10)
+-- Password: reemplazá el hash por el de una clave propia (ver la nota al final); el repo es público
 INSERT INTO users (email, password_hash, created_at)
 VALUES (
   'admin@balneario.com',
