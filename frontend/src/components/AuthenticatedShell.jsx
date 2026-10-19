@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import Sidebar from './Sidebar';
 import { isWideSection, DEFAULT_MAX_WIDTH, groupNavItems } from '../config/sections';
 import { NavIcon, SalirIcon } from './icons';
+import useChatSoporte from '../hooks/useChatSoporte';
 
 function AuthenticatedShell({
   establishment,
@@ -22,6 +23,12 @@ function AuthenticatedShell({
   // Misma fuente que el menu de escritorio: antes este menu repetia a mano
   // los items de configuracion y habia que tocar dos archivos por seccion.
   const grupos = groupNavItems(navItems);
+
+  useChatSoporte({
+    email: userEmail,
+    establecimiento: establishment?.name,
+    pantalla: (navItems || []).find((item) => item.id === activeSection)?.label || activeSection
+  });
 
   const handleSectionChange = (sectionId) => {
     onChangeSection(sectionId);
