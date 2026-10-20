@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
     }
 
     const estResult = await db.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [user.id]
     );
 

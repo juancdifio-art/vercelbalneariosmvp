@@ -11,7 +11,7 @@ const PERIODOS = [
 ];
 const SECTORES = [{ id: 3, serviceType: 'carpa', nombre: 'Terraza', color: '#F97316', unidades: [118] }];
 const GENERAL_ALTA = { id: 20, serviceType: 'carpa', alcance: 'tipo', sectorId: null, resourceNumber: null, clase: 'fecha', periodoId: 1, precio: 14000 };
-const ESTABLISHMENT = { carpasCapacity: 117, sombrillasCapacity: 220, parkingCapacity: 10, hasCarpas: true };
+const ESTABLISHMENT = { carpasCapacity: 117, sombrillasCapacity: 220, parkingCapacity: 10, hasCarpas: true, plano: 'zeus' };
 
 function renderizar(tarifas = [GENERAL_ALTA], ejecutar = vi.fn().mockResolvedValue(''), establishment = ESTABLISHMENT) {
   render(<PreciosTab servicios={SERVICIOS} periodos={PERIODOS} sectores={SECTORES} tarifas={tarifas} ejecutar={ejecutar} establishment={establishment} />);

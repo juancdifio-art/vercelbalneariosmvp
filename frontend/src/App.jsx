@@ -34,6 +34,7 @@ import useAuth from './hooks/useAuth';
 import useEstablishment from './hooks/useEstablishment';
 import useClients from './hooks/useClients';
 import { useAccesoCuentas } from './hooks/useCuentas';
+import { seccionesDelRol } from './config/sections';
 import { getApiBaseUrl } from './apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -2406,6 +2407,11 @@ function App() {
       navItems.push({ id: 'cuentas', label: 'Cuentas', group: 'admin' });
     }
 
+    // Cada rol del personal ve sus secciones (la API igual controla cada
+    // pedido). Si la seccion abierta no es una de las suyas, se ve la primera.
+    const navDelRol = seccionesDelRol(navItems, userRole);
+    const seccionActiva = navDelRol.some((item) => item.id === activeSection) ? activeSection : navDelRol[0]?.id;
+
     const sectionTitleMap = {
       inicio: 'Resumen general',
       'vista-diaria': 'Vista rápida',
@@ -2444,6 +2450,7 @@ function App() {
       setEstPoolMaxOccupancy,
       estAjustes,
       setEstAjustes,
+      estPlano: establishment?.plano ?? null,
       onSubmit: handleSaveEstablishment,
       estSaving,
       error,
@@ -2473,12 +2480,12 @@ function App() {
       <AuthenticatedShell
         establishment={establishment}
         userEmail={userEmail}
-        activeSection={activeSection}
+        activeSection={seccionActiva}
         onChangeSection={setActiveSection}
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
         onLogout={handleLogout}
-        navItems={navItems}
+        navItems={navDelRol}
       >
         <>
           <AvisoGlobal
@@ -2685,18 +2692,18 @@ function App() {
           )}
 
           <div className="w-full rounded-2xl bg-white/95 border border-cyan-100 shadow-2xl p-5 sm:p-7 text-slate-900">
-            {activeSection !== 'pileta' && (
+            {seccionActiva !== 'pileta' && (
               <div className="mb-6">
-                {activeSection !== 'clientes' && activeSection !== 'reservas' && (
+                {seccionActiva !== 'clientes' && seccionActiva !== 'reservas' && (
                   <p className="text-[11px] font-semibold uppercase tracking-wide text-cyan-700">
-                    {sectionTitleMap[activeSection] || 'Panel'}
+                    {sectionTitleMap[seccionActiva] || 'Panel'}
                   </p>
                 )}
               </div>
             )}
 
             {/* Sección principal */}
-            {activeSection === 'inicio' && (
+            {seccionActiva === 'inicio' && (
               <DashboardSection
                 establishment={establishment}
                 reservationGroups={reservationGroups}
@@ -2705,9 +2712,9 @@ function App() {
               />
             )}
 
-            {activeSection === 'vista-diaria' && <DailyViewSection {...propsVistaRapida} />}
+            {seccionActiva === 'vista-diaria' && <DailyViewSection {...propsVistaRapida} />}
 
-            {activeSection === 'reservas' && (
+            {seccionActiva === 'reservas' && (
               <ReservasSection
                 reservationGroups={reservationGroups}
                 reservationGroupsLoading={reservationGroupsLoading}
@@ -2730,13 +2737,13 @@ function App() {
               />
             )}
 
-            {activeSection === 'reportes' && (
+            {seccionActiva === 'reportes' && (
               <ReportsPaymentsSection authToken={authToken} />
             )}
 
-            {activeSection === 'tarifas' && <TarifasSection establishment={establishment} />}
+            {seccionActiva === 'tarifas' && <TarifasSection establishment={establishment} />}
 
-            {activeSection === 'clientes' && (
+            {seccionActiva === 'clientes' && (
               <ClientsSection
                 clients={clients}
                 clientsLoading={clientsLoading}
@@ -2751,7 +2758,7 @@ function App() {
               />
             )}
 
-            {activeSection === 'carpas' && (
+            {seccionActiva === 'carpas' && (
               <CarpasSection
                 establishment={establishment}
                 carpasDayOffset={carpasDayOffset}
@@ -2770,7 +2777,7 @@ function App() {
               />
             )}
 
-            {activeSection === 'panel-usuario' && (
+            {seccionActiva === 'panel-usuario' && (
               <PanelUsuarioSection
                 authToken={authToken}
                 userEmail={userEmail}
@@ -2781,12 +2788,13 @@ function App() {
                   sessionStorage.setItem('authEmail', nuevo);
                 }}
                 establecimiento={propsEstablecimiento}
+                rol={userRole}
               />
             )}
 
-            {activeSection === 'cuentas' && administraCuentas && <PanelCuentas embebida userEmail={userEmail} />}
+            {seccionActiva === 'cuentas' && administraCuentas && <PanelCuentas embebida userEmail={userEmail} />}
 
-            {activeSection === 'sombrillas' && (
+            {seccionActiva === 'sombrillas' && (
               <SombrillasSection
                 establishment={establishment}
                 sombrillasDayOffset={sombrillasDayOffset}
@@ -2805,7 +2813,7 @@ function App() {
               />
             )}
 
-            {activeSection === 'estacionamiento' && (
+            {seccionActiva === 'estacionamiento' && (
               <EstacionamientoSection
                 establishment={establishment}
                 parkingDayOffset={parkingDayOffset}
@@ -2824,7 +2832,7 @@ function App() {
               />
             )}
 
-            {activeSection === 'pileta' && (
+            {seccionActiva === 'pileta' && (
               <PiletaSection
                 establishment={establishment}
                 reservationGroups={reservationGroups}

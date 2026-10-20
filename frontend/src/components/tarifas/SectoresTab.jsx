@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import PlanoBalneario from '../PlanoBalneario';
 import { PALETA, colorSuave } from '../../lib/tarifas';
+import { planoDe } from '../../config/planos';
+import { numerosDeUnidades } from '../../lib/unidades';
 
 const entrada = 'rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-cyan-500';
 const PREFIJO = { carpa: 'Carpa', sombrilla: 'Sombrilla', parking: 'Plaza' };
 
 /**
  * Sectores de unidades con precio propio (Terraza, Frente al mar).
- * Se arman tocando el plano; una unidad esta en un solo sector, asi que las
+ * Se arman tocando el plano (o la grilla, sin plano); una unidad esta en un solo sector, asi que las
  * de otro sector se ven con su color y no se pueden tomar.
  */
 function SectoresTab({ servicios, sectores, ejecutar, establishment }) {
@@ -62,7 +64,10 @@ function SectoresTab({ servicios, sectores, ejecutar, establishment }) {
     setError(await ejecutar(`tarifas/sectores/${s.id}`, { method: 'DELETE' }));
   };
 
-  const plazas = Array.from({ length: Number(establishment?.parkingCapacity) || 0 }, (_, i) => i + 1);
+  // Sin plano dibujado (o para el estacionamiento, que no esta en el plano) las
+  // unidades se eligen de una grilla de botones.
+  const enPlano = serviceType !== 'parking' && Boolean(planoDe(establishment));
+  const plazas = numerosDeUnidades(establishment, serviceType);
 
   return (
     <div className="space-y-3">
@@ -120,7 +125,7 @@ function SectoresTab({ servicios, sectores, ejecutar, establishment }) {
 
       {error && <p role="alert" className="text-xs text-red-700">{error}</p>}
 
-      {serviceType === 'parking' ? (
+      {!enPlano ? (
         <div className="flex flex-wrap gap-1">
           {plazas.map((n) => {
             const otro = duenoDe.get(n);
@@ -133,10 +138,10 @@ function SectoresTab({ servicios, sectores, ejecutar, establishment }) {
                 disabled={Boolean(otro)}
                 title={otro ? otro.nombre : undefined}
                 onClick={() => alternar('parking', n)}
-                className="h-8 w-16 rounded border text-[11px] font-semibold disabled:cursor-not-allowed"
+                className="h-8 min-w-[4rem] rounded border px-2 text-[11px] font-semibold disabled:cursor-not-allowed"
                 style={elegida ? { backgroundColor: editando.color, color: '#fff' } : otro ? { backgroundColor: colorSuave(otro.color) } : undefined}
               >
-                {PREFIJO.parking} {n}
+                {PREFIJO[serviceType]} {n}
               </button>
             );
           })}

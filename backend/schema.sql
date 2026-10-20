@@ -261,6 +261,19 @@ ALTER TABLE establishments
   ADD COLUMN IF NOT EXISTS contrato_condiciones TEXT,
   ADD COLUMN IF NOT EXISTS contrato_datos JSONB NOT NULL DEFAULT '[]'::jsonb;
 
+-- Usuarios por balneario (migrate-usuarios-establecimiento.sql): el dueño y su
+-- personal apuntan al establecimiento; el rol dice qué puede hacer cada uno.
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS establishment_id INTEGER REFERENCES establishments(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_users_establishment ON users(establishment_id);
+ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE users
+  ADD CONSTRAINT users_role_check CHECK (role IN ('admin', 'operador', 'pileta', 'soporte'));
+
+-- Clave del plano dibujado del balneario (migrate-plano.sql).
+ALTER TABLE establishments
+  ADD COLUMN IF NOT EXISTS plano VARCHAR(40);
+
 -- Administrador general de cuentas (migrate-administra-cuentas.sql).
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS administra_cuentas BOOLEAN NOT NULL DEFAULT FALSE;

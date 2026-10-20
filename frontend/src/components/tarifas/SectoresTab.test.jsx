@@ -11,13 +11,13 @@ const unidad = (n) => document.querySelector(`[data-unidad="carpa-${n}"]`);
 
 describe('SectoresTab', () => {
   it('pinta las unidades de otro sector con su color', () => {
-    render(<SectoresTab servicios={SERVICIOS} sectores={[TERRAZA]} ejecutar={vi.fn()} establishment={{ parkingCapacity: 10 }} />);
+    render(<SectoresTab servicios={SERVICIOS} sectores={[TERRAZA]} ejecutar={vi.fn()} establishment={{ parkingCapacity: 10, plano: 'zeus' }} />);
     expect(unidad(118).querySelector('rect').getAttribute('fill')).toBe('#FED7AA');
   });
 
   it('arma un sector nuevo tocando el plano y lo guarda', async () => {
     const ejecutar = vi.fn().mockResolvedValue('');
-    render(<SectoresTab servicios={SERVICIOS} sectores={[TERRAZA]} ejecutar={ejecutar} establishment={{ parkingCapacity: 10 }} />);
+    render(<SectoresTab servicios={SERVICIOS} sectores={[TERRAZA]} ejecutar={ejecutar} establishment={{ parkingCapacity: 10, plano: 'zeus' }} />);
     await userEvent.click(screen.getByRole('button', { name: 'Nuevo sector' }));
     await userEvent.type(screen.getByLabelText('Nombre del sector'), 'Frente al mar');
     await userEvent.click(unidad(58));
@@ -32,7 +32,7 @@ describe('SectoresTab', () => {
 
   it('en estacionamiento elige plazas de una lista', async () => {
     const ejecutar = vi.fn().mockResolvedValue('');
-    render(<SectoresTab servicios={SERVICIOS} sectores={[]} ejecutar={ejecutar} establishment={{ parkingCapacity: 10 }} />);
+    render(<SectoresTab servicios={SERVICIOS} sectores={[]} ejecutar={ejecutar} establishment={{ parkingCapacity: 10, plano: 'zeus' }} />);
     await userEvent.selectOptions(screen.getByLabelText('Servicio'), 'parking');
     await userEvent.click(screen.getByRole('button', { name: 'Nuevo sector' }));
     await userEvent.type(screen.getByLabelText('Nombre del sector'), 'Techado');
@@ -41,4 +41,12 @@ describe('SectoresTab', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar sector' }));
     expect(ejecutar.mock.calls[0][1].body.unidades).toEqual([3]);
   }, 15000);
+});
+
+describe('SectoresTab sin plano dibujado', () => {
+  it('las carpas se eligen de una grilla de 1 a la capacidad', () => {
+    render(<SectoresTab servicios={SERVICIOS} sectores={[]} ejecutar={vi.fn()} establishment={{ carpasCapacity: 3, parkingCapacity: 10 }} />);
+    expect(screen.getByRole('button', { name: 'Carpa 3' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Carpa 4' })).not.toBeInTheDocument();
+  });
 });

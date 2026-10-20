@@ -26,9 +26,16 @@ export const queryMock = vi.fn();
 export const txMock = vi.fn(async () => ({ rows: [] }));
 const esControl = (sql) => /^(BEGIN|COMMIT|ROLLBACK)$/.test(String(sql).trim()) || /pg_advisory_xact_lock/.test(String(sql));
 
+// El control de roles (_permisos/permisos.js) pregunta el rol antes de cada
+// ruta del balneario. Esa consulta tampoco consume respuestas de queryMock: va
+// a rolMock, que por defecto contesta un encargado. Los tests de permisos le
+// cambian la respuesta con mockResolvedValueOnce.
+export const rolMock = vi.fn(async () => ({ rows: [{ role: 'admin' }] }));
+const esRol = (sql) => String(sql).includes('/* permisos */');
+
 export class Pool {
-  query(...args) {
-    return queryMock(...args);
+  query(sql, ...args) {
+    return esRol(sql) ? rolMock(sql, ...args) : queryMock(sql, ...args);
   }
 
   connect() {

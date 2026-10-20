@@ -13,7 +13,8 @@ const ESTABLECIMIENTO = {
   hasSombrillas: true,
   hasParking: false,
   carpasCapacity: '5',
-  sombrillasCapacity: '5'
+  sombrillasCapacity: '5',
+  plano: 'zeus'
 };
 
 const RESERVA_CARPA_134 = {
@@ -42,8 +43,7 @@ function renderVista(props = {}) {
     reservationGroups: [RESERVA_CARPA_134],
     onViewReservationDetails: vi.fn(),
     onOpenNewCarpaReservation: vi.fn(),
-    onOpenNewSombrillaReservation: vi.fn(),
-    conPlano: true
+    onOpenNewSombrillaReservation: vi.fn()
   };
   const merged = { ...base, ...props };
   const utils = render(<DailyViewSection {...merged} />);
@@ -118,7 +118,7 @@ describe('Vista rapida con el plano', () => {
 
 describe('Vista rapida sin plano', () => {
   it('sigue siendo la grilla 1..capacidad y no ofrece plano completo', () => {
-    renderVista({ conPlano: false, carpasReservations: {}, reservationGroups: [] });
+    renderVista({ establishment: { ...ESTABLECIMIENTO, plano: null }, carpasReservations: {}, reservationGroups: [] });
     expect(screen.getByLabelText(/^Carpa 5 -/)).toBeInTheDocument();
     expect(screen.queryByLabelText(/^Carpa 6 -/)).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Plano completo/ })).not.toBeInTheDocument();

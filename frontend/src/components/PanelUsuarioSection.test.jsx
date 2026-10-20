@@ -70,7 +70,22 @@ describe('PanelUsuarioSection', () => {
   it('muestra el nivel de acceso que devuelve la API', async () => {
     renderPanel();
 
-    expect(await screen.findByText('Administrador')).toBeInTheDocument();
+    expect(await screen.findByText('Encargado')).toBeInTheDocument();
+  });
+
+  it('el encargado ve Establecimiento, Contrato y Usuarios; un empleado solo su perfil', async () => {
+    const { unmount } = renderPanel({ rol: 'admin' });
+    for (const solapa of ['Perfil', 'Establecimiento', 'Contrato', 'Usuarios']) {
+      expect(screen.getByRole('button', { name: solapa })).toBeInTheDocument();
+    }
+    unmount();
+
+    renderPanel({ rol: 'operador' });
+    expect(screen.getByRole('button', { name: 'Perfil' })).toBeInTheDocument();
+    for (const solapa of ['Establecimiento', 'Contrato', 'Usuarios']) {
+      expect(screen.queryByRole('button', { name: solapa })).not.toBeInTheDocument();
+    }
+    await screen.findByText('admin@balneario.com');
   });
 
   it('cambia a la solapa Establecimiento al clickearla', async () => {

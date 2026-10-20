@@ -64,8 +64,8 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 267 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas / _contrato
-cd frontend && npm test   # 370 tests de componentes y utilidades
+cd api && npm test        # 282 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas / _contrato / _usuarios
+cd frontend && npm test   # 384 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
@@ -80,12 +80,14 @@ cd api && DB_INTEGRACION=1 npx vitest run incluidos-integracion.test.js
 
 **Transacciones en los tests de `api/`:** `test/pg-mock.js` hace que `BEGIN`, `COMMIT`, `ROLLBACK` y `pg_advisory_xact_lock` no consuman respuestas de `queryMock` (van a `txMock`). Al preparar un test se mockean solo las consultas de datos, en orden.
 
+**El control de roles en los tests:** la consulta del rol (`permisos.CONSULTA_ROL`, marcada con `/* permisos */`) tampoco consume `queryMock`: va a `rolMock`, que por defecto contesta un encargado (`admin`). Para probar otro rol, `rolMock.mockResolvedValueOnce({ rows: [{ role: 'operador' }] })`.
+
 ## Convenciones propias
 
 - **Iconos:** `frontend/src/components/icons.jsx` es la única fuente. Son de lucide-react, salvo la carpa, que es un SVG propio: ninguna librería dibuja la carpa de balneario (el `Tent` de lucide es de camping y se lee como toldo indígena).
 - **Navegación:** `frontend/src/config/sections.js` define los grupos del menú y qué pantallas van a ancho completo. El menú de escritorio y el de mobile se arman de ahí.
 - **Grillas de ocupación:** son `table-fixed`, así que **el ancho de columna lo define el `<th>`, no el `<td>`**. Ensanchar el `td` no hace nada.
-- **Plano del balneario:** `frontend/src/config/planoZeus.js` es la fuente de verdad de qué carpas y sombrillas existen y dónde van. Con el plano activo, las listas de unidades salen de `numerosDeUnidades` (`frontend/src/lib/unidades.js`) y **no de 1..capacidad**: las carpas son 117 pero numeradas hasta la 134, con huecos (4-11, 26, 27, 77-83). Cualquier lista nueva de carpas o sombrillas tiene que usar ese helper. La capacidad configurada queda fija en lo que dice el plano. `docs/plano-zeus.html` es la versión suelta del mismo plano, con sus datos duplicados en `docs/plano-zeus.js`: si se corrige una unidad, corregirla en los dos.
+- **Plano del balneario:** cada establecimiento guarda la clave de su plano dibujado en `establishments.plano` (migración `backend/migrate-plano.sql`); `frontend/src/config/planos.js` mapea la clave a sus unidades. Hoy hay uno solo, `'zeus'` (`config/planoZeus.js`, dibujado por `PlanoBalneario`); un balneario sin plano numera de 1 a la capacidad y no muestra el dibujo. El dibujo de cada balneario nuevo lo hacemos nosotros en el onboarding y la clave se pone por SQL (Cuentas la copia del modelo). Las listas de unidades salen de `numerosDeUnidades(establishment, tipo)` (`frontend/src/lib/unidades.js`) y **no de 1..capacidad**: las carpas de Zeus son 117 pero numeradas hasta la 134, con huecos (4-11, 26, 27, 77-83). Cualquier lista nueva de carpas o sombrillas tiene que usar ese helper. Con plano, la capacidad configurada queda fija en lo que dice el plano. `docs/plano-zeus.html` es la versión suelta del mismo plano, con sus datos duplicados en `docs/plano-zeus.js`: si se corrige una unidad, corregirla en los dos.
 - **Patente obligatoria en estacionamiento:** toda reserva `parking` lleva `vehicle_plate`. Las dos APIs la exigen (`vehicle_plate_required`) y la guardan normalizada (`AB123CD`), y los formularios no dejan guardar sin ella. Va en la reserva, no solo en la ficha del cliente, porque el mismo cliente puede venir con otro auto; la ficha solo sirve para completarla sola. Columna nueva: `backend/migrate-reservation-vehicle-plate.sql`.
 - **Mostrar datos crudos:** montos con `formatPesos` (`lib/money.js`); medio de pago, fechas `YYYY-MM-DD` y nombre de la unidad con `lib/formato.js`. Nada de `toFixed` ni de `cash`/`transfer` en pantalla.
 - **Manual de uso:** la fuente es `docs/manual/manual.html` con capturas en `docs/manual/img/`; el PDF se imprime con Edge headless (`msedge --headless=new --no-pdf-header-footer --print-to-pdf=...`). Si cambia una pantalla que sale en el manual, rehacer su captura.
@@ -137,7 +139,8 @@ Una cuenta con `users.administra_cuentas = true` ve todas las cuentas de la app,
 
 - **La lógica vive en `api/_cuentas/servicio.js`** (`rutearCuentas`), compartida por las dos APIs como `_soporte`. Recibe `hashear` de cada API (bcrypt 12), así no importa bcrypt. Rutas: `cuentas/acceso` (cualquier cuenta: si administra), `cuentas` GET/POST y `cuentas/:id/clave` POST.
 - **El permiso se lee de la base en cada pedido**, no del token, igual que el de soporte.
-- **Alta:** el email se guarda en minúsculas y la clave la genera el servidor (`Kp7m-x4Qz-9tRw`) y se muestra una sola vez. Con un balneario modelo (`copiarDe`) se crea el establecimiento con su configuración, períodos, sectores (con sus unidades) y tarifas, sin clientes ni reservas, todo en una transacción. Sin modelo se crea solo el usuario y el cliente configura su balneario al entrar.
+- **Alta:** el email se guarda en minúsculas y la clave la genera el servidor (`Kp7m-x4Qz-9tRw`) y se muestra una sola vez. Con un balneario modelo (`copiarDe`) se crea el establecimiento con su configuración, su plano, su contrato, períodos, sectores (con sus unidades) y tarifas, sin clientes ni reservas, todo en una transacción; el usuario nuevo queda como su encargado. Sin modelo se crea solo el usuario y el cliente configura su balneario al entrar.
+- **El listado muestra también al personal** de cada balneario con su rol; de modelo para copiar solo se ofrece la cuenta del encargado.
 - **Clave nueva:** no para la cuenta propia (se cambia en Panel de usuario) ni para otro administrador general.
 - **Frontend:** `hooks/useCuentas.js` y `components/cuentas/PanelCuentas.jsx`. Con balneario, el menú suma **Cuentas**; sin balneario, el panel ocupa la pantalla (como la bandeja del rol `soporte`).
 
@@ -154,8 +157,14 @@ Pendientes conocidos, fuera del alcance de lo hecho hasta ahora:
 - El login hashea con bcrypt rounds 10. Los endpoints nuevos de cambio de contraseña usan 12, así que cada usuario sube de rounds al cambiarla.
 - El login no tiene rate limiting por IP ni por cuenta, y con un email inexistente responde sin correr bcrypt (se puede averiguar qué emails existen). Pesa más desde que existe el rol `soporte`. En Vercel un límite en memoria no sirve: tiene que vivir en la base (tabla de intentos por `ip:` y `cuenta:`, 15 minutos).
 
-## Estado del modelo de datos
+## Usuarios por balneario
 
-`establishments` tiene `UNIQUE (user_id)`: **un usuario = un establecimiento**. La columna `users.role` existe (`admin` | `operador`) pero por ahora es informativa — mientras esa restricción siga, no puede haber operadores. Romperla es el prerrequisito para usuarios múltiples por balneario.
+Cada balneario tiene un encargado y su personal. Migración: `backend/migrate-usuarios-establecimiento.sql`.
+
+- **Modelo:** todos apuntan al balneario con `users.establishment_id`; `establishments.user_id` (UNIQUE) sigue siendo el encargado. El balneario de quien pide se busca siempre por `establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)`, **nunca por `user_id`**, o el personal no ve su balneario. Al crear un balneario (onboarding o Cuentas) se le pone el `establishment_id` al encargado.
+- **Roles** (`users.role`): `admin` el encargado, todo; `operador` un empleado: reservas, clientes, pagos y reportes, mira tarifas y contrato sin cambiarlos; `pileta` solo mira reservas, pases y clientes; `soporte` sin balneario.
+- **El control es uno solo, a la entrada de cada API** (`api/_permisos/permisos.js`, `REGLAS` por recurso y método): en `api/index.js` antes de las rutas y en `backend/src/index.js` como middleware de `/api`. Lee el rol de la base en cada pedido y responde 403 `sin_permiso`. Auth, soporte y cuentas no pasan por ahí. **Un recurso nuevo del balneario hay que sumarlo a `REGLAS`**, o queda abierto para todo el personal.
+- **El encargado administra a su personal** en Panel de usuario › Usuarios (`api/_usuarios/servicio.js`, ruta `usuarios`): alta con clave generada, cambio de rol, clave nueva y baja. Al encargado no se lo toca desde ahí; tope de 30 usuarios por balneario.
+- **Frontend:** `seccionesDelRol` (`config/sections.js`) oculta las secciones de cada rol (el empleado no ve Tarifas; pileta ve Vista rápida, Pileta y su perfil) y `App.jsx` muestra `seccionActiva`, que cae en la primera permitida. Las solapas de configuración, contrato y usuarios son solo del encargado. Es lo que se muestra: el que manda es el control de la API.
 
 Documentos de diseño en `docs/superpowers/specs/` y planes en `docs/superpowers/plans/`.

@@ -39,10 +39,12 @@ describe.skipIf(!activo)('alta de cuenta con modelo contra la base', () => {
     query = (sql, params) => client.query(sql, params);
     await query('BEGIN');
     await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS administra_cuentas BOOLEAN NOT NULL DEFAULT FALSE');
+    await query('ALTER TABLE establishments ADD COLUMN IF NOT EXISTS plano VARCHAR(40)');
 
     admin = (await query("INSERT INTO users (email, password_hash, administra_cuentas) VALUES ('admin-integracion@test.local', 'x', TRUE) RETURNING id")).rows[0];
     modelo = (await query(
-      "INSERT INTO establishments (user_id, name, has_carpas, has_pileta, carpas_capacity, pool_max_occupancy, pases_pileta_por_carpa) VALUES ($1, 'Modelo', true, true, 117, 150, 3) RETURNING *",
+      `INSERT INTO establishments (user_id, name, has_carpas, has_pileta, carpas_capacity, pool_max_occupancy, pases_pileta_por_carpa, plano, contrato_titulo, contrato_condiciones, contrato_datos)
+       VALUES ($1, 'Modelo', true, true, 117, 150, 3, 'zeus', 'CONTRATO {Temporada}', 'Abre a las {Pileta abre}.', '[{"nombre":"Pileta abre","valor":"13.30"}]') RETURNING *`,
       [admin.id]
     )).rows[0];
     const alta = (await query(
@@ -85,6 +87,8 @@ describe.skipIf(!activo)('alta de cuenta con modelo contra la base', () => {
 
     const est = (await query('SELECT * FROM establishments WHERE id = $1', [nuevo])).rows[0];
     expect(est).toMatchObject({ name: 'Copia', has_carpas: true, has_pileta: true, carpas_capacity: 117, pool_max_occupancy: 150, pases_pileta_por_carpa: 3 });
+    expect(est).toMatchObject({ plano: 'zeus', contrato_titulo: 'CONTRATO {Temporada}', contrato_condiciones: 'Abre a las {Pileta abre}.' });
+    expect(est.contrato_datos).toEqual([{ nombre: 'Pileta abre', valor: '13.30' }]);
     expect((await query('SELECT email, password_hash FROM users WHERE id = $1', [est.user_id])).rows[0])
       .toEqual({ email: 'nuevo-integracion@test.local', password_hash: `hash:${r.body.clave}` });
 

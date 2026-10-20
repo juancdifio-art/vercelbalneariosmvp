@@ -1,20 +1,17 @@
 /**
- * Plano del Balneario Zeus, temporada 2025-2026.
+ * Plano del Balneario Zeus, temporada 2025-2026: el que usan los
+ * establecimientos con `plano = 'zeus'` (ver config/planos.js).
  *
  * Relevado de la foto del plano en papel (docs/Plano foto.jpeg). La version
  * navegable fuera de la app esta en docs/plano-zeus.html.
  *
- * Con el plano activo, las unidades de carpas y sombrillas salen de aca y no
- * de la capacidad configurada: las carpas del plano van del 1 al 134 pero son
- * 117, porque faltan la 4 a la 11, la 26, la 27 y la 77 a la 83. Armar la
- * lista como 1..capacidad dejaria afuera a la 118-134.
+ * Con este plano, las unidades de carpas y sombrillas salen de aca y no de la
+ * capacidad configurada: las carpas del plano van del 1 al 134 pero son 117,
+ * porque faltan la 4 a la 11, la 26, la 27 y la 77 a la 83. Armar la lista
+ * como 1..capacidad dejaria afuera a la 118-134.
  *
  * Coordenadas en un lienzo de 1290 x 900.
  */
-
-// El sistema es de Zeus. Si algun dia se usa en otro balneario, esto pasa a
-// depender del establecimiento.
-export const PLANO_ACTIVO = true;
 
 function rango(a, b) {
   const o = [];

@@ -23,6 +23,9 @@ function EstablishmentConfigForm({
   setEstPoolMaxOccupancy,
   estAjustes,
   setEstAjustes,
+  // Clave del plano dibujado del balneario: con plano, la cantidad de carpas y
+  // sombrillas la fija el plano. En el alta todavia no hay.
+  estPlano = null,
   onSubmit,
   estSaving,
   error,
@@ -32,8 +35,8 @@ function EstablishmentConfigForm({
 
   // Con el plano del balneario activo, la cantidad de carpas y sombrillas es
   // la relevada en el plano: el campo queda fijo y se guarda ese valor.
-  const carpasDelPlano = capacidadDelPlano('carpa');
-  const sombrillasDelPlano = capacidadDelPlano('sombrilla');
+  const carpasDelPlano = capacidadDelPlano({ plano: estPlano }, 'carpa');
+  const sombrillasDelPlano = capacidadDelPlano({ plano: estPlano }, 'sombrilla');
 
   useEffect(() => {
     if (estHasCarpas && carpasDelPlano != null && estCarpasCapacity !== String(carpasDelPlano)) {

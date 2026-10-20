@@ -130,3 +130,19 @@ describe('panel de cuentas', () => {
     await screen.findByRole('list', { name: 'Cuentas' });
   });
 });
+
+describe('panel de cuentas con personal de un balneario', () => {
+  it('el personal figura con su rol y su balneario no se repite como modelo', async () => {
+    const conPersonal = [
+      { id: 2, email: 'admin@balneario.com', rol: 'admin', administra: true, creada: '2025-11-23T10:00:00.000Z', balneario: { id: 1, nombre: 'Zeus' }, encargado: true, reservas: 271 },
+      { id: 8, email: 'caja@balneario.test', rol: 'operador', administra: false, creada: '2026-10-20T13:00:00.000Z', balneario: { id: 1, nombre: 'Zeus' }, encargado: false, reservas: 271 }
+    ];
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({ cuentas: conPersonal }) }));
+    render(<PanelCuentas userEmail="admin@balneario.com" onLogout={() => {}} />);
+
+    const lista = await screen.findByRole('list', { name: 'Cuentas' });
+    expect(within(lista).getByText('Empleado')).toBeInTheDocument();
+    const opciones = within(screen.getByLabelText('Configuración')).getAllByRole('option').map((o) => o.textContent);
+    expect(opciones).toEqual(['Ninguna: el cliente la carga al entrar', 'Copiar de Zeus']);
+  });
+});

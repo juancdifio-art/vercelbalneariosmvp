@@ -10,6 +10,8 @@ const { enTransaccion } = require('./_incluidos/transaccion');
 const soporte = require('./_soporte/servicio');
 const cuentas = require('./_cuentas/servicio');
 const contrato = require('./_contrato/servicio');
+const permisos = require('./_permisos/permisos');
+const usuarios = require('./_usuarios/servicio');
 
 // Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
 // Es obligatoria en toda reserva de estacionamiento.
@@ -76,6 +78,19 @@ const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
 function signToken(user) {
   const payload = { userId: user.id, email: user.email };
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
+}
+
+// Quien hace el pedido, o null si no hay token valido. No responde: la ruta,
+// con authenticateToken, es la que contesta 401.
+function usuarioDelToken(req) {
+  const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return null;
+  try {
+    return { id: jwt.verify(token, JWT_SECRET).userId };
+  } catch (err) {
+    return null;
+  }
 }
 
 function authenticateToken(req, res) {
@@ -262,6 +277,17 @@ module.exports = async (req, res) => {
       res.statusCode = 404;
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify({ error: 'not_found' }));
+    }
+
+    // ============= Control de roles =============
+    // El personal de un balneario (empleado, pileta) solo usa lo que su rol le
+    // permite (_permisos/permisos.js). El rol se lee de la base en cada pedido.
+    if (permisos.controla(first)) {
+      const quien = usuarioDelToken(req);
+      if (quien) {
+        const rol = (await db.query(permisos.CONSULTA_ROL, [quien.id])).rows[0]?.role;
+        if (!permisos.puede(rol, method, first)) return responder(res, 403, { error: 'sin_permiso' });
+      }
     }
 
     // ============= /api/debug =============
@@ -551,7 +577,7 @@ module.exports = async (req, res) => {
           return res.end(JSON.stringify({ error: 'invalid_name' }));
         }
 
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
 
         const parkingCap = (parkingCapacity === null || parkingCapacity === undefined || parkingCapacity === '') ? null : parseInt(parkingCapacity, 10);
         const carpasCap = (carpasCapacity === null || carpasCapacity === undefined || carpasCapacity === '') ? null : parseInt(carpasCapacity, 10);
@@ -568,9 +594,11 @@ module.exports = async (req, res) => {
             'INSERT INTO establishments (user_id, name, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy, pases_pileta_por_carpa, pases_pileta_por_sombrilla, max_personas_por_unidad) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, COALESCE($11, 4), COALESCE($12, 0), COALESCE($13, 6)) RETURNING *',
             [user.id, name, Boolean(hasParking), Boolean(hasCarpas), Boolean(hasSombrillas), Boolean(hasPileta), parkingCap, carpasCap, sombrillasCap, poolCap, pasesCarpa, pasesSombrilla, maxPersonas]
           );
+          // El encargado queda apuntando a su balneario, como el resto del personal.
+          await db.query('UPDATE users SET establishment_id = $1 WHERE id = $2', [result.rows[0].id, user.id]);
         } else {
           result = await db.query(
-            'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9, pases_pileta_por_carpa = COALESCE($11, pases_pileta_por_carpa), pases_pileta_por_sombrilla = COALESCE($12, pases_pileta_por_sombrilla), max_personas_por_unidad = COALESCE($13, max_personas_por_unidad) WHERE user_id = $10 RETURNING *',
+            'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9, pases_pileta_por_carpa = COALESCE($11, pases_pileta_por_carpa), pases_pileta_por_sombrilla = COALESCE($12, pases_pileta_por_sombrilla), max_personas_por_unidad = COALESCE($13, max_personas_por_unidad) WHERE id = (SELECT establishment_id FROM users WHERE id = $10) RETURNING *',
             [name, Boolean(hasParking), Boolean(hasCarpas), Boolean(hasSombrillas), Boolean(hasPileta), parkingCap, carpasCap, sombrillasCap, poolCap, user.id, pasesCarpa, pasesSombrilla, maxPersonas]
           );
         }
@@ -590,6 +618,7 @@ module.exports = async (req, res) => {
             carpasCapacity: row.carpas_capacity,
             sombrillasCapacity: row.sombrillas_capacity,
             poolMaxOccupancy: row.pool_max_occupancy,
+            plano: row.plano || null,
             ...ajustesIncluidos(row)
           }
         }));
@@ -608,7 +637,7 @@ module.exports = async (req, res) => {
 
       try {
         const result = await db.query(
-          'SELECT * FROM establishments WHERE user_id = $1',
+          'SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
           [user.id]
         );
 
@@ -633,6 +662,7 @@ module.exports = async (req, res) => {
             carpasCapacity: row.carpas_capacity,
             sombrillasCapacity: row.sombrillas_capacity,
             poolMaxOccupancy: row.pool_max_occupancy,
+            plano: row.plano || null,
             ...ajustesIncluidos(row)
           }
         }));
@@ -657,7 +687,7 @@ module.exports = async (req, res) => {
       }
 
       try {
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -745,7 +775,7 @@ module.exports = async (req, res) => {
       if (!user) return;
 
       try {
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -871,7 +901,7 @@ module.exports = async (req, res) => {
           return res.end(JSON.stringify({ error: 'invalid_dates' }));
         }
 
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -920,7 +950,7 @@ module.exports = async (req, res) => {
         const allowedServices = ['carpa', 'sombrilla', 'parking', 'pileta'];
         const allowedStatus = ['active', 'cancelled'];
 
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -1146,7 +1176,7 @@ module.exports = async (req, res) => {
           return responder(res, 400, { error: 'client_required' });
         }
 
-        const estResult = await db.query('SELECT * FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           return responder(res, 404, { error: 'establishment_not_found' });
         }
@@ -1286,7 +1316,7 @@ module.exports = async (req, res) => {
       }
 
       try {
-        const estResult = await db.query('SELECT * FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           return responder(res, 404, { error: 'establishment_not_found' });
         }
@@ -1500,7 +1530,7 @@ module.exports = async (req, res) => {
         const from = url.searchParams.get('from');
         const to = url.searchParams.get('to');
 
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -1587,7 +1617,7 @@ module.exports = async (req, res) => {
       }
 
       try {
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -1682,7 +1712,7 @@ module.exports = async (req, res) => {
         if (!pago) return responder(res, 400, { error: 'missing_required_fields' });
         if (pago.error) return responder(res, 400, { error: pago.error });
 
-        const estResult = await db.query('SELECT * FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) return responder(res, 404, { error: 'establishment_not_found' });
 
         const r = await conTransaccion((query) => incluidos.cobrarCuenta(
@@ -1708,7 +1738,7 @@ module.exports = async (req, res) => {
       if (isNaN(paseId) || paseId <= 0) return responder(res, 400, { error: 'invalid_id' });
 
       try {
-        const estResult = await db.query('SELECT * FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) return responder(res, 404, { error: 'establishment_not_found' });
         const body = method === 'PUT' ? await parseJsonBody(req) : {};
         const r = await conTransaccion((query) => incluidos.rutearPasePersonas(query, estResult.rows[0], paseId, method, body));
@@ -1734,7 +1764,7 @@ module.exports = async (req, res) => {
       }
 
       try {
-        const estResult = await db.query('SELECT * FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -1834,7 +1864,7 @@ module.exports = async (req, res) => {
       }
 
       try {
-        const estResult = await db.query('SELECT * FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');
@@ -1955,6 +1985,28 @@ module.exports = async (req, res) => {
       }
     }
 
+    // ============= /api/usuarios/* =============
+    // Personal del balneario: la logica vive en _usuarios/servicio.js, compartida con el backend local.
+    if (first === 'usuarios') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const body = method === 'POST' || method === 'PATCH' ? await parseJsonBody(req) : {};
+        const r = await usuarios.rutearUsuarios(db.query, user.id, {
+          method,
+          partes: segments.slice(2),
+          body,
+          transaccion: conTransaccion,
+          hashear: (clave) => bcrypt.hash(clave, 12)
+        });
+        return responder(res, r.status, r.body);
+      } catch (error) {
+        console.error('Error en usuarios:', error);
+        return responder(res, 500, { error: 'server_error' });
+      }
+    }
+
     // ============= /api/contrato =============
     // Titulo y condiciones del contrato imprimible: la logica vive en _contrato/servicio.js.
     if (first === 'contrato') {
@@ -1962,7 +2014,7 @@ module.exports = async (req, res) => {
       if (!user) return;
 
       try {
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) return responder(res, 404, { error: 'establishment_not_found' });
         const body = method === 'PUT' ? await parseJsonBody(req) : {};
         const r = await contrato.rutearContrato(db.query, estResult.rows[0].id, { method, partes: segments.slice(2), body });
@@ -1980,7 +2032,7 @@ module.exports = async (req, res) => {
       if (!user) return;
 
       try {
-        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        const estResult = await db.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [user.id]);
         if (estResult.rows.length === 0) {
           res.statusCode = 404;
           res.setHeader('Content-Type', 'application/json');

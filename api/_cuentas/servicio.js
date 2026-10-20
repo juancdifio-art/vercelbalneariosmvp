@@ -16,11 +16,12 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
 
 // Lo que se copia del balneario modelo: toda su configuracion menos el nombre,
-// el dueno y las fechas.
+// el dueno y las fechas. Incluye el plano dibujado y el contrato.
 const COLUMNAS_CONFIG = [
   'has_parking', 'has_carpas', 'has_sombrillas', 'has_pileta',
   'parking_capacity', 'carpas_capacity', 'sombrillas_capacity', 'pool_max_occupancy',
-  'pases_pileta_por_carpa', 'pases_pileta_por_sombrilla', 'max_personas_por_unidad'
+  'pases_pileta_por_carpa', 'pases_pileta_por_sombrilla', 'max_personas_por_unidad',
+  'plano', 'contrato_titulo', 'contrato_condiciones', 'contrato_datos'
 ];
 
 // Postgres rechaza el byte 0 en un texto: se quita antes de validar.
@@ -48,6 +49,9 @@ const mapCuenta = (r) => ({
   administra: r.administra_cuentas === true,
   creada: r.created_at,
   balneario: r.establishment_id ? { id: r.establishment_id, nombre: r.establishment_name } : null,
+  // El encargado del balneario (los demas son su personal): solo un balneario
+  // con su encargado sirve de modelo para copiar.
+  encargado: r.encargado === true,
   reservas: r.reservas ?? 0
 });
 
@@ -68,10 +72,10 @@ function validarAlta(body) {
 async function listar(query) {
   const r = await query(
     `SELECT u.id, u.email, u.role, u.administra_cuentas, u.created_at,
-            e.id AS establishment_id, e.name AS establishment_name,
+            e.id AS establishment_id, e.name AS establishment_name, (e.user_id = u.id) AS encargado,
             (SELECT COUNT(*)::int FROM reservation_groups rg WHERE rg.establishment_id = e.id) AS reservas
        FROM users u
-       LEFT JOIN establishments e ON e.user_id = u.id
+       LEFT JOIN establishments e ON e.id = u.establishment_id
       ORDER BY u.created_at DESC NULLS LAST, u.id DESC`
   );
   return r.rows.map(mapCuenta);
@@ -160,8 +164,9 @@ async function crear(transaccion, hashear, adminId, body) {
       if (datos.copiarDe !== null) {
         est = await crearBalnearioCopiado(q, datos.copiarDe, u.id, datos.nombre);
         if (!est) return falla(404, 'modelo_no_encontrado');
+        await q('UPDATE users SET establishment_id = $1 WHERE id = $2', [est.id, u.id]);
       }
-      const cuenta = mapCuenta({ ...u, establishment_id: est?.id, establishment_name: est?.name, reservas: 0 });
+      const cuenta = mapCuenta({ ...u, establishment_id: est?.id, establishment_name: est?.name, encargado: Boolean(est), reservas: 0 });
       return ok({ cuenta, clave }, 201);
     });
   } catch (error) {

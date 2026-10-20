@@ -83,16 +83,19 @@ describe('listado de cuentas', () => {
   it('trae cada cuenta con su balneario y sus reservas', async () => {
     soy(ADMINISTRADOR);
     responde([
-      { id: 30, email: 'nuevo@balneario.com', role: 'admin', administra_cuentas: false, created_at: '2026-10-20T12:00:00.000Z', establishment_id: null, establishment_name: null, reservas: 0 },
-      { id: 2, email: 'admin@balneario.com', role: 'admin', administra_cuentas: true, created_at: '2025-11-23T10:00:00.000Z', establishment_id: 1, establishment_name: 'Zeus', reservas: 271 }
+      { id: 30, email: 'nuevo@balneario.com', role: 'admin', administra_cuentas: false, created_at: '2026-10-20T12:00:00.000Z', establishment_id: null, establishment_name: null, encargado: null, reservas: 0 },
+      { id: 2, email: 'admin@balneario.com', role: 'admin', administra_cuentas: true, created_at: '2025-11-23T10:00:00.000Z', establishment_id: 1, establishment_name: 'Zeus', encargado: true, reservas: 271 },
+      { id: 8, email: 'empleado@balneario.test', role: 'operador', administra_cuentas: false, created_at: '2026-10-20T13:00:00.000Z', establishment_id: 1, establishment_name: 'Zeus', encargado: false, reservas: 271 }
     ]);
 
     const res = await request(handler).get('/?route=cuentas').set('Authorization', token);
 
     expect(res.status).toBe(200);
     expect(res.body.cuentas).toEqual([
-      { id: 30, email: 'nuevo@balneario.com', rol: 'admin', administra: false, creada: '2026-10-20T12:00:00.000Z', balneario: null, reservas: 0 },
-      { id: 2, email: 'admin@balneario.com', rol: 'admin', administra: true, creada: '2025-11-23T10:00:00.000Z', balneario: { id: 1, nombre: 'Zeus' }, reservas: 271 }
+      { id: 30, email: 'nuevo@balneario.com', rol: 'admin', administra: false, creada: '2026-10-20T12:00:00.000Z', balneario: null, encargado: false, reservas: 0 },
+      { id: 2, email: 'admin@balneario.com', rol: 'admin', administra: true, creada: '2025-11-23T10:00:00.000Z', balneario: { id: 1, nombre: 'Zeus' }, encargado: true, reservas: 271 },
+      // El personal del balneario figura con su rol, sin ser el encargado.
+      { id: 8, email: 'empleado@balneario.test', rol: 'operador', administra: false, creada: '2026-10-20T13:00:00.000Z', balneario: { id: 1, nombre: 'Zeus' }, encargado: false, reservas: 271 }
     ]);
     // Nunca sale el hash de la clave.
     expect(sqlDe(/FROM users u/)[0]).not.toMatch(/password_hash/);
@@ -147,6 +150,10 @@ describe('alta de una cuenta', () => {
     expect(paramsEst).toEqual([30, 'Balneario Nuevo', 1]);
     expect(sqlEst).toMatch(/has_carpas/);
     expect(sqlEst).toMatch(/pases_pileta_por_carpa/);
+    // El plano dibujado y el contrato vienen con la configuracion.
+    expect(sqlEst).toMatch(/plano/);
+    expect(sqlEst).toMatch(/contrato_condiciones/);
+    expect(sqlEst).toMatch(/contrato_datos/);
 
     const periodos = queryMock.mock.calls.filter(([sql]) => /INSERT INTO periodos_tarifarios/.test(sql));
     expect(periodos.map(([, p]) => p)).toEqual([[40, 'Alta', 1, 1, 1, 31, 2], [40, 'Temporada', 12, 15, 3, 15, 1]]);

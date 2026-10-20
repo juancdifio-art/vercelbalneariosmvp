@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { SalirIcon } from '../icons';
 import { fechaCorta } from '../../lib/formato';
 import { pedirCuentas } from '../../hooks/useCuentas';
+import { ETIQUETA_ROL } from '../../lib/usuariosApi';
 
 const SIN_MODELO = '';
 
@@ -43,7 +44,8 @@ function PanelCuentas({ userEmail, onLogout, embebida = false }) {
     cargar();
   }, [cargar]);
 
-  const modelos = cuentas.filter((c) => c.balneario);
+  // De modelo sirve cada balneario una sola vez: el de su encargado, no el de su personal.
+  const modelos = cuentas.filter((c) => c.balneario && c.encargado !== false);
   const miEmail = String(userEmail || '').toLowerCase();
 
   const crear = async (e) => {
@@ -135,7 +137,7 @@ function PanelCuentas({ userEmail, onLogout, embebida = false }) {
         </div>
         {modelo !== SIN_MODELO && (
           <p className="text-[12px] text-slate-500">
-            Se copian los servicios, las capacidades, los períodos, los sectores y las tarifas. No se copian clientes ni reservas.
+            Se copian los servicios, las capacidades, el plano, los períodos, los sectores, las tarifas y el contrato. No se copian clientes ni reservas.
           </p>
         )}
         {errorAlta && <p role="alert" className="text-[12px] text-rose-700">{errorAlta}</p>}
@@ -196,6 +198,7 @@ function PanelCuentas({ userEmail, onLogout, embebida = false }) {
                       <span className="break-all">{c.email}</span>
                       {c.administra && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-800">Administrador</span>}
                       {c.rol === 'soporte' && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700">Soporte</span>}
+                      {(c.rol === 'operador' || c.rol === 'pileta') && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">{ETIQUETA_ROL[c.rol]}</span>}
                     </p>
                     <p className="text-[12px] text-slate-500">
                       {c.balneario ? c.balneario.nombre : 'Sin balneario'}

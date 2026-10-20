@@ -4,7 +4,7 @@ import { format } from '../lib/dates';
 import { ServiceIcon } from './icons';
 import { diasOcupadaDesde, reservaEnFecha, proximaReserva, estacionamientoVinculado, cuentaDe } from '../lib/reservas';
 import { numerosDeUnidades } from '../lib/unidades';
-import { PLANO_ACTIVO } from '../config/planoZeus';
+import { planoDe } from '../config/planos';
 import PlanoBalneario from './PlanoBalneario';
 import PlanoCompletoOverlay from './PlanoCompletoOverlay';
 import TooltipFlotante from './TooltipFlotante';
@@ -28,9 +28,10 @@ function DailyViewSection({
   onViewReservationDetails,
   onOpenNewCarpaReservation,
   onOpenNewSombrillaReservation,
-  onOpenNewParkingReservation,
-  conPlano = PLANO_ACTIVO
+  onOpenNewParkingReservation
 }) {
+  // Carpas y sombrillas se ven sobre el plano si el balneario tiene uno dibujado.
+  const conPlano = Boolean(planoDe(establishment));
   const [dayOffset, setDayOffset] = useState(0);
   const [selectedServiceId, setSelectedServiceId] = useState(null);
   // Con plano, carpas y sombrillas se ven sobre el plano; la lista queda a mano.
@@ -70,7 +71,7 @@ function DailyViewSection({
   const services = useMemo(() => {
     const armar = (id, label, habilitado) => {
       if (!habilitado) return null;
-      const unidades = numerosDeUnidades(establishment, TIPO_DE_SERVICIO[id], conPlano);
+      const unidades = numerosDeUnidades(establishment, TIPO_DE_SERVICIO[id]);
       return {
         id,
         label,

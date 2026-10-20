@@ -47,7 +47,7 @@ function validarMensaje(body, { delEstablecimiento }) {
 
 async function quienEs(query, userId) {
   const r = await query(
-    'SELECT u.role, u.atiende_soporte, e.id AS establishment_id FROM users u LEFT JOIN establishments e ON e.user_id = u.id WHERE u.id = $1',
+    'SELECT u.role, u.atiende_soporte, u.establishment_id FROM users u WHERE u.id = $1',
     [userId]
   );
   return r.rows[0] || null;

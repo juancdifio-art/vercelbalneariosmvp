@@ -70,7 +70,7 @@ module.exports = async (req, res) => {
     }
 
     const estResult = await db.query(
-      'SELECT id, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy FROM establishments WHERE user_id = $1',
+      'SELECT id, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [user.id]
     );
 

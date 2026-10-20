@@ -2,13 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { getApiBaseUrl } from '../apiConfig';
 import EstablishmentConfigForm from './EstablishmentConfigForm';
 import ContratoConfig from './ContratoConfig';
+import UsuariosPanel from './usuarios/UsuariosPanel';
+import { ETIQUETA_ROL } from '../lib/usuariosApi';
 
 const API_BASE_URL = getApiBaseUrl();
-
-const ETIQUETA_ROL = {
-  admin: 'Administrador',
-  operador: 'Operador'
-};
 
 /**
  * Panel de usuario: perfil y configuracion del establecimiento.
@@ -21,13 +18,17 @@ const ETIQUETA_ROL = {
  * cableado, y la firma de EstablishmentConfigForm queda intacta para que el
  * onboarding la siga usando igual.
  */
+// `soloEncargado`: la configuracion, el contrato y los usuarios los ve solo el
+// encargado; el resto del personal ve su perfil.
 const SOLAPAS = [
   { id: 'perfil', label: 'Perfil' },
-  { id: 'establecimiento', label: 'Establecimiento' },
-  { id: 'contrato', label: 'Contrato' }
+  { id: 'establecimiento', label: 'Establecimiento', soloEncargado: true },
+  { id: 'contrato', label: 'Contrato', soloEncargado: true },
+  { id: 'usuarios', label: 'Usuarios', soloEncargado: true }
 ];
 
-function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimiento }) {
+function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimiento, rol = 'admin' }) {
+  const solapas = SOLAPAS.filter((s) => !s.soloEncargado || rol === 'admin');
   const [solapa, setSolapa] = useState('perfil');
   const [perfil, setPerfil] = useState(null);
 
@@ -171,7 +172,7 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
   return (
     <div className="rounded-xl bg-sky-50 border border-cyan-100 px-4 py-4 text-sm">
       <div className="flex gap-1 border-b border-cyan-200 mb-4">
-        {SOLAPAS.map((s) => (
+        {solapas.map((s) => (
           <button
             key={s.id}
             type="button"
@@ -295,7 +296,7 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
         </div>
       )}
 
-      {solapa === 'establecimiento' && (
+      {solapa === 'establecimiento' && rol === 'admin' && (
         <div>
           <p className="text-[11px] text-slate-600 mb-4">
             Actualizá el nombre y los servicios del establecimiento. Los cambios impactan en todas las secciones.
@@ -304,7 +305,9 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
         </div>
       )}
 
-      {solapa === 'contrato' && (
+      {solapa === 'usuarios' && rol === 'admin' && <UsuariosPanel />}
+
+      {solapa === 'contrato' && rol === 'admin' && (
         <ContratoConfig
           establishment={{
             name: establecimiento?.estName,

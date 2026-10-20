@@ -44,3 +44,18 @@ export function groupNavItems(navItems) {
     }))
     .filter((group) => group.items.length > 0);
 }
+
+/**
+ * Las secciones que ve cada rol del personal. El encargado ve todas; un
+ * empleado, todas menos Tarifas; el de pileta, la vista rapida, la pileta y su
+ * perfil. Es solo lo que se muestra: la API vuelve a controlar cada pedido.
+ */
+const OCULTAS_POR_ROL = {
+  operador: ['tarifas'],
+  pileta: ['inicio', 'reservas', 'carpas', 'sombrillas', 'estacionamiento', 'clientes', 'reportes', 'tarifas']
+};
+
+export function seccionesDelRol(navItems, rol) {
+  const ocultas = OCULTAS_POR_ROL[rol] || [];
+  return (navItems || []).filter((item) => !ocultas.includes(item.id));
+}

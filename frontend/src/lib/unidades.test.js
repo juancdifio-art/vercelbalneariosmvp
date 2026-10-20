@@ -3,6 +3,7 @@ import { numerosDeUnidades, capacidadDelPlano } from './unidades';
 import { NUMEROS_CARPAS, NUMEROS_SOMBRILLAS } from '../config/planoZeus';
 
 const est = { carpasCapacity: '5', sombrillasCapacity: '3', parkingCapacity: '4' };
+const conZeus = { ...est, plano: 'zeus' };
 
 describe('plano de Zeus', () => {
   it('tiene 117 carpas numeradas del 1 al 134, sin repetidas', () => {
@@ -20,31 +21,35 @@ describe('plano de Zeus', () => {
 });
 
 describe('numerosDeUnidades', () => {
-  it('con plano, carpas y sombrillas salen del plano y no de la capacidad', () => {
-    expect(numerosDeUnidades(est, 'carpa', true)).toEqual(NUMEROS_CARPAS);
-    expect(numerosDeUnidades(est, 'sombrilla', true)).toEqual(NUMEROS_SOMBRILLAS);
+  it('con plano, carpas y sombrillas salen del plano del establecimiento y no de la capacidad', () => {
+    expect(numerosDeUnidades(conZeus, 'carpa')).toEqual(NUMEROS_CARPAS);
+    expect(numerosDeUnidades(conZeus, 'sombrilla')).toEqual(NUMEROS_SOMBRILLAS);
+  });
+
+  it('una clave de plano que no existe es como no tener plano', () => {
+    expect(numerosDeUnidades({ ...est, plano: 'otro' }, 'carpa')).toEqual([1, 2, 3, 4, 5]);
   });
 
   it('el estacionamiento sigue siendo 1..capacidad aunque haya plano', () => {
-    expect(numerosDeUnidades(est, 'parking', true)).toEqual([1, 2, 3, 4]);
+    expect(numerosDeUnidades(conZeus, 'parking')).toEqual([1, 2, 3, 4]);
   });
 
   it('sin plano, es 1..capacidad', () => {
-    expect(numerosDeUnidades(est, 'carpa', false)).toEqual([1, 2, 3, 4, 5]);
-    expect(numerosDeUnidades(est, 'sombrilla', false)).toEqual([1, 2, 3]);
+    expect(numerosDeUnidades(est, 'carpa')).toEqual([1, 2, 3, 4, 5]);
+    expect(numerosDeUnidades(est, 'sombrilla')).toEqual([1, 2, 3]);
   });
 
   it('sin establecimiento o sin capacidad devuelve lista vacia', () => {
-    expect(numerosDeUnidades(null, 'parking', true)).toEqual([]);
-    expect(numerosDeUnidades({ carpasCapacity: '' }, 'carpa', false)).toEqual([]);
+    expect(numerosDeUnidades(null, 'parking')).toEqual([]);
+    expect(numerosDeUnidades({ carpasCapacity: '' }, 'carpa')).toEqual([]);
   });
 });
 
 describe('capacidadDelPlano', () => {
   it('da la cantidad relevada para carpas y sombrillas', () => {
-    expect(capacidadDelPlano('carpa', true)).toBe(117);
-    expect(capacidadDelPlano('sombrilla', true)).toBe(220);
-    expect(capacidadDelPlano('parking', true)).toBeNull();
-    expect(capacidadDelPlano('carpa', false)).toBeNull();
+    expect(capacidadDelPlano(conZeus, 'carpa')).toBe(117);
+    expect(capacidadDelPlano(conZeus, 'sombrilla')).toBe(220);
+    expect(capacidadDelPlano(conZeus, 'parking')).toBeNull();
+    expect(capacidadDelPlano(est, 'carpa')).toBeNull();
   });
 });

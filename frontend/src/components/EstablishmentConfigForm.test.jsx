@@ -40,3 +40,18 @@ describe('EstablishmentConfigForm: servicios incluidos', () => {
     expect(screen.getByLabelText('Máximo de personas por unidad')).toBeInTheDocument();
   });
 });
+
+describe('EstablishmentConfigForm: capacidad y plano', () => {
+  it('con el plano de Zeus, la cantidad de sombrillas queda en la del plano', () => {
+    const setEstSombrillasCapacity = vi.fn();
+    render(<EstablishmentConfigForm {...BASE} estPlano="zeus" setEstSombrillasCapacity={setEstSombrillasCapacity} />);
+    // 218 no es lo que dice el plano (220): se corrige solo.
+    expect(setEstSombrillasCapacity).toHaveBeenCalledWith('220');
+  });
+
+  it('sin plano la cantidad es la que se escribe', () => {
+    const setEstSombrillasCapacity = vi.fn();
+    render(<EstablishmentConfigForm {...BASE} setEstSombrillasCapacity={setEstSombrillasCapacity} />);
+    expect(setEstSombrillasCapacity).not.toHaveBeenCalled();
+  });
+});

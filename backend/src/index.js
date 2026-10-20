@@ -22,6 +22,8 @@ const { enTransaccion } = require('../../api/_incluidos/transaccion');
 const soporte = require('../../api/_soporte/servicio');
 const cuentas = require('../../api/_cuentas/servicio');
 const contrato = require('../../api/_contrato/servicio');
+const permisos = require('../../api/_permisos/permisos');
+const usuarios = require('../../api/_usuarios/servicio');
 
 async function conTransaccion(fn) {
   const client = await pool.connect();
@@ -95,6 +97,31 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Control de roles: el personal de un balneario (empleado, pileta) solo usa lo
+// que su rol le permite (api/_permisos/permisos.js). El rol se lee de la base
+// en cada pedido. Sin token valido sigue de largo: la ruta contesta 401.
+app.use('/api', async (req, res, next) => {
+  // En minusculas: Express rutea /api/Establishment igual que /api/establishment.
+  const recurso = (req.path.split('/').filter(Boolean)[0] || '').toLowerCase();
+  if (req.method === 'OPTIONS' || !permisos.controla(recurso)) return next();
+  const token = (req.headers.authorization || '').split(' ')[1];
+  if (!token) return next();
+  let userId;
+  try {
+    userId = jwt.verify(token, JWT_SECRET).userId;
+  } catch (err) {
+    return next();
+  }
+  try {
+    const rol = (await pool.query(permisos.CONSULTA_ROL, [userId])).rows[0]?.role;
+    if (!permisos.puede(rol, req.method, recurso)) return res.status(403).json({ error: 'sin_permiso' });
+    return next();
+  } catch (error) {
+    console.error('Error en el control de roles', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
 
 const PORT = process.env.PORT || 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change_this_secret';
@@ -323,7 +350,7 @@ app.get('/api/establishment/me', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     const result = await pool.query(
-      'SELECT * FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -345,6 +372,7 @@ app.get('/api/establishment/me', authenticateToken, async (req, res) => {
         carpasCapacity: row.carpas_capacity,
         sombrillasCapacity: row.sombrillas_capacity,
         poolMaxOccupancy: row.pool_max_occupancy,
+        plano: row.plano || null,
         ...ajustesIncluidos(row)
       }
     });
@@ -374,7 +402,7 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
     }
 
     const existing = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -432,9 +460,11 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
           maxPersonas
         ]
       );
+      // El encargado queda apuntando a su balneario, como el resto del personal.
+      await pool.query('UPDATE users SET establishment_id = $1 WHERE id = $2', [result.rows[0].id, userId]);
     } else {
       result = await pool.query(
-        'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9, pases_pileta_por_carpa = COALESCE($11, pases_pileta_por_carpa), pases_pileta_por_sombrilla = COALESCE($12, pases_pileta_por_sombrilla), max_personas_por_unidad = COALESCE($13, max_personas_por_unidad) WHERE user_id = $10 RETURNING *',
+        'UPDATE establishments SET name = $1, has_parking = $2, has_carpas = $3, has_sombrillas = $4, has_pileta = $5, parking_capacity = $6, carpas_capacity = $7, sombrillas_capacity = $8, pool_max_occupancy = $9, pases_pileta_por_carpa = COALESCE($11, pases_pileta_por_carpa), pases_pileta_por_sombrilla = COALESCE($12, pases_pileta_por_sombrilla), max_personas_por_unidad = COALESCE($13, max_personas_por_unidad) WHERE id = (SELECT establishment_id FROM users WHERE id = $10) RETURNING *',
         [
           name,
           Boolean(hasParking),
@@ -467,6 +497,7 @@ app.post('/api/establishment', authenticateToken, async (req, res) => {
         carpasCapacity: row.carpas_capacity,
         sombrillasCapacity: row.sombrillas_capacity,
         poolMaxOccupancy: row.pool_max_occupancy,
+        plano: row.plano || null,
         ...ajustesIncluidos(row)
       }
     });
@@ -481,7 +512,7 @@ app.get('/api/clients', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -574,7 +605,7 @@ app.post('/api/clients', authenticateToken, async (req, res) => {
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -712,7 +743,7 @@ app.patch('/api/clients/:id', authenticateToken, async (req, res) => {
     } = req.body;
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -893,7 +924,7 @@ app.delete('/api/clients/:id', authenticateToken, async (req, res) => {
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -944,7 +975,7 @@ app.get('/api/reservations', authenticateToken, async (req, res) => {
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -1000,7 +1031,7 @@ app.get('/api/reservation-groups', authenticateToken, async (req, res) => {
     const allowedStatus = ['active', 'cancelled'];
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -1240,7 +1271,7 @@ app.post('/api/reservation-groups', authenticateToken, async (req, res) => {
     }
 
     const estResult = await pool.query(
-      'SELECT * FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -1537,7 +1568,7 @@ app.patch('/api/reservation-groups/:id', authenticateToken, async (req, res) => 
     }
 
     const estResult = await pool.query(
-      'SELECT * FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -1800,7 +1831,7 @@ app.get('/api/reservation-groups/payments', authenticateToken, async (req, res) 
     const { limit, from, to } = req.query;
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -1883,7 +1914,7 @@ app.get('/api/reservation-groups/:id/payments', authenticateToken, async (req, r
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -1959,7 +1990,7 @@ app.post('/api/reservation-groups/:id/payments', authenticateToken, async (req, 
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -2041,7 +2072,7 @@ const parseGuestAge = (age) => {
 // Devuelve el establecimiento del usuario y valida que la reserva sea suya.
 const resolveGuestScope = async (userId, groupId) => {
   const estResult = await pool.query(
-    'SELECT id FROM establishments WHERE user_id = $1',
+    'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
     [userId]
   );
 
@@ -2159,7 +2190,7 @@ app.patch('/api/reservation-guests/:guestId', authenticateToken, async (req, res
     }
 
     const estResult = await pool.query(
-      'SELECT * FROM establishments WHERE user_id = $1',
+      'SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [req.user.id]
     );
 
@@ -2224,7 +2255,7 @@ app.delete('/api/reservation-guests/:guestId', authenticateToken, async (req, re
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [req.user.id]
     );
 
@@ -2275,7 +2306,7 @@ app.post('/api/reservation-groups/:id/pago-cuenta', authenticateToken, async (re
     if (!pago) return res.status(400).json({ error: 'missing_required_fields' });
     if (pago.error) return res.status(400).json({ error: pago.error });
 
-    const estResult = await pool.query('SELECT * FROM establishments WHERE user_id = $1', [req.user.id]);
+    const estResult = await pool.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [req.user.id]);
     if (estResult.rows.length === 0) {
       return res.status(404).json({ error: 'establishment_not_found' });
     }
@@ -2299,7 +2330,7 @@ const pasePersonas = async (req, res) => {
     if (!paseId || Number.isNaN(paseId) || paseId <= 0) {
       return res.status(400).json({ error: 'invalid_id' });
     }
-    const estResult = await pool.query('SELECT * FROM establishments WHERE user_id = $1', [req.user.id]);
+    const estResult = await pool.query('SELECT * FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [req.user.id]);
     if (estResult.rows.length === 0) {
       return res.status(404).json({ error: 'establishment_not_found' });
     }
@@ -2347,10 +2378,27 @@ app.all(/^\/api\/cuentas(\/.*)?$/, authenticateToken, async (req, res) => {
   }
 });
 
+// Personal del balneario. La logica vive en api/_usuarios/servicio.js.
+app.all(/^\/api\/usuarios(\/.*)?$/, authenticateToken, async (req, res) => {
+  try {
+    const r = await usuarios.rutearUsuarios(queryTarifas, req.user.id, {
+      method: req.method,
+      partes: req.path.split('/').filter(Boolean).slice(2),
+      body: req.body || {},
+      transaccion: conTransaccion,
+      hashear: (clave) => bcrypt.hash(clave, 12)
+    });
+    return res.status(r.status).json(r.body);
+  } catch (error) {
+    console.error('Error en usuarios', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
 // Titulo y condiciones del contrato imprimible. La logica vive en api/_contrato/servicio.js.
 app.all(/^\/api\/contrato(\/.*)?$/, authenticateToken, async (req, res) => {
   try {
-    const estResult = await pool.query('SELECT id FROM establishments WHERE user_id = $1', [req.user.id]);
+    const estResult = await pool.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [req.user.id]);
     if (estResult.rows.length === 0) {
       return res.status(404).json({ error: 'establishment_not_found' });
     }
@@ -2368,7 +2416,7 @@ app.all(/^\/api\/contrato(\/.*)?$/, authenticateToken, async (req, res) => {
 
 app.all(/^\/api\/tarifas(\/.*)?$/, authenticateToken, async (req, res) => {
   try {
-    const estResult = await pool.query('SELECT id FROM establishments WHERE user_id = $1', [req.user.id]);
+    const estResult = await pool.query('SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)', [req.user.id]);
     if (estResult.rows.length === 0) {
       return res.status(404).json({ error: 'establishment_not_found' });
     }
@@ -2402,7 +2450,7 @@ app.get('/api/reports/payments', authenticateToken, async (req, res) => {
     }
 
     const estResult = await pool.query(
-      'SELECT id FROM establishments WHERE user_id = $1',
+      'SELECT id FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
@@ -2569,7 +2617,7 @@ app.get('/api/reports/occupancy', authenticateToken, async (req, res) => {
     }
 
     const estResult = await pool.query(
-      'SELECT id, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy FROM establishments WHERE user_id = $1',
+      'SELECT id, has_parking, has_carpas, has_sombrillas, has_pileta, parking_capacity, carpas_capacity, sombrillas_capacity, pool_max_occupancy FROM establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)',
       [userId]
     );
 
