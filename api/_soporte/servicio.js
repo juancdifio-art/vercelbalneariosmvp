@@ -154,6 +154,8 @@ async function noLeidos(query, yo) {
 async function rutearSoporte(query, userId, { method, partes, body, transaccion }) {
   const yo = await quienEs(query, userId);
   if (!yo) return falla(401, 'user_not_found');
+  // El chat es de la administracion: el personal (empleados, pileta) no lo usa.
+  if (yo.role === 'operador' || yo.role === 'pileta') return falla(403, 'solo_encargado');
   const [recurso = '', idTexto, sobra] = partes;
   if (sobra !== undefined) return falla(404, 'not_found');
 

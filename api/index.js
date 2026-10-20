@@ -286,7 +286,8 @@ module.exports = async (req, res) => {
       const quien = usuarioDelToken(req);
       if (quien) {
         const rol = (await db.query(permisos.CONSULTA_ROL, [quien.id])).rows[0]?.role;
-        if (!permisos.puede(rol, method, first)) return responder(res, 403, { error: 'sin_permiso' });
+        const detalle = { partes: segments.slice(2), servicio: url.searchParams.get('service') };
+        if (!permisos.puede(rol, method, first, detalle)) return responder(res, 403, { error: 'sin_permiso' });
       }
     }
 

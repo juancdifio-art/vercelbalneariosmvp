@@ -103,7 +103,8 @@ app.use(express.json());
 // en cada pedido. Sin token valido sigue de largo: la ruta contesta 401.
 app.use('/api', async (req, res, next) => {
   // En minusculas: Express rutea /api/Establishment igual que /api/establishment.
-  const recurso = (req.path.split('/').filter(Boolean)[0] || '').toLowerCase();
+  const [primero = '', ...partes] = req.path.split('/').filter(Boolean);
+  const recurso = primero.toLowerCase();
   if (req.method === 'OPTIONS' || !permisos.controla(recurso)) return next();
   const token = (req.headers.authorization || '').split(' ')[1];
   if (!token) return next();
@@ -115,7 +116,9 @@ app.use('/api', async (req, res, next) => {
   }
   try {
     const rol = (await pool.query(permisos.CONSULTA_ROL, [userId])).rows[0]?.role;
-    if (!permisos.puede(rol, req.method, recurso)) return res.status(403).json({ error: 'sin_permiso' });
+    if (!permisos.puede(rol, req.method, recurso, { partes, servicio: req.query.service ?? null })) {
+      return res.status(403).json({ error: 'sin_permiso' });
+    }
     return next();
   } catch (error) {
     console.error('Error en el control de roles', error);

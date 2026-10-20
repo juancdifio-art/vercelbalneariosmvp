@@ -134,6 +134,8 @@ function PiletaSection({
               </p>
             </div>
           </div>
+          {/* Sin onOpenNewPoolPass (el rol pileta, que solo mira) no se ofrece el alta. */}
+          {onOpenNewPoolPass && (
           <button
             type="button"
             onClick={onOpenNewPoolPass}
@@ -144,6 +146,7 @@ function PiletaSection({
             </svg>
             Nuevo Pase
           </button>
+          )}
         </div>
       </div>
 
@@ -338,6 +341,7 @@ function PiletaSection({
             <p className="text-sm text-slate-500 mb-6 max-w-md mx-auto">
               Comenzá a gestionar la ocupación de tu pileta creando el primer pase
             </p>
+            {onOpenNewPoolPass && (
             <button
               type="button"
               onClick={onOpenNewPoolPass}
@@ -348,6 +352,7 @@ function PiletaSection({
               </svg>
               Crear Primer Pase
             </button>
+            )}
           </div>
         )}
 
@@ -565,6 +570,7 @@ function PiletaSection({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right">
+                        {onViewReservationDetails && (
                         <button
                           type="button"
                           className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-500 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:shadow-md hover:from-cyan-600 hover:to-blue-600 disabled:opacity-60 disabled:cursor-not-allowed transition-all"
@@ -577,6 +583,7 @@ function PiletaSection({
                           </svg>
                           Ver Detalle
                         </button>
+                        )}
                       </td>
                     </tr>
                   );

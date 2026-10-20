@@ -47,15 +47,25 @@ export function groupNavItems(navItems) {
 
 /**
  * Las secciones que ve cada rol del personal. El encargado ve todas; un
- * empleado, todas menos Tarifas; el de pileta, la vista rapida, la pileta y su
- * perfil. Es solo lo que se muestra: la API vuelve a controlar cada pedido.
+ * empleado, todas menos Tarifas; el de pileta, solo la Pileta y su perfil (lo
+ * usa desde el celular). Es solo lo que se muestra: la API vuelve a controlar
+ * cada pedido.
  */
-const OCULTAS_POR_ROL = {
-  operador: ['tarifas'],
-  pileta: ['inicio', 'reservas', 'carpas', 'sombrillas', 'estacionamiento', 'clientes', 'reportes', 'tarifas']
-};
+const OCULTAS_POR_ROL = { operador: ['tarifas'] };
+const SOLO_ESTAS_POR_ROL = { pileta: ['pileta', 'panel-usuario'] };
+
+const visibleParaRol = (id, rol) =>
+  SOLO_ESTAS_POR_ROL[rol] ? SOLO_ESTAS_POR_ROL[rol].includes(id) : !(OCULTAS_POR_ROL[rol] || []).includes(id);
 
 export function seccionesDelRol(navItems, rol) {
-  const ocultas = OCULTAS_POR_ROL[rol] || [];
-  return (navItems || []).filter((item) => !ocultas.includes(item.id));
+  return (navItems || []).filter((item) => visibleParaRol(item.id, rol));
 }
+
+/** La seccion a mostrar: la pedida si el rol la ve, o la primera que ve. */
+export function seccionPermitida(id, rol) {
+  if (visibleParaRol(id, rol)) return id;
+  return SOLO_ESTAS_POR_ROL[rol]?.[0] ?? 'inicio';
+}
+
+/** El personal (empleados, pileta) no usa el chat de soporte: es de la administracion. */
+export const usaSoporte = (rol) => rol !== 'operador' && rol !== 'pileta';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seccionesDelRol } from './sections';
+import { seccionesDelRol, seccionPermitida, usaSoporte } from './sections';
 
 const TODAS = ['inicio', 'vista-diaria', 'reservas', 'carpas', 'pileta', 'clientes', 'reportes', 'tarifas', 'panel-usuario'].map((id) => ({ id }));
 const ids = (items) => items.map((i) => i.id);
@@ -14,8 +14,21 @@ describe('secciones por rol', () => {
     expect(ids(seccionesDelRol(TODAS, 'operador'))).toContain('reportes');
   });
 
-  it('pileta ve la vista rapida, la pileta y su perfil', () => {
-    expect(ids(seccionesDelRol(TODAS, 'pileta'))).toEqual(['vista-diaria', 'pileta', 'panel-usuario']);
+  it('pileta ve solo la pileta y su perfil', () => {
+    expect(ids(seccionesDelRol(TODAS, 'pileta'))).toEqual(['pileta', 'panel-usuario']);
+  });
+
+  it('si el rol no ve la seccion abierta, va a una que ve', () => {
+    expect(seccionPermitida('inicio', 'pileta')).toBe('pileta');
+    expect(seccionPermitida('panel-usuario', 'pileta')).toBe('panel-usuario');
+    expect(seccionPermitida('tarifas', 'operador')).toBe('inicio');
+    expect(seccionPermitida('tarifas', 'admin')).toBe('tarifas');
+  });
+
+  it('el chat de soporte es de la administracion', () => {
+    expect(usaSoporte('admin')).toBe(true);
+    expect(usaSoporte('operador')).toBe(false);
+    expect(usaSoporte('pileta')).toBe(false);
   });
 
   it('sin rol conocido no oculta nada', () => {

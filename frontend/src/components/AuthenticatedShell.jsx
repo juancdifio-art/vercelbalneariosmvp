@@ -18,6 +18,8 @@ function AuthenticatedShell({
   onToggleSidebar,
   onLogout,
   navItems,
+  // El chat de soporte es de la administracion: el personal no lo ve.
+  conSoporte = true,
   children
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -31,7 +33,7 @@ function AuthenticatedShell({
     noLeidos: soporteNoLeidos,
     bandeja: bandejaNoLeidos,
     refrescar: refrescarSoporte
-  } = useNoLeidosSoporte(true);
+  } = useNoLeidosSoporte(conSoporte);
   const atiendeSoporte = bandejaNoLeidos !== null;
   const itemsMenu = atiendeSoporte
     ? [...(navItems || []), { id: SECCION_BANDEJA, label: 'Bandeja de soporte', group: 'admin', badge: bandejaNoLeidos }]
@@ -128,6 +130,7 @@ function AuthenticatedShell({
             ))}
 
             <div className="border-t border-white/10 pt-3">
+              {conSoporte && (
               <button
                 type="button"
                 onClick={abrirSoporte}
@@ -139,6 +142,7 @@ function AuthenticatedShell({
                   <span className="rounded-full bg-cyan-400 px-1.5 text-[10px] font-bold leading-4 text-sky-950">{soporteNoLeidos}</span>
                 )}
               </button>
+              )}
               <p className="mb-2 truncate px-1 text-[11px] text-sky-200/80">{userEmail}</p>
               <button
                 type="button"
@@ -172,7 +176,7 @@ function AuthenticatedShell({
         onToggleSidebar={onToggleSidebar}
         onLogout={onLogout}
         navItems={itemsMenu}
-        onAbrirSoporte={abrirSoporte}
+        onAbrirSoporte={conSoporte ? abrirSoporte : undefined}
         soporteNoLeidos={soporteNoLeidos}
       />
 
@@ -185,6 +189,7 @@ function AuthenticatedShell({
         </div>
       </main>
 
+      {conSoporte && (
       <SoportePanel
         abierto={soporteAbierto}
         onCerrar={cerrarSoporte}
@@ -194,6 +199,7 @@ function AuthenticatedShell({
         noLeidos={soporteNoLeidos}
         onLeido={refrescarSoporte}
       />
+      )}
     </div>
   );
 }

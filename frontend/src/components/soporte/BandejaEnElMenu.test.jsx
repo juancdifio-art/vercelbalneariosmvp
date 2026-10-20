@@ -62,3 +62,12 @@ describe('la bandeja de soporte en el menu de un balneario', () => {
     expect(within(menu).getByText('Clientes')).toBeInTheDocument();
   });
 });
+
+describe('el personal del balneario', () => {
+  it('no ve el boton de Soporte ni pregunta los no leidos', async () => {
+    render(shell({ conSoporte: false }));
+    await screen.findAllByRole('button', { name: /Inicio/ });
+    expect(screen.queryByRole('button', { name: /^Soporte/ })).not.toBeInTheDocument();
+    expect(global.fetch.mock.calls.some(([url]) => /\/soporte\//.test(url))).toBe(false);
+  });
+});

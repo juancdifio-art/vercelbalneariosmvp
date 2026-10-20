@@ -27,3 +27,12 @@ describe('seccion Pileta con pases vinculados a una carpa', () => {
     expect(screen.getAllByText(/Carpa 12/)).toHaveLength(3);
   });
 });
+
+describe('la seccion Pileta para el rol pileta', () => {
+  it('sin acciones muestra los pases y quien los tiene, sin alta ni detalle', () => {
+    render(<PiletaSection establishment={{ hasPileta: true }} reservationGroups={PASES} reservationGroupsLoading={false} />);
+    expect(screen.getByText('Lucia, Ana')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Nuevo Pase/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ver Detalle/ })).not.toBeInTheDocument();
+  });
+});
