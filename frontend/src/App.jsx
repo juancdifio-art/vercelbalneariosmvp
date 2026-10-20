@@ -34,7 +34,7 @@ import useAuth from './hooks/useAuth';
 import useEstablishment from './hooks/useEstablishment';
 import useClients from './hooks/useClients';
 import { useAccesoCuentas } from './hooks/useCuentas';
-import { seccionesDelRol, seccionPermitida, usaSoporte } from './config/sections';
+import { seccionesDelRol, seccionPermitida, seccionVisible, usaSoporte } from './config/sections';
 import { getApiBaseUrl } from './apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -2417,7 +2417,7 @@ function App() {
     // Cada rol del personal ve sus secciones (la API igual controla cada
     // pedido). Si la seccion abierta no es una de las suyas, se ve la primera.
     const navDelRol = seccionesDelRol(navItems, userRole);
-    const seccionActiva = navDelRol.some((item) => item.id === activeSection) ? activeSection : navDelRol[0]?.id;
+    const seccionActiva = seccionVisible(activeSection, navDelRol);
 
     const sectionTitleMap = {
       inicio: 'Resumen general',

@@ -67,5 +67,21 @@ export function seccionPermitida(id, rol) {
   return SOLO_ESTAS_POR_ROL[rol]?.[0] ?? 'inicio';
 }
 
+/**
+ * Secciones que arma AuthenticatedShell por su cuenta: no estan en los
+ * navItems de App.jsx (la Bandeja de soporte aparece solo si la cuenta atiende).
+ */
+export const SECCIONES_DEL_SHELL = ['bandeja-soporte'];
+
+/**
+ * La seccion que se muestra: la abierta si esta en el menu del rol o la arma
+ * el shell; si no, la primera del menu.
+ */
+export function seccionVisible(activeSection, navDelRol) {
+  if (SECCIONES_DEL_SHELL.includes(activeSection)) return activeSection;
+  if ((navDelRol || []).some((item) => item.id === activeSection)) return activeSection;
+  return navDelRol?.[0]?.id;
+}
+
 /** El personal (empleados, pileta) no usa el chat de soporte: es de la administracion. */
 export const usaSoporte = (rol) => rol !== 'operador' && rol !== 'pileta';

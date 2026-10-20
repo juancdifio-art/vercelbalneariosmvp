@@ -6,7 +6,8 @@ import { isWideSection, DEFAULT_MAX_WIDTH, groupNavItems } from '../config/secti
 import { NavIcon, SalirIcon, SoporteIcon } from './icons';
 import { useNoLeidosSoporte } from '../hooks/useSoporte';
 
-// Seccion que el shell suma por su cuenta (no la arma App.jsx).
+// Seccion que el shell suma por su cuenta (no la arma App.jsx): esta en
+// SECCIONES_DEL_SHELL de config/sections.js para que App.jsx la deje mostrar.
 const SECCION_BANDEJA = 'bandeja-soporte';
 
 function AuthenticatedShell({
