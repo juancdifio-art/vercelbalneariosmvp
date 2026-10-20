@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { format } from '../lib/dates';
-import { etiquetaVinculo } from '../lib/incluidos';
+import { etiquetaVinculo, esPiletaIncluida, textoPiletaIncluida } from '../lib/incluidos';
 import { formatPesos } from '../lib/money';
 function PiletaSection({
   establishment,
@@ -537,6 +537,9 @@ function PiletaSection({
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        {esPiletaIncluida(group) ? (
+                          <span className="text-xs text-slate-500">{textoPiletaIncluida(group)}</span>
+                        ) : (
                         <div className="flex flex-col gap-1">
                           <div className="flex items-baseline gap-1.5">
                             <span className="text-xs text-slate-500">Pagado:</span>
@@ -551,6 +554,7 @@ function PiletaSection({
                             </div>
                           )}
                         </div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-center">
                         <span

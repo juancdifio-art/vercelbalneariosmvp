@@ -272,3 +272,16 @@ describe('cuenta unica en el alta', () => {
     expect(mensaje({ error: 'precio_pase_requerido' })).toMatch(/precio por día/);
   });
 });
+
+describe('pileta incluida: sin precio propio', () => {
+  it('se reconoce y dice en el precio de que unidad va', async () => {
+    const { esPiletaIncluida, textoPiletaIncluida } = await import('./incluidos');
+    const incluida = { serviceType: 'pileta', vinculo: 'incluido', incluidaEnTipo: 'carpa', incluidaEnNumero: 97 };
+    expect(esPiletaIncluida(incluida)).toBe(true);
+    expect(textoPiletaIncluida(incluida)).toBe('Incluida en el precio de la Carpa 97');
+    // Un pase pago de la carpa si tiene precio, y una cochera incluida tambien.
+    expect(esPiletaIncluida({ ...incluida, vinculo: 'adicional' })).toBe(false);
+    expect(esPiletaIncluida({ ...incluida, serviceType: 'parking' })).toBe(false);
+    expect(esPiletaIncluida({ serviceType: 'pileta' })).toBe(false);
+  });
+});

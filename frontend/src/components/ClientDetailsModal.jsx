@@ -3,6 +3,7 @@ import { getApiBaseUrl } from '../apiConfig';
 import { reservasDelCliente, estadoDeCuenta, saldoDe } from '../lib/reservas';
 import { formatPesos } from '../lib/money';
 import { format } from '../lib/dates';
+import { esPiletaIncluida, textoPiletaIncluida } from '../lib/incluidos';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -452,7 +453,9 @@ function ClientDetailsModal({ client, onClose, onViewReservation }) {
                         </div>
                         <div className="flex flex-col items-end text-right">
                           <span className={`text-[10px] ${paymentClasses}`}>{paymentLabel}</span>
-                          {group.totalPrice && (
+                          {esPiletaIncluida(group) ? (
+                            <span className="text-[10px] text-slate-500">{textoPiletaIncluida(group)}</span>
+                          ) : group.totalPrice && (
                             <span className="text-[10px] text-slate-500">
                               Total {formatPesos(group.totalPrice, 0)}
                             </span>

@@ -8,7 +8,7 @@ import { ServiceIcon, COLOR_SERVICIO } from './icons';
 import PersonasReserva from './PersonasReserva';
 import { formatearPatente } from '../lib/patente';
 import { lineasDesglose, formatearPesos } from '../lib/tarifas';
-import { etiquetaVinculo, pasesIncluidosPara } from '../lib/incluidos';
+import { etiquetaVinculo, pasesIncluidosPara, esPiletaIncluida, textoPiletaIncluida } from '../lib/incluidos';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -376,6 +376,12 @@ function ReservationDetailsModal({
             {/* Right: Financial Summary */}
             <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-3">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide mb-3">💰 Resumen financiero</h3>
+              {esPiletaIncluida(reservation) ? (
+                <div className="rounded-lg bg-cyan-50 px-3 py-3 text-xs text-cyan-900 space-y-1">
+                  <p className="font-semibold">{textoPiletaIncluida(reservation)}.</p>
+                  <p>No tiene un precio aparte: lo que debe el cliente está en el saldo de la cuenta de la carpa.</p>
+                </div>
+              ) : (
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-[11px] text-slate-600">{desglose ? 'Promedio por día' : 'Precio por día'}</span>
@@ -413,6 +419,7 @@ function ReservationDetailsModal({
                   </span>
                 </div>
               </div>
+              )}
 
               {/* Progress bar */}
               {totalPrice !== null && totalPrice !== undefined && Number(totalPrice) > 0 && (

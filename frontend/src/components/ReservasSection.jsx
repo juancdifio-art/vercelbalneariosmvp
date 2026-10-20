@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { formatPesos } from '../lib/money';
+import { esPiletaIncluida, textoPiletaIncluida } from '../lib/incluidos';
 
 function ReservasSection({
   reservationGroups,
@@ -442,9 +443,13 @@ function ReservasSection({
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <span className={`text-xs font-semibold ${paidAmountNum + 0.01 < totalPriceNum ? 'text-red-600' : 'text-emerald-600'}`}>
-                        {formatPesos(paidAmountNum, 0)}
-                      </span>
+                      {esPiletaIncluida(group) ? (
+                        <span className="text-xs text-slate-500" title={textoPiletaIncluida(group)}>Incluida en la carpa</span>
+                      ) : (
+                        <span className={`text-xs font-semibold ${paidAmountNum + 0.01 < totalPriceNum ? 'text-red-600' : 'text-emerald-600'}`}>
+                          {formatPesos(paidAmountNum, 0)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 align-top">
                       <span className={statusClasses}>
@@ -479,7 +484,8 @@ function ReservasSection({
                             />
                           </svg>
                         </button>
-                        {!isCancelled && (
+                        {/* La pileta incluida no se cobra sola: se cobra en su carpa. */}
+                        {!isCancelled && !esPiletaIncluida(group) && (
                           <button
                             type="button"
                             className="inline-flex items-center rounded-full border border-emerald-300 px-2 py-0.5 text-[10px] font-medium text-emerald-800 bg-white hover:bg-emerald-50 disabled:opacity-60"

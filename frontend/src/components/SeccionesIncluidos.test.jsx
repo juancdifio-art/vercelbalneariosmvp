@@ -22,6 +22,8 @@ describe('seccion Pileta con pases vinculados a una carpa', () => {
     expect(screen.getByText('Incluido en Carpa 12')).toBeInTheDocument();
     expect(screen.getByText('Pase pago · Carpa 12')).toBeInTheDocument();
     expect(screen.getByText('Lucia, Ana')).toBeInTheDocument();
-    expect(screen.getAllByText(/Carpa 12/)).toHaveLength(2);
+    // El incluido no muestra $0: va en el precio de la carpa.
+    expect(screen.getByText('Incluida en el precio de la Carpa 12')).toBeInTheDocument();
+    expect(screen.getAllByText(/Carpa 12/)).toHaveLength(3);
   });
 });

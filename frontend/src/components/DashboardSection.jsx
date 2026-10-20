@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { isToday, parseISO, differenceInCalendarDays, isTomorrow } from 'date-fns';
 import { format } from '../lib/dates';
 import { formatPesos } from '../lib/money';
+import { esPiletaIncluida } from '../lib/incluidos';
 import { getApiBaseUrl } from '../apiConfig';
 import {
   ServiceIcon,
@@ -398,7 +399,9 @@ function DashboardSection({
                           </p>
                         </div>
                       </div>
-                      {group.totalPrice && (
+                      {esPiletaIncluida(group) ? (
+                        <span className="text-xs text-slate-500">Incluida en la carpa</span>
+                      ) : group.totalPrice && (
                         <span className="text-sm font-bold text-emerald-700">
                           {formatPesos(group.totalPrice, 0)}
                         </span>
@@ -555,7 +558,9 @@ function DashboardSection({
                           </div>
                         </div>
                       </div>
-                      {group.totalPrice && (
+                      {esPiletaIncluida(group) ? (
+                        <span className="text-xs text-slate-500">Incluida en la carpa</span>
+                      ) : group.totalPrice && (
                         <span className="text-sm font-bold text-slate-700">
                           {formatPesos(group.totalPrice, 0)}
                         </span>

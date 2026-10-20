@@ -113,12 +113,21 @@ export function contarPorEdad(personas, hoy = new Date()) {
 
 const NOMBRE_UNIDAD = { carpa: 'Carpa', sombrilla: 'Sombrilla' };
 
+const unidadDelVinculo = (group) => `${NOMBRE_UNIDAD[group.incluidaEnTipo] || 'Carpa'} ${group.incluidaEnNumero ?? ''}`.trim();
+
 /** "Incluido en Carpa 12" o "Pase pago · Carpa 12"; null si no esta vinculado. */
 export function etiquetaVinculo(group) {
   if (!group || !group.vinculo) return null;
-  const unidad = `${NOMBRE_UNIDAD[group.incluidaEnTipo] || 'Carpa'} ${group.incluidaEnNumero ?? ''}`.trim();
+  const unidad = unidadDelVinculo(group);
   return group.vinculo === 'adicional' ? `Pase pago · ${unidad}` : `Incluido en ${unidad}`;
 }
+
+/**
+ * El pase de pileta incluido no tiene precio propio: va dentro del de la carpa
+ * y se cobra en ella. Donde iria su monto ($0) se muestra esto.
+ */
+export const esPiletaIncluida = (group) => group?.vinculo === 'incluido' && group?.serviceType === 'pileta';
+export const textoPiletaIncluida = (group) => `Incluida en el precio de la ${unidadDelVinculo(group)}`;
 
 export function pasesIncluidosPara(establishment, serviceType) {
   if (!establishment?.hasPileta) return 0;
