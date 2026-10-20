@@ -64,8 +64,8 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 257 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas
-cd frontend && npm test   # 336 tests de componentes y utilidades
+cd api && npm test        # 266 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas / _contrato
+cd frontend && npm test   # 355 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
@@ -117,6 +117,16 @@ El balneario nos escribe desde la app (error, sugerencia o consulta) y respondem
 - **El rol `soporte` se lee de la base en cada pedido**, no del token. El login devuelve `user.role` solo para que el frontend elija pantalla: con `soporte`, `App.jsx` muestra `BandejaSoporte` en vez del balneario. No hay alta por la app: se crea el usuario y se le pone `role = 'soporte'` por SQL, con una contraseña larga y aleatoria (esa cuenta ve todos los balnearios).
 - **Frontend:** el botón Soporte del menú (`Sidebar` y el menú mobile, con contador de no leídos) abre `SoportePanel` encima de la pantalla actual, que se guarda con el mensaje. Componentes en `components/soporte/`, pedidos en `hooks/useSoporte.js`.
 - **Envíos:** máximo 10 por minuto por lado, contados e insertados en una transacción con `pg_advisory_xact_lock` (`soporte:<estId>:<deSoporte>`). El hilo devuelve los últimos 200 mensajes.
+
+## Contrato imprimible
+
+Cada carpa y sombrilla imprime su contrato para firmar desde el detalle de la reserva (**Imprimir contrato**). El título y las condiciones generales los carga cada balneario en **Panel de usuario › Contrato**. Migración: `backend/migrate-contrato.sql` (`establishments.contrato_titulo`, `contrato_condiciones`).
+
+- **La API solo guarda el texto** (`api/_contrato/servicio.js`, ruta `contrato` GET/PUT, compartida por las dos APIs). El PDF lo arma el navegador: `lib/contrato.js` (puro: titular, unidad, período, importe de la cuenta, forma de pago, cocheras con su sector, nómina) y `utils/generateContrato.js` (jsPDF, A4).
+- **La nómina deja `max_personas_por_unidad - 1` filas** (el titular va arriba). Lo que falta sale con puntos para completar a mano.
+- **Formato de las condiciones:** cada renglón sale como está; uno escrito entre `**` y `**` sale en negrita.
+- **Las fuentes de jsPDF solo traen Latin-1:** `aTextoPdf` pasa guiones y comillas tipográficas a simples y quita lo que no entra. Acentos y eñes andan.
+- El texto de Zeus, transcripto tal cual de `docs/Contrato zeus*.jpeg`, está en `backend/supabase-zeus-contrato.sql`.
 
 ## Administrador general de cuentas
 

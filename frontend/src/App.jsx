@@ -2592,7 +2592,10 @@ function App() {
               onViewReservation={(group) => setReservationDetailsModal(group)}
               titular={(() => {
                 const c = (clients || []).find((x) => Number(x.id) === Number(reservationDetailsModal.clientId));
-                return c ? { id: c.id, fullName: c.fullName, documentNumber: c.documentNumber, birthDate: c.birthDate } : null;
+                // Telefono y direccion van al contrato imprimible.
+                return c
+                  ? { id: c.id, fullName: c.fullName, documentNumber: c.documentNumber, birthDate: c.birthDate, phone: c.phone, addressStreet: c.addressStreet, addressCity: c.addressCity }
+                  : null;
               })()}
               onVenderPase={handleVenderPase}
               onIrALaReserva={abrirReservaVinculada}

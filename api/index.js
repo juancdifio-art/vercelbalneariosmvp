@@ -9,6 +9,7 @@ const reglasIncluidos = require('./_incluidos/reglas');
 const { enTransaccion } = require('./_incluidos/transaccion');
 const soporte = require('./_soporte/servicio');
 const cuentas = require('./_cuentas/servicio');
+const contrato = require('./_contrato/servicio');
 
 // Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
 // Es obligatoria en toda reserva de estacionamiento.
@@ -1950,6 +1951,24 @@ module.exports = async (req, res) => {
         return responder(res, r.status, r.body);
       } catch (error) {
         console.error('Error en cuentas:', error);
+        return responder(res, 500, { error: 'server_error' });
+      }
+    }
+
+    // ============= /api/contrato =============
+    // Titulo y condiciones del contrato imprimible: la logica vive en _contrato/servicio.js.
+    if (first === 'contrato') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const estResult = await db.query('SELECT id FROM establishments WHERE user_id = $1', [user.id]);
+        if (estResult.rows.length === 0) return responder(res, 404, { error: 'establishment_not_found' });
+        const body = method === 'PUT' ? await parseJsonBody(req) : {};
+        const r = await contrato.rutearContrato(db.query, estResult.rows[0].id, { method, partes: segments.slice(2), body });
+        return responder(res, r.status, r.body);
+      } catch (error) {
+        console.error('Error en contrato:', error);
         return responder(res, 500, { error: 'server_error' });
       }
     }

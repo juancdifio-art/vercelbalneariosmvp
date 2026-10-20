@@ -255,6 +255,11 @@ CREATE INDEX IF NOT EXISTS idx_soporte_mensajes_establecimiento
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS atiende_soporte BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- Titulo y condiciones del contrato imprimible (migrate-contrato.sql).
+ALTER TABLE establishments
+  ADD COLUMN IF NOT EXISTS contrato_titulo VARCHAR(120),
+  ADD COLUMN IF NOT EXISTS contrato_condiciones TEXT;
+
 -- Administrador general de cuentas (migrate-administra-cuentas.sql).
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS administra_cuentas BOOLEAN NOT NULL DEFAULT FALSE;
