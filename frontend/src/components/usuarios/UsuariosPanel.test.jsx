@@ -31,7 +31,7 @@ describe('Panel de usuario > Usuarios', () => {
     render(<UsuariosPanel />);
     const lista = await screen.findByRole('list', { name: 'Usuarios del balneario' });
     expect(within(lista).getAllByRole('listitem')).toHaveLength(2);
-    expect(within(lista).getByText('Encargado')).toBeInTheDocument();
+    expect(within(lista).getByText('Dueño')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Quitar a admin@balneario.test' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Quitar a caja@balneario.test' })).toBeInTheDocument();
   });

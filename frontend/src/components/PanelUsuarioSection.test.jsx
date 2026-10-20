@@ -70,7 +70,7 @@ describe('PanelUsuarioSection', () => {
   it('muestra el nivel de acceso que devuelve la API', async () => {
     renderPanel();
 
-    expect(await screen.findByText('Encargado')).toBeInTheDocument();
+    expect(await screen.findByText('Dueño')).toBeInTheDocument();
   });
 
   it('el encargado ve Establecimiento, Contrato y Usuarios; un empleado solo su perfil', async () => {
