@@ -19,6 +19,7 @@ import PoolPassModal from './components/PoolPassModal';
 import ReservationEditModal from './components/ReservationEditModal';
 import EstablishmentConfigForm from './components/EstablishmentConfigForm';
 import BandejaSoporte from './components/soporte/BandejaSoporte';
+import PanelCuentas from './components/cuentas/PanelCuentas';
 import PanelUsuarioSection from './components/PanelUsuarioSection';
 import ClientDetailsModal from './components/ClientDetailsModal';
 import AuthenticatedShell from './components/AuthenticatedShell';
@@ -32,6 +33,7 @@ import useReservationGroups from './hooks/useReservationGroups';
 import useAuth from './hooks/useAuth';
 import useEstablishment from './hooks/useEstablishment';
 import useClients from './hooks/useClients';
+import { useAccesoCuentas } from './hooks/useCuentas';
 import { getApiBaseUrl } from './apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -134,6 +136,10 @@ function App() {
       setActiveSection('inicio');
     }
   });
+
+  // Administrador general: suma la seccion Cuentas, o la ve sola si no tiene
+  // balneario. null mientras se pregunta a la API.
+  const administraCuentas = useAccesoCuentas(isAuthenticated);
 
   // Sube cada vez que un cambio toca varias reservas a la vez (una carpa con
   // sus incluidos): las grillas y listas que dependen de esto se vuelven a pedir.
@@ -2302,6 +2308,20 @@ function App() {
       );
     }
 
+    // Sin balneario, el administrador general ve solo las cuentas; el resto
+    // configura su establecimiento.
+    if (!establishment && administraCuentas === null) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+          <div className="text-slate-200 text-sm">Cargando…</div>
+        </div>
+      );
+    }
+
+    if (!establishment && administraCuentas) {
+      return <PanelCuentas userEmail={userEmail} onLogout={handleLogout} />;
+    }
+
     if (!establishment) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
@@ -2382,6 +2402,9 @@ function App() {
     navItems.push({ id: 'reportes', label: 'Reportes', group: 'admin' });
     navItems.push({ id: 'tarifas', label: 'Tarifas', group: 'admin' });
     navItems.push({ id: 'panel-usuario', label: 'Panel de usuario', group: 'admin' });
+    if (administraCuentas) {
+      navItems.push({ id: 'cuentas', label: 'Cuentas', group: 'admin' });
+    }
 
     const sectionTitleMap = {
       inicio: 'Resumen general',
@@ -2394,7 +2417,8 @@ function App() {
       sombrillas: 'Capacidades y reservas',
       estacionamiento: 'Capacidades y reservas',
       pileta: 'Pileta',
-      'panel-usuario': 'Panel de usuario'
+      'panel-usuario': 'Panel de usuario',
+      cuentas: 'Cuentas'
     };
 
     // Las 25 props del formulario de establecimiento viajan agrupadas para no
@@ -2756,6 +2780,8 @@ function App() {
                 establecimiento={propsEstablecimiento}
               />
             )}
+
+            {activeSection === 'cuentas' && administraCuentas && <PanelCuentas embebida userEmail={userEmail} />}
 
             {activeSection === 'sombrillas' && (
               <SombrillasSection

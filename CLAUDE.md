@@ -29,7 +29,7 @@ Una ruta nueva es un `if (first === 'auth' && second === 'xxx')`. Y para pegarle
 
 ### `register` no existe en producción
 
-`api/index.js` solo implementa `login`. Los archivos `api/auth/register.js` y `api/_handlers/auth/register.js` nunca se ejecutan. El alta de usuarios es por script: `cd backend && npm run create-user -- <email> <password>`.
+`api/index.js` solo implementa `login`. Los archivos `api/auth/register.js` y `api/_handlers/auth/register.js` nunca se ejecutan. El alta de usuarios la hace el administrador general desde la pantalla **Cuentas** (ver abajo); en local también sirve el script `cd backend && npm run create-user -- <email> <password>`.
 
 ### Mockear `pg` en los tests de la API
 
@@ -64,8 +64,8 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 217 tests del router serverless y de _incluidos / _tarifas
-cd frontend && npm test   # 303 tests de componentes y utilidades
+cd api && npm test        # 257 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas
+cd frontend && npm test   # 336 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
@@ -75,6 +75,8 @@ cd frontend && npm test   # 303 tests de componentes y utilidades
 ```bash
 cd api && DB_INTEGRACION=1 npx vitest run incluidos-integracion.test.js
 ```
+
+`api/cuentas-integracion.test.js` hace lo mismo con el SQL de `_cuentas` (la copia de tarifas al crear una cuenta).
 
 **Transacciones en los tests de `api/`:** `test/pg-mock.js` hace que `BEGIN`, `COMMIT`, `ROLLBACK` y `pg_advisory_xact_lock` no consuman respuestas de `queryMock` (van a `txMock`). Al preparar un test se mockean solo las consultas de datos, en orden.
 
@@ -115,6 +117,16 @@ El balneario nos escribe desde la app (error, sugerencia o consulta) y respondem
 - **El rol `soporte` se lee de la base en cada pedido**, no del token. El login devuelve `user.role` solo para que el frontend elija pantalla: con `soporte`, `App.jsx` muestra `BandejaSoporte` en vez del balneario. No hay alta por la app: se crea el usuario y se le pone `role = 'soporte'` por SQL, con una contraseña larga y aleatoria (esa cuenta ve todos los balnearios).
 - **Frontend:** el botón Soporte del menú (`Sidebar` y el menú mobile, con contador de no leídos) abre `SoportePanel` encima de la pantalla actual, que se guarda con el mensaje. Componentes en `components/soporte/`, pedidos en `hooks/useSoporte.js`.
 - **Envíos:** máximo 10 por minuto por lado, contados e insertados en una transacción con `pg_advisory_xact_lock` (`soporte:<estId>:<deSoporte>`). El hilo devuelve los últimos 200 mensajes.
+
+## Administrador general de cuentas
+
+Una cuenta con `users.administra_cuentas = true` ve todas las cuentas de la app, crea la de cada balneario y le genera una clave nueva a quien la olvidó. Se habilita solo por SQL. Migración: `backend/migrate-administra-cuentas.sql`.
+
+- **La lógica vive en `api/_cuentas/servicio.js`** (`rutearCuentas`), compartida por las dos APIs como `_soporte`. Recibe `hashear` de cada API (bcrypt 12), así no importa bcrypt. Rutas: `cuentas/acceso` (cualquier cuenta: si administra), `cuentas` GET/POST y `cuentas/:id/clave` POST.
+- **El permiso se lee de la base en cada pedido**, no del token, igual que el de soporte.
+- **Alta:** el email se guarda en minúsculas y la clave la genera el servidor (`Kp7m-x4Qz-9tRw`) y se muestra una sola vez. Con un balneario modelo (`copiarDe`) se crea el establecimiento con su configuración, períodos, sectores (con sus unidades) y tarifas, sin clientes ni reservas, todo en una transacción. Sin modelo se crea solo el usuario y el cliente configura su balneario al entrar.
+- **Clave nueva:** no para la cuenta propia (se cambia en Panel de usuario) ni para otro administrador general.
+- **Frontend:** `hooks/useCuentas.js` y `components/cuentas/PanelCuentas.jsx`. Con balneario, el menú suma **Cuentas**; sin balneario, el panel ocupa la pantalla (como la bandeja del rol `soporte`).
 
 ## Seguridad
 

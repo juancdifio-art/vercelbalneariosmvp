@@ -254,3 +254,7 @@ CREATE INDEX IF NOT EXISTS idx_soporte_mensajes_establecimiento
 -- Acceso a la bandeja para cuentas con balneario (migrate-soporte-acceso.sql).
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS atiende_soporte BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Administrador general de cuentas (migrate-administra-cuentas.sql).
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS administra_cuentas BOOLEAN NOT NULL DEFAULT FALSE;
