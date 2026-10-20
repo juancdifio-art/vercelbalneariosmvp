@@ -20,6 +20,7 @@ const incluidos = require('../../api/_incluidos/servicio');
 const reglasIncluidos = require('../../api/_incluidos/reglas');
 const { enTransaccion } = require('../../api/_incluidos/transaccion');
 const soporte = require('../../api/_soporte/servicio');
+const cuentas = require('../../api/_cuentas/servicio');
 
 async function conTransaccion(fn) {
   const client = await pool.connect();
@@ -2324,6 +2325,23 @@ app.all(/^\/api\/soporte(\/.*)?$/, authenticateToken, async (req, res) => {
     return res.status(r.status).json(r.body);
   } catch (error) {
     console.error('Error en soporte', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Administrador general de cuentas. La logica vive en api/_cuentas/servicio.js.
+app.all(/^\/api\/cuentas(\/.*)?$/, authenticateToken, async (req, res) => {
+  try {
+    const r = await cuentas.rutearCuentas(queryTarifas, req.user.id, {
+      method: req.method,
+      partes: req.path.split('/').filter(Boolean).slice(2),
+      body: req.body || {},
+      transaccion: conTransaccion,
+      hashear: (clave) => bcrypt.hash(clave, 12)
+    });
+    return res.status(r.status).json(r.body);
+  } catch (error) {
+    console.error('Error en cuentas', error);
     return res.status(500).json({ error: 'server_error' });
   }
 });

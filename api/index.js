@@ -8,6 +8,7 @@ const incluidos = require('./_incluidos/servicio');
 const reglasIncluidos = require('./_incluidos/reglas');
 const { enTransaccion } = require('./_incluidos/transaccion');
 const soporte = require('./_soporte/servicio');
+const cuentas = require('./_cuentas/servicio');
 
 // Patente en mayusculas y sin espacios ni guiones: "ab 123-cd" -> "AB123CD".
 // Es obligatoria en toda reserva de estacionamiento.
@@ -1927,6 +1928,28 @@ module.exports = async (req, res) => {
         return responder(res, r.status, r.body);
       } catch (error) {
         console.error('Error en soporte:', error);
+        return responder(res, 500, { error: 'server_error' });
+      }
+    }
+
+    // ============= /api/cuentas/* =============
+    // Administrador general: la logica vive en _cuentas/servicio.js, compartida con el backend local.
+    if (first === 'cuentas') {
+      const user = authenticateToken(req, res);
+      if (!user) return;
+
+      try {
+        const body = method === 'POST' ? await parseJsonBody(req) : {};
+        const r = await cuentas.rutearCuentas(db.query, user.id, {
+          method,
+          partes: segments.slice(2),
+          body,
+          transaccion: conTransaccion,
+          hashear: (clave) => bcrypt.hash(clave, 12)
+        });
+        return responder(res, r.status, r.body);
+      } catch (error) {
+        console.error('Error en cuentas:', error);
         return responder(res, 500, { error: 'server_error' });
       }
     }
