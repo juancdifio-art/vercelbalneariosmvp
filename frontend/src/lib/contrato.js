@@ -1,11 +1,60 @@
 // Contrato de una carpa o sombrilla: arma lo que se imprime a partir de la
 // reserva, el titular, las personas y las condiciones que el balneario carga en
-// Panel de usuario > Contrato. Es puro: el PDF lo dibuja utils/generateContrato.js.
+// Panel de usuario > Contrato. En las condiciones, {Nombre} se cambia por el
+// valor de ese dato. Es puro: el PDF lo dibuja utils/generateContrato.js.
 import { fechaCorta, etiquetaMetodo, nombreUnidad } from './formato';
 import { formatPesos } from './money';
 import { formatearPatente } from './patente';
 
 export const TITULO_POR_DEFECTO = 'CONTRATACIÓN DE UNIDAD DE SOMBRA';
+
+// Un dato que no tiene valor sale con puntos, para completarlo a mano.
+const SIN_VALOR = '..........';
+
+// Los nombres se comparan sin mayusculas ni espacios de mas: {horario de la
+// pileta} y {Horario de la Pileta} son el mismo dato.
+const claveDato = (nombre) => String(nombre ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+const MARCA_DATO = /\{([^{}\n]{1,60})\}/g;
+
+/**
+ * Datos que pone el sistema: no se cargan en la tabla del contrato porque ya
+ * estan en la configuracion, y si cambian ahi cambian en el contrato.
+ */
+export function datosDelSistema({ nombreBalneario, maxPersonas } = {}) {
+  return [
+    { nombre: 'Máximo de personas', valor: maxPersonas == null || maxPersonas === '' ? '' : String(maxPersonas), origen: 'Panel de usuario › Establecimiento' },
+    { nombre: 'Balneario', valor: nombreBalneario || '', origen: 'el nombre del establecimiento' }
+  ];
+}
+
+export const esDatoDelSistema = (nombre) => datosDelSistema().some((d) => claveDato(d.nombre) === claveDato(nombre));
+
+/** Nombre -> valor, con los del sistema por encima de los cargados a mano. */
+export function valoresDelContrato(datos, sistema) {
+  const valores = new Map();
+  for (const d of datos || []) {
+    if (String(d?.nombre ?? '').trim()) valores.set(claveDato(d.nombre), String(d.valor ?? '').trim());
+  }
+  for (const d of datosDelSistema(sistema)) valores.set(claveDato(d.nombre), d.valor);
+  return valores;
+}
+
+/** Cambia cada {Nombre} por su valor. Un nombre que no es un dato queda como esta. */
+export function reemplazarDatos(texto, valores) {
+  return String(texto ?? '').replace(MARCA_DATO, (marca, nombre) => {
+    if (!valores.has(claveDato(nombre))) return marca;
+    return valores.get(claveDato(nombre)) || SIN_VALOR;
+  });
+}
+
+/** Los {Nombre} del texto que no son ningun dato, sin repetir. */
+export function datosFaltantes(texto, valores) {
+  const faltan = [];
+  for (const [, nombre] of String(texto ?? '').matchAll(MARCA_DATO)) {
+    if (!valores.has(claveDato(nombre)) && !faltan.some((f) => claveDato(f) === claveDato(nombre))) faltan.push(nombre.trim());
+  }
+  return faltan;
+}
 
 /**
  * Las condiciones, linea por linea. Una linea escrita entre ** y ** sale en
@@ -64,13 +113,15 @@ export function armarContrato({
   const sectorDeCochera = (numero) =>
     sectores.find((s) => s.serviceType === 'parking' && (s.unidades || []).map(Number).includes(Number(numero)))?.nombre || null;
 
+  const valores = valoresDelContrato(contrato?.datos, { nombreBalneario: establecimiento?.name, maxPersonas });
+
   const nomina = personas.map((p) => ({ nombre: p.fullName || '', dni: p.documentNumber || '' }));
   const filas = Math.max(maxPersonas - 1, nomina.length, 1);
   while (nomina.length < filas) nomina.push({ nombre: '', dni: '' });
 
   return {
     balneario: establecimiento?.name || '',
-    titulo: (contrato?.titulo || '').trim() || TITULO_POR_DEFECTO,
+    titulo: reemplazarDatos((contrato?.titulo || '').trim(), valores) || TITULO_POR_DEFECTO,
     numero: reserva.id ?? null,
     titular: [
       ['Titular', titular?.fullName || reserva.customerName || ''],
@@ -93,6 +144,6 @@ export function armarContrato({
       return [`N° ${c.resourceNumber}`, sector, patente].filter(Boolean).join(' · ');
     }),
     nomina,
-    condiciones: lineasCondiciones(contrato?.condiciones)
+    condiciones: lineasCondiciones(reemplazarDatos(contrato?.condiciones, valores))
   };
 }

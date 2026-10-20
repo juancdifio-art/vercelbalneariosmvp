@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { armarContrato, lineasCondiciones, TITULO_POR_DEFECTO } from './contrato';
+import {
+  armarContrato,
+  lineasCondiciones,
+  reemplazarDatos,
+  datosFaltantes,
+  valoresDelContrato,
+  esDatoDelSistema,
+  TITULO_POR_DEFECTO
+} from './contrato';
 
 const CARPA = {
   id: 60, serviceType: 'carpa', resourceNumber: 50, startDate: '2026-12-15', endDate: '2027-03-15',
@@ -84,6 +92,57 @@ describe('armarContrato', () => {
     const c = armarContrato({ establecimiento: {}, contrato: {}, reserva: { serviceType: 'sombrilla', resourceNumber: 3 } });
     expect(c.contratacion[0]).toEqual(['Unidad', 'Sombrilla 3']);
     expect(c.contratacion[1]).toEqual(['Período', '']);
+  });
+});
+
+describe('datos del contrato', () => {
+  const DATOS = [
+    { nombre: 'Horario de la pileta', valor: '13.30 a 19.30 hs' },
+    { nombre: 'Inicio de temporada', valor: '15 de Diciembre del 2026' },
+    { nombre: 'Dispositivos wifi', valor: '' }
+  ];
+  const valores = valoresDelContrato(DATOS, { nombreBalneario: 'Zeus', maxPersonas: 6 });
+
+  it('cambia cada {Nombre} por su valor, sin importar mayusculas ni espacios', () => {
+    expect(reemplazarDatos('Pileta de {Horario de la pileta}; desde el {inicio  de TEMPORADA}.', valores))
+      .toBe('Pileta de 13.30 a 19.30 hs; desde el 15 de Diciembre del 2026.');
+  });
+
+  it('el maximo de personas y el balneario salen de la configuracion', () => {
+    expect(reemplazarDatos('{Balneario}: hasta {Máximo de personas} personas', valores)).toBe('Zeus: hasta 6 personas');
+  });
+
+  it('el sistema le gana a un dato cargado con el mismo nombre', () => {
+    const v = valoresDelContrato([{ nombre: 'máximo de personas', valor: '99' }], { maxPersonas: 6 });
+    expect(reemplazarDatos('{Máximo de personas}', v)).toBe('6');
+    expect(esDatoDelSistema(' Máximo  de personas ')).toBe(true);
+  });
+
+  it('un dato sin valor sale con puntos y uno que no existe queda tal cual', () => {
+    expect(reemplazarDatos('{Dispositivos wifi} y {No existe}', valores)).toBe('.......... y {No existe}');
+  });
+
+  it('avisa los nombres del texto que no son datos, sin repetir', () => {
+    expect(datosFaltantes('{No existe} {Horario de la pileta} {no existe} {Otro}', valores)).toEqual(['No existe', 'Otro']);
+  });
+
+  it('el contrato sale con los datos ya reemplazados, tambien en el titulo', () => {
+    const c = armarContrato({
+      establecimiento: { name: 'Zeus' },
+      contrato: {
+        titulo: 'CONTRATACIÓN {Temporada}',
+        condiciones: '**8 - PILETA**\nHabilitada de {Horario de la pileta}.\nMáximo {Máximo de personas} personas.',
+        datos: [{ nombre: 'Temporada', valor: '2026-2027' }, { nombre: 'Horario de la pileta', valor: '13.30 a 19.30 hs' }]
+      },
+      reserva: CARPA,
+      maxPersonas: 6
+    });
+    expect(c.titulo).toBe('CONTRATACIÓN 2026-2027');
+    expect(c.condiciones).toEqual([
+      { texto: '8 - PILETA', negrita: true },
+      { texto: 'Habilitada de 13.30 a 19.30 hs.', negrita: false },
+      { texto: 'Máximo 6 personas.', negrita: false }
+    ]);
   });
 });
 
