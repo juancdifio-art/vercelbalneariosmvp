@@ -60,14 +60,16 @@ function ReservationDetailsModal({
 
   // Estado para cargar pagos lazy (solo cuando se abre el modal)
   const [payments, setPayments] = useState([]);
-  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  // Arranca cargando: el comprobante y el contrato esperan a que lleguen los pagos.
+  const [paymentsLoading, setPaymentsLoading] = useState(true);
 
   // Cargar pagos cuando se abre el modal
   useEffect(() => {
-    if (!id) return;
-
     const token = sessionStorage.getItem('authToken');
-    if (!token) return;
+    if (!id || !token) {
+      setPaymentsLoading(false);
+      return;
+    }
 
     async function fetchPayments() {
       setPaymentsLoading(true);
@@ -95,13 +97,18 @@ function ReservationDetailsModal({
   // trae solo carpas, y el estacionamiento del mismo cliente no aparecia.
   const clienteId = reservation.clientId;
   const [reservasCliente, setReservasCliente] = useState([]);
+  // De esta lista salen las cocheras y la pileta de la cuenta: el comprobante y
+  // el contrato esperan a que llegue (o a que falle).
+  const [clienteCargado, setClienteCargado] = useState(false);
 
   useEffect(() => {
     setReservasCliente([]);
-    if (clienteId === null || clienteId === undefined || clienteId === '') return;
-
+    setClienteCargado(false);
     const token = sessionStorage.getItem('authToken');
-    if (!token) return;
+    if (clienteId === null || clienteId === undefined || clienteId === '' || !token) {
+      setClienteCargado(true);
+      return undefined;
+    }
 
     let cancelado = false;
     (async () => {
@@ -116,6 +123,8 @@ function ReservationDetailsModal({
       } catch (err) {
         // Sin esta lista solo se pierde la seccion de otras reservas.
         console.error('Error loading client reservations', err);
+      } finally {
+        if (!cancelado) setClienteCargado(true);
       }
     })();
 
@@ -178,6 +187,10 @@ function ReservationDetailsModal({
     }
     generateReceipt({ ...reservation, payments: pagosDeLaCuenta, vinculadas }, establishment);
   };
+
+  // Hasta que lleguen los pagos y las reservas vinculadas, el comprobante y el
+  // contrato saldrian sin forma de pago ni cocheras: sus botones esperan.
+  const cuentaCargada = !paymentsLoading && clienteCargado;
 
   // Contrato para firmar: el importe es el de toda la cuenta.
   const [errorContrato, setErrorContrato] = useState('');
@@ -689,18 +702,22 @@ function ReservationDetailsModal({
               )}
               <button
                 type="button"
-                className="inline-flex items-center rounded-lg border border-blue-300 px-4 py-2 text-xs font-semibold text-blue-700 bg-white hover:bg-blue-50 transition shadow-sm"
+                className="inline-flex items-center rounded-lg border border-blue-300 px-4 py-2 text-xs font-semibold text-blue-700 bg-white hover:bg-blue-50 transition shadow-sm disabled:cursor-wait disabled:opacity-50"
                 // La reserva de la lista no trae el array de pagos: sin esto el
                 // comprobante salia sin fecha ni metodo de pago y sin historial.
                 onClick={descargarComprobante}
+                disabled={!cuentaCargada}
+                title={cuentaCargada ? undefined : 'Cargando los pagos…'}
               >
                 📄 Descargar comprobante
               </button>
               {esUnidadDeSombra && status !== 'cancelled' && (
                 <button
                   type="button"
-                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm"
+                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm disabled:cursor-wait disabled:opacity-50"
                   onClick={imprimirContrato}
+                  disabled={!cuentaCargada}
+                  title={cuentaCargada ? undefined : 'Cargando los pagos…'}
                 >
                   📝 Imprimir contrato
                 </button>

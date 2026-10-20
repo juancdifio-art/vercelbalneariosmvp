@@ -60,6 +60,24 @@ describe('Imprimir contrato', () => {
     expect(args.total).toBe(2520000);
   });
 
+  it('el contrato y el comprobante esperan a que lleguen los pagos y la cuenta', async () => {
+    let soltarPagos;
+    const fetchNormal = global.fetch;
+    global.fetch = vi.fn((url, opts) => (String(url).includes('/payments')
+      ? new Promise((resolve) => { soltarPagos = () => resolve(fetchNormal(url, opts)); })
+      : fetchNormal(url, opts)));
+    render(<ReservationDetailsModal {...props(CARPA)} />);
+
+    expect(screen.getByRole('button', { name: /Imprimir contrato/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Descargar comprobante/ })).toBeDisabled();
+    await screen.findByText('Servicios incluidos');
+    expect(screen.getByRole('button', { name: /Imprimir contrato/ })).toBeDisabled();
+
+    soltarPagos();
+    await waitFor(() => expect(screen.getByRole('button', { name: /Imprimir contrato/ })).toBeEnabled());
+    expect(screen.getByRole('button', { name: /Descargar comprobante/ })).toBeEnabled();
+  });
+
   it('no aparece en una reserva de estacionamiento ni en una cancelada', () => {
     const { unmount } = render(<ReservationDetailsModal {...props({ ...COCHERA, vinculo: null, incluidaEnReservaId: null })} />);
     expect(screen.queryByRole('button', { name: /Imprimir contrato/ })).not.toBeInTheDocument();
@@ -71,7 +89,9 @@ describe('Imprimir contrato', () => {
   it('si falla, lo dice en el detalle', async () => {
     descargarContrato.mockRejectedValueOnce(new Error('No se pudo completar. Probá de nuevo.'));
     render(<ReservationDetailsModal {...props(CARPA)} />);
-    await userEvent.click(screen.getByRole('button', { name: /Imprimir contrato/ }));
+    const boton = screen.getByRole('button', { name: /Imprimir contrato/ });
+    await waitFor(() => expect(boton).toBeEnabled());
+    await userEvent.click(boton);
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo completar');
   });
 });
