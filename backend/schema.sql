@@ -258,7 +258,8 @@ ALTER TABLE users
 -- Titulo y condiciones del contrato imprimible (migrate-contrato.sql).
 ALTER TABLE establishments
   ADD COLUMN IF NOT EXISTS contrato_titulo VARCHAR(120),
-  ADD COLUMN IF NOT EXISTS contrato_condiciones TEXT;
+  ADD COLUMN IF NOT EXISTS contrato_condiciones TEXT,
+  ADD COLUMN IF NOT EXISTS contrato_datos JSONB NOT NULL DEFAULT '[]'::jsonb;
 
 -- Administrador general de cuentas (migrate-administra-cuentas.sql).
 ALTER TABLE users

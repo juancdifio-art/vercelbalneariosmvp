@@ -6,7 +6,13 @@ import { generarContratoPdf } from '../utils/generateContrato';
 
 const ERRORES = {
   titulo_largo: 'El título es muy largo: máximo 120 caracteres.',
-  condiciones_largas: 'Las condiciones son muy largas: máximo 20.000 caracteres.'
+  condiciones_largas: 'Las condiciones son muy largas: máximo 20.000 caracteres.',
+  dato_repetido: 'Hay dos datos con el mismo nombre.',
+  dato_sin_nombre: 'Hay un dato con valor pero sin nombre.',
+  nombre_dato_invalido: 'El nombre de un dato no puede llevar llaves ni pasar de 60 caracteres.',
+  valor_dato_largo: 'El valor de un dato es muy largo: máximo 200 caracteres.',
+  demasiados_datos: 'Son demasiados datos: máximo 50.',
+  datos_invalidos: 'Revisá los datos del contrato.'
 };
 
 async function pedir(ruta, { method = 'GET', body } = {}) {
@@ -24,8 +30,8 @@ export async function leerContrato() {
   return (await pedir('contrato')).contrato;
 }
 
-export async function guardarContrato({ titulo, condiciones }) {
-  return (await pedir('contrato', { method: 'PUT', body: { titulo, condiciones } })).contrato;
+export async function guardarContrato({ titulo, condiciones, datos }) {
+  return (await pedir('contrato', { method: 'PUT', body: { titulo, condiciones, datos } })).contrato;
 }
 
 // Las personas y los sectores completan el contrato, pero sin ellos igual se
