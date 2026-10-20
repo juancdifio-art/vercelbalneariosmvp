@@ -108,6 +108,12 @@ function PoolPassModal({
 
   const hasPaymentError = paymentExceedsTotal || paymentMissingMethod;
 
+  // La pileta no usa tarifas: el precio por dia se carga en cada pase. Sin
+  // personas o sin precio el pase quedaria en $0, asi que no se guarda.
+  const faltanPersonas = adults + children === 0;
+  const faltaPrecio = (adults > 0 && !(adultPrice > 0)) || (children > 0 && !(childPrice > 0));
+  const bloqueaGuardar = hasPaymentError || faltanPersonas || faltaPrecio;
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === 'Escape') {
@@ -487,6 +493,17 @@ function PoolPassModal({
           )}
         </div>
 
+        {faltanPersonas && (
+          <div className="mx-5 mb-3 bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200">
+            ⚠️ Cargá cuántos adultos y niños van.
+          </div>
+        )}
+        {!faltanPersonas && faltaPrecio && (
+          <div className="mx-5 mb-3 bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200">
+            ⚠️ Cargá el precio por día de {adults > 0 && !(adultPrice > 0) && children > 0 && !(childPrice > 0) ? 'adultos y de niños' : adults > 0 && !(adultPrice > 0) ? 'adultos' : 'niños'}: sin precio el pase quedaría en $0.
+          </div>
+        )}
+
         {/* Mensaje de error de pago */}
         {paymentMissingMethod && (
           <div className="mx-5 mb-3 bg-red-50 text-red-700 text-xs p-3 rounded-lg border border-red-200">
@@ -505,8 +522,8 @@ function PoolPassModal({
           </button>
           <button
             type="button"
-            disabled={hasPaymentError}
-            className={`ml-auto inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${hasPaymentError
+            disabled={bloqueaGuardar}
+            className={`ml-auto inline-flex items-center rounded-lg px-4 py-2 text-xs font-semibold text-white shadow-md transition-all ${bloqueaGuardar
               ? 'bg-slate-400 cursor-not-allowed'
               : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:shadow-lg hover:from-cyan-600 hover:to-blue-600'
               }`}

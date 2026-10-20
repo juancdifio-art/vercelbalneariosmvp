@@ -55,7 +55,24 @@ describe('vender pase de pileta desde la carpa', () => {
     const onSave = vi.fn().mockResolvedValue(true);
     render(<ConEstado onSave={onSave} />);
     await userEvent.click(screen.getByLabelText('Vender pase a Dani'));
+    await userEvent.type(screen.getByLabelText(/Precio por adulto por día/), '6000');
     await userEvent.click(screen.getByRole('button', { name: /Guardar pase/ }));
     expect(onSave.mock.calls[0][0].personasElegidas).toEqual(['g-14']);
+  });
+
+  it('sin personas o sin precio no se guarda: el pase quedaria en $0', async () => {
+    render(<ConEstado />);
+    expect(screen.getByRole('button', { name: /Guardar pase/ })).toBeDisabled();
+    expect(screen.getByText(/Cargá cuántos adultos y niños van/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText('Vender pase a Caro'));
+    await userEvent.click(screen.getByLabelText('Vender pase a Dani'));
+    expect(screen.getByText(/Cargá el precio por día de adultos y de niños/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText(/Precio por adulto por día/), '6000');
+    expect(screen.getByText(/Cargá el precio por día de niños/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Guardar pase/ })).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText(/Precio por niño por día/), '4000');
+    expect(screen.getByRole('button', { name: /Guardar pase/ })).toBeEnabled();
   });
 });
