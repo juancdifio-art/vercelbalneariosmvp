@@ -86,6 +86,16 @@ describe('control de roles a la entrada de la API', () => {
     expect((await request(handler).get('/?route=reports/payments').set('Authorization', token)).status).toBe(403);
   });
 
+  it('una ruta con ? adentro no existe: no se puede saltear el filtro de pileta', async () => {
+    // Corta antes del control de roles: ni siquiera se pregunta el rol.
+    for (const ruta of ['reservation-groups%3F', 'reservation-groups%3Fservice%3Dcarpa%26', 'reservation-groups%23']) {
+      const res = await request(handler).get(`/?route=${ruta}&service=pileta`).set('Authorization', token);
+      expect(res.status).toBe(404);
+    }
+    expect(rolMock).not.toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
+  });
+
   it('un empleado no cambia la configuracion del balneario ni el contrato', async () => {
     comoRol('operador');
     expect((await request(handler).post('/?route=establishment').set('Authorization', token).send({ name: 'X' })).status).toBe(403);
