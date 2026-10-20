@@ -12,7 +12,7 @@ vi.mock('jspdf', () => {
         get(target, clave) {
           if (clave in target) return target[clave];
           if (clave === 'internal') {
-            return { pageSize: { getWidth: () => 210, getHeight: () => 297 } };
+            return { pageSize: { getWidth: () => 210, getHeight: () => 297 }, scaleFactor: 1 };
           }
           return () => 10;
         }
@@ -87,10 +87,28 @@ describe('contrato en PDF', () => {
 
   it('las condiciones respetan la negrita y pasan los signos tipograficos a texto simple', () => {
     generarContratoPdf(datos());
-    const linea = globalThis.ultimoPdf.textos.find((t) => t.texto.startsWith('1 - La cantidad'));
-    expect(linea.texto).toBe('1 - La cantidad máxima de personas es de "seis".');
-    expect(linea.fuente).toBe('normal');
-    expect(globalThis.ultimoPdf.textos.find((t) => t.texto === 'OBLIGATORIO').fuente).toBe('bold');
+    const fuenteDe = (t) => globalThis.ultimoPdf.textos.find((p) => p.texto === t)?.fuente;
+    // Se escribe palabra por palabra: el guion largo y las comillas pasan a simples.
+    expect(textos()).toContain('-');
+    expect(fuenteDe('"seis".')).toBe('normal');
+    expect(fuenteDe('cantidad')).toBe('normal');
+    expect(fuenteDe('OBLIGATORIO')).toBe('bold');
+  });
+
+  it('el valor de cada dato sale en negrita en medio del texto, pegado a su puntuacion', () => {
+    generarContratoPdf(armarContrato({
+      establecimiento: { name: 'Zeus' },
+      contrato: { condiciones: 'La pileta abre a las {Pileta abre}. Hasta {Máximo de personas} personas.', datos: [{ nombre: 'Pileta abre', valor: '13.30' }] },
+      reserva: { serviceType: 'carpa', resourceNumber: 1 },
+      maxPersonas: 6
+    }));
+    const escritos = globalThis.ultimoPdf.textos;
+    const i = escritos.findIndex((p) => p.texto === '13.30');
+    expect(escritos[i].fuente).toBe('bold');
+    // El punto va pegado al valor, en letra normal.
+    expect(escritos[i + 1]).toEqual({ texto: '.', fuente: 'normal' });
+    expect(escritos.find((p) => p.texto === '6').fuente).toBe('bold');
+    expect(escritos.find((p) => p.texto === 'pileta').fuente).toBe('normal');
   });
 
   it('sin condiciones no imprime la seccion', () => {

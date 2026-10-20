@@ -1,16 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { leerContrato, guardarContrato } from '../lib/contratoApi';
 import {
   armarContrato,
-  datosDelSistema,
   datosFaltantes,
   esDatoDelSistema,
+  reemplazarDatos,
   valoresDelContrato,
   TITULO_POR_DEFECTO
 } from '../lib/contrato';
 import { generarContratoPdf } from '../utils/generateContrato';
+import { DocumentoIcon } from './icons';
+import DatosContrato from './contrato/DatosContrato';
+import TextoContrato from './contrato/TextoContrato';
 
 const FILA_VACIA = { nombre: '', valor: '' };
+
+function Bloque({ numero, titulo, ayuda, children }) {
+  return (
+    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-3 flex items-start gap-3">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-[12px] font-bold text-white">{numero}</span>
+        <div>
+          <h3 className="text-[14px] font-semibold text-slate-900">{titulo}</h3>
+          {ayuda && <p className="text-[12px] text-slate-500">{ayuda}</p>}
+        </div>
+      </div>
+      {children}
+    </section>
+  );
+}
 
 /**
  * Panel de usuario > Contrato: el titulo, los datos (fechas, horarios,
@@ -27,6 +45,7 @@ function ContratoConfig({ establishment }) {
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
   const [ok, setOk] = useState('');
+  const textareaRef = useRef(null);
 
   const cargar = (c) => {
     setTitulo(c.titulo || '');
@@ -50,15 +69,33 @@ function ContratoConfig({ establishment }) {
   const faltan = datosFaltantes(`${titulo}\n${condiciones}`, valores);
   const reservados = datos.filter((d) => esDatoDelSistema(d.nombre));
 
-  const cambiarDato = (i, campo) => (e) => {
-    const valor = e.target.value;
+  const cambiado = () => setOk('');
+  const cambiarDato = (i, campo, valor) => {
     setDatos((prev) => prev.map((d, j) => (j === i ? { ...d, [campo]: valor } : d)));
-    setOk('');
+    cambiado();
   };
-  const quitarDato = (i) => setDatos((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [FILA_VACIA]));
+  const quitarDato = (i) => {
+    setDatos((prev) => (prev.length > 1 ? prev.filter((_, j) => j !== i) : [FILA_VACIA]));
+    cambiado();
+  };
+
+  // Pone {Nombre} donde esta el cursor del texto (o al final) y deja el cursor despues.
+  const insertar = (nombre) => {
+    const marca = `{${nombre.trim()}}`;
+    const area = textareaRef.current;
+    const desde = area ? area.selectionStart : condiciones.length;
+    const hasta = area ? area.selectionEnd : condiciones.length;
+    setCondiciones(condiciones.slice(0, desde) + marca + condiciones.slice(hasta));
+    cambiado();
+    requestAnimationFrame(() => {
+      if (!area) return;
+      area.focus();
+      area.setSelectionRange(desde + marca.length, desde + marca.length);
+    });
+  };
 
   const guardar = async (e) => {
-    e.preventDefault();
+    e?.preventDefault();
     setError('');
     setOk('');
     if (reservados.length > 0) {
@@ -87,92 +124,83 @@ function ContratoConfig({ establishment }) {
 
   if (cargando) return <p className="text-xs text-slate-500">Cargando…</p>;
 
-  const input = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2';
+  const acciones = (
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="submit" disabled={guardando} className="rounded-lg bg-cyan-600 px-4 py-2 text-[13px] font-medium text-white disabled:opacity-60">
+        {guardando ? 'Guardando…' : 'Guardar'}
+      </button>
+      <button type="button" onClick={vistaPrevia} className="inline-flex items-center gap-1.5 rounded-lg border border-cyan-400 bg-white px-4 py-2 text-[13px] hover:bg-cyan-50">
+        <DocumentoIcon className="h-4 w-4" />
+        Vista previa en PDF
+      </button>
+      {ok && <span className="text-[12px] text-emerald-700">{ok}</span>}
+    </div>
+  );
 
   return (
-    <form onSubmit={guardar} className="space-y-5 max-w-3xl">
-      <p className="text-[11px] text-slate-600">
-        Esto sale impreso en el contrato de cada carpa y sombrilla, debajo de los datos del titular, la unidad, el período y las personas.
-        El contrato se imprime desde el detalle de la reserva.
-      </p>
-
-      <label className="block text-[12px] text-slate-700">
-        Título
-        <input
-          type="text"
-          value={titulo}
-          onChange={(e) => setTitulo(e.target.value)}
-          placeholder={TITULO_POR_DEFECTO}
-          maxLength={120}
-          className={`mt-1 ${input}`}
-        />
-      </label>
-
-      <fieldset className="space-y-2">
-        <legend className="text-[12px] font-semibold text-slate-800">Datos del contrato</legend>
-        <p className="text-[11px] text-slate-500">
-          Fechas, horarios y cantidades que cambian de una temporada a otra. En el texto se escriben entre llaves, por ejemplo {'{Horario de la pileta}'}, y en el contrato sale el valor.
+    <form onSubmit={guardar} className="max-w-6xl space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-2xl text-[12px] text-slate-600">
+          Lo que se carga acá sale impreso en el contrato de cada carpa y sombrilla, debajo de los datos del titular, la unidad, el período y las personas.
+          El contrato se imprime desde el detalle de la reserva.
         </p>
-        <ul className="space-y-1 text-[12px]">
-          {datosDelSistema(sistema).map((d) => (
-            <li key={d.nombre} className="flex flex-wrap items-baseline gap-x-2 rounded-lg bg-white/60 px-3 py-1.5">
-              <code className="text-cyan-800">{`{${d.nombre}}`}</code>
-              <span className="font-medium text-slate-900">{d.valor || '—'}</span>
-              <span className="text-[11px] text-slate-500">sale de {d.origen}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="space-y-2" role="list" aria-label="Datos del contrato">
-          {datos.map((d, i) => (
-            <div key={i} role="listitem" className="grid gap-2 sm:grid-cols-[1fr,1fr,auto] sm:items-start">
-              <label className="block text-[11px] text-slate-600">
-                <span className="sr-only">Nombre del dato {i + 1}</span>
-                <input type="text" value={d.nombre} onChange={cambiarDato(i, 'nombre')} placeholder="Nombre (ej.: Horario de la pileta)" maxLength={60} className={input} />
-                {esDatoDelSistema(d.nombre) && <span className="mt-0.5 block text-rose-700">Ese dato ya lo pone el sistema.</span>}
-              </label>
-              <label className="block text-[11px] text-slate-600">
-                <span className="sr-only">Valor del dato {i + 1}</span>
-                <input type="text" value={d.valor} onChange={cambiarDato(i, 'valor')} placeholder="Valor (ej.: 13.30 a 19.30 hs)" maxLength={200} className={input} />
-              </label>
-              <button type="button" onClick={() => quitarDato(i)} aria-label={`Quitar el dato ${d.nombre || i + 1}`} className="rounded-lg px-3 py-2 text-[12px] text-slate-500 hover:bg-rose-50 hover:text-rose-700">
-                Quitar
-              </button>
-            </div>
-          ))}
-        </div>
-        <button type="button" onClick={() => setDatos((prev) => [...prev, FILA_VACIA])} className="rounded-full border border-cyan-400 bg-white px-3 py-1 text-[12px] hover:bg-cyan-50">
-          + Agregar dato
-        </button>
-      </fieldset>
-
-      <label className="block text-[12px] text-slate-700">
-        Condiciones generales
-        <textarea
-          value={condiciones}
-          onChange={(e) => setCondiciones(e.target.value)}
-          rows={22}
-          placeholder={'1 - La cantidad máxima de personas por unidad es de {Máximo de personas}.\n2 - ...'}
-          className={`mt-1 ${input} font-mono text-[12px] leading-relaxed`}
-        />
-      </label>
-      <p className="text-[11px] text-slate-500">
-        Cada renglón sale como está. Para que uno salga en negrita, escribilo entre dos asteriscos de cada lado: **OBLIGATORIO**. Un renglón vacío separa párrafos.
-      </p>
-      {faltan.length > 0 && (
-        <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
-          En el texto hay datos que no están en la tabla y saldrían tal cual: {faltan.map((f) => `{${f}}`).join(', ')}.
-        </p>
-      )}
-      {error && <p role="alert" className="text-[12px] text-rose-700">{error}</p>}
-      {ok && <p className="text-[12px] text-emerald-700">{ok}</p>}
-      <div className="flex flex-wrap gap-2">
-        <button type="submit" disabled={guardando} className="rounded-lg bg-cyan-600 px-4 py-2 text-[13px] text-white disabled:opacity-60">
-          {guardando ? 'Guardando…' : 'Guardar'}
-        </button>
-        <button type="button" onClick={vistaPrevia} className="rounded-lg border border-cyan-400 bg-white px-4 py-2 text-[13px] hover:bg-cyan-50">
-          Vista previa
-        </button>
+        {acciones}
       </div>
+      {error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-[12px] text-rose-800">{error}</p>}
+
+      <Bloque numero={1} titulo="Título" ayuda="Va arriba de todo, en mayúsculas. También acepta datos, como {Temporada}.">
+        <label className="block">
+          <span className="sr-only">Título</span>
+          <input
+            type="text"
+            value={titulo}
+            onChange={(e) => { setTitulo(e.target.value); cambiado(); }}
+            placeholder={TITULO_POR_DEFECTO}
+            maxLength={120}
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] focus:border-cyan-500 focus:outline-none"
+          />
+        </label>
+        {titulo.includes('{') && (
+          <p className="mt-1 px-1 text-[12px] text-slate-500">
+            Se imprime: <span className="font-semibold text-slate-800">{reemplazarDatos(titulo, valores)}</span>
+          </p>
+        )}
+      </Bloque>
+
+      <Bloque
+        numero={2}
+        titulo="Datos del contrato"
+        ayuda="Fechas, horarios y cantidades que cambian de una temporada a otra. Se cambian acá y se actualizan solos en todo el texto."
+      >
+        <DatosContrato
+          datos={datos}
+          sistema={sistema}
+          onCambiar={cambiarDato}
+          onQuitar={quitarDato}
+          onAgregar={() => setDatos((prev) => [...prev, FILA_VACIA])}
+          onInsertar={insertar}
+        />
+      </Bloque>
+
+      <Bloque
+        numero={3}
+        titulo="Condiciones generales"
+        ayuda="El texto del contrato. Para usar un dato, escribí su nombre entre llaves o tocá el botón de insertar en la tabla de arriba."
+      >
+        <TextoContrato
+          condiciones={condiciones}
+          valores={valores}
+          onCambiar={(v) => { setCondiciones(v); cambiado(); }}
+          textareaRef={textareaRef}
+        />
+        {faltan.length > 0 && (
+          <p role="status" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-[12px] text-amber-900">
+            En el texto hay datos que no están en la tabla y saldrían tal cual: {faltan.map((f) => `{${f}}`).join(', ')}. Agregalos en la tabla o corregí el nombre.
+          </p>
+        )}
+      </Bloque>
+
+      <div className="flex justify-end">{acciones}</div>
     </form>
   );
 }
