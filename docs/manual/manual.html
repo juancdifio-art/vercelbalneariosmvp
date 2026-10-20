@@ -74,10 +74,10 @@
   <div>
     <div class="marca">BALNEARIO ZEUS</div>
     <h1>Manual de uso<br>del sistema</h1>
-    <p class="bajada">Reservas de carpas, sombrillas, estacionamiento y pileta, servicios incluidos, cobros, clientes, reportes y tarifas.</p>
+    <p class="bajada">Reservas de carpas, sombrillas, estacionamiento y pileta, servicios incluidos, cobros, clientes, reportes, tarifas, contratos y usuarios del personal.</p>
   </div>
   <img src="img/03-vista-rapida.png" alt="">
-  <div class="pie">Versión octubre 2026 · Para el encargado del balneario</div>
+  <div class="pie">Versión 20 de octubre de 2026 · Para el dueño y el personal del balneario</div>
 </section>
 
 <!-- ============ CONTENIDO ============ -->
@@ -85,9 +85,9 @@
   <h1 class="cap">Contenido</h1>
   <ol class="indice">
     <li><span class="n">1</span>Entrar al sistema</li>
-    <li><span class="n">2</span>El menú y la pantalla de Inicio</li>
+    <li><span class="n">2</span>El menú, Inicio y Soporte<span class="nuevo">con cambios</span></li>
     <li><span class="n">3</span>Vista rápida: el plano del día</li>
-    <li><span class="n">4</span>Tomar una reserva paso a paso<span class="nuevo">con cambios</span></li>
+    <li><span class="n">4</span>Tomar una reserva paso a paso</li>
     <li><span class="n">5</span>El precio: tarifas, ajustes y avisos</li>
     <li><span class="n">6</span>Ver, cobrar, editar y cancelar una reserva<span class="nuevo">con cambios</span></li>
     <li><span class="n">7</span>Listado de reservas</li>
@@ -96,24 +96,21 @@
     <li><span class="n">10</span>Pileta<span class="nuevo">con cambios</span></li>
     <li><span class="n">11</span>Reportes</li>
     <li><span class="n">12</span>Tarifas: cómo cargar los precios</li>
-    <li><span class="n">13</span>Panel de usuario<span class="nuevo">con cambios</span></li>
-    <li><span class="n">14</span>Preguntas frecuentes</li>
+    <li><span class="n">13</span>Panel de usuario: contrato y usuarios<span class="nuevo">con cambios</span></li>
+    <li><span class="n">14</span>Preguntas frecuentes<span class="nuevo">con cambios</span></li>
   </ol>
 
   <h2>Cómo leer este manual</h2>
   <p>Cada capítulo explica una parte del sistema con capturas de la pantalla real. Los nombres de botones y campos aparecen en <b>negrita</b>, tal como se ven en la pantalla.</p>
-  <p>Si recién empezás, leé en orden los capítulos 1 a 6: con eso ya podés atender el teléfono y el mostrador. Antes de la temporada, leé el capítulo 12 para cargar los precios.</p>
+  <p>Si recién empezás, leé en orden los capítulos 1 a 6: con eso ya podés atender el teléfono y el mostrador. Antes de la temporada, el dueño lee el capítulo 12 para cargar los precios y el 13 para preparar el contrato y darle un usuario a cada persona del balneario.</p>
   <p>El sistema funciona en el navegador (Chrome, Edge o Firefox), en la computadora o en el celular. No hay que instalar nada.</p>
 
   <div class="nota">
     <span class="t">Qué hay de nuevo en esta versión</span>
     <ul>
-      <li><b>Pileta incluida en la carpa:</b> cada carpa trae 4 pases de pileta; elegís a quién le tocan.</li>
-      <li><b>Datos de cada persona</b> (nombre, DNI y edad) en el mismo formulario de la reserva.</li>
-      <li><b>Pases de pileta pagos</b> para quien no entra en los incluidos, vendidos en la misma reserva.</li>
-      <li><b>Cocheras incluidas:</b> el estacionamiento queda atado a la carpa y se mueve y se cancela con ella.</li>
-      <li><b>Cuenta de la reserva:</b> la carpa y todo lo suyo se cobran juntos, con un solo pago.</li>
-      <li><b>Avisos visibles</b> arriba a la derecha cuando algo sale bien o hay que revisar algo.</li>
+      <li><b>Contrato para firmar:</b> cada carpa y sombrilla imprime su contrato con los datos del cliente y las condiciones del balneario (capítulos 6 y 13).</li>
+      <li><b>Un usuario para cada persona:</b> el dueño crea los usuarios del personal, y cada rol ve solo lo suyo (capítulo 13).</li>
+      <li><b>Soporte:</b> preguntas frecuentes y mensajes con nosotros, desde el mismo sistema (capítulo 2).</li>
     </ul>
   </div>
 </section>
@@ -123,6 +120,7 @@
   <h1 class="cap"><span class="n">1</span>Entrar al sistema</h1>
   <p>Abrí la dirección del sistema en el navegador, escribí tu <b>Email</b> y tu <b>Contraseña</b> y tocá <b>Ingresar</b>.</p>
   <figure class="w70"><img src="img/01-ingreso.png" alt=""><figcaption>Pantalla de ingreso.</figcaption></figure>
+  <p>Cada persona entra con su propio usuario. El del dueño es la cuenta principal del balneario; los del personal los crea el dueño (capítulo 13). Según el rol, el menú muestra más o menos secciones.</p>
 
   <h2>La sesión dura una hora</h2>
   <div class="lado">
@@ -137,7 +135,7 @@
 
 <!-- ============ 2 ============ -->
 <section class="capitulo">
-  <h1 class="cap"><span class="n">2</span>El menú y la pantalla de Inicio</h1>
+  <h1 class="cap"><span class="n">2</span>El menú, Inicio y Soporte</h1>
   <div class="lado">
     <figure class="f25"><img src="img/02-menu.png" alt=""><figcaption>Menú lateral.</figcaption></figure>
     <div class="texto">
@@ -152,8 +150,10 @@
         <tr><td>Clientes</td><td>Fichas de clientes y deudas.</td></tr>
         <tr><td>Reportes</td><td>Cobros y ocupación por fechas.</td></tr>
         <tr><td>Tarifas</td><td>Temporadas, sectores y precios.</td></tr>
-        <tr><td>Panel de usuario</td><td>Tu email, tu contraseña, los datos del balneario y las reglas de las reservas.</td></tr>
+        <tr><td>Panel de usuario</td><td>Tu email y tu contraseña. El dueño además ve los datos del balneario, el contrato y los usuarios.</td></tr>
+        <tr><td>Soporte</td><td>Abajo de todo: preguntas frecuentes y mensajes con nosotros.</td></tr>
       </table>
+      <p>Así ve el menú el dueño. El empleado no ve <b>Tarifas</b> ni <b>Soporte</b>; el usuario de pileta solo ve <b>Pileta</b> y <b>Panel de usuario</b>.</p>
     </div>
   </div>
 
@@ -164,6 +164,21 @@
   <h2>Los avisos</h2>
   <p>Cuando guardás algo o hay algo para revisar, aparece un aviso arriba a la derecha de la pantalla. Los avisos de que algo salió bien se van solos; los que piden revisar algo quedan hasta que los cerrás con la <b>×</b>.</p>
   <figure class="w60"><img src="img/06-aviso.png" alt=""><figcaption>Aviso después de mover una carpa que tiene un pase de pileta pago.</figcaption></figure>
+
+  <h2>Soporte: preguntas frecuentes y mensajes</h2>
+  <div class="lado">
+    <div class="texto">
+      <p>El botón <b>Soporte</b>, abajo de todo en el menú, abre un panel encima de la pantalla en la que estás. Lo que estabas haciendo queda como estaba: al cerrar el panel seguís donde estabas.</p>
+      <p>Tiene dos pestañas:</p>
+      <ul>
+        <li><b>Preguntas frecuentes</b>: las dudas más comunes, con los pasos y las capturas. Arriba aparecen las de la pantalla en la que estás, y el buscador encuentra por palabra (pago, cochera, tarifa…).</li>
+        <li><b>Mensajes</b>: para escribirnos. Podés marcar si es un error, una sugerencia o una consulta. Te respondemos ahí mismo.</li>
+      </ul>
+      <p>Cuando hay una respuesta nuestra sin leer, el botón Soporte muestra un número y el panel se abre directo en Mensajes.</p>
+      <div class="nota"><p>Soporte lo usa solo el dueño, que es quien habla con nosotros. El personal no lo ve: si tiene una duda, se la consulta al dueño.</p></div>
+    </div>
+    <figure class="f40"><img src="img/02-soporte.png" alt=""><figcaption>Soporte, abierto en Preguntas frecuentes.</figcaption></figure>
+  </div>
 </section>
 
 <!-- ============ 3 ============ -->
@@ -326,7 +341,7 @@
         <li><b>Servicios incluidos</b>: el saldo de toda la cuenta y cada cosa asociada.</li>
         <li><b>Personas</b>: el titular y los acompañantes, con sus pases de pileta.</li>
         <li><b>Historial de pagos</b> de la carpa.</li>
-        <li>Abajo, los botones <b>Editar</b>, <b>Cancelar reserva</b>, <b>Descargar comprobante</b> y <b>Cerrar</b>.</li>
+        <li>Abajo, los botones <b>Editar</b>, <b>Cancelar reserva</b>, <b>Descargar comprobante</b>, <b>Imprimir contrato</b> (en carpas y sombrillas) y <b>Cerrar</b>.</li>
       </ul>
       <div class="nota"><p>El <b>Resumen financiero</b> muestra solo la carpa. Lo que debe el cliente en total está en <b>Saldo de la cuenta</b>, dentro de Servicios incluidos.</p></div>
     </div>
@@ -381,6 +396,19 @@
 
   <h2>Descargar el comprobante</h2>
   <p><b>Descargar comprobante</b> genera un PDF para darle al cliente. Es el comprobante de <b>toda la cuenta</b>: la carpa, la pileta incluida con los nombres, cada cochera, cada pase pago, el <b>Total de la cuenta</b>, cada pago como lo hizo el cliente y el <b>saldo</b>.</p>
+
+  <div style="break-inside: avoid">
+  <h2>Imprimir el contrato</h2>
+  <p>Las carpas y las sombrillas tienen <b>Imprimir contrato</b>. Baja un PDF listo para imprimir y que el cliente lo firme. Lleva:</p>
+  <ul>
+    <li><b>Datos del titular</b>: nombre, DNI, ciudad, dirección y teléfono, de la ficha del cliente.</li>
+    <li><b>Contratación</b>: la unidad, el período, el importe total de la cuenta, la forma de pago (los medios de los pagos hechos) y las cocheras con su patente.</li>
+    <li><b>Registro de personas</b>: los acompañantes cargados, y renglones con puntos para completar a mano hasta el máximo de personas.</li>
+    <li><b>Condiciones generales</b> del balneario, con las fechas y los horarios de la temporada en negrita.</li>
+  </ul>
+  </div>
+  <figure class="w70"><img src="img/06-contrato.png" alt=""><figcaption>El principio de un contrato impreso.</figcaption></figure>
+  <p>Si en la ficha del cliente falta un dato, como el DNI o la dirección, en el contrato sale con puntos para completarlo a mano. El título y las condiciones los carga el dueño en <b>Panel de usuario › Contrato</b> (capítulo 13).</p>
 
   <h2>Los botones del pie</h2>
   <figure class="w80"><img src="img/06-botones.png" alt=""></figure>
@@ -467,8 +495,12 @@
     <tr><td>(sin etiqueta)</td><td>Un pase suelto, para alguien que viene solo a la pileta.</td></tr>
   </table>
   <p>Con <b>Nuevo Pase</b> vendés un pase suelto: elegís el cliente (obligatorio), las fechas, cuántos adultos y niños, y el precio por adulto y por niño por día. El sistema calcula el total. <b>Ver Detalle</b> abre el pase para cobrarlo o editarlo.</p>
-  <figure class="w60"><img src="img/10-pileta.png" alt=""><figcaption>Gestión de Pileta, con pases incluidos en carpas.</figcaption></figure>
+  <figure class="w50"><img src="img/10-pileta.png" alt=""><figcaption>Gestión de Pileta, con pases incluidos en carpas.</figcaption></figure>
   <p>La pileta no usa las tarifas del capítulo 12: el precio por persona se carga en cada pase.</p>
+  <div class="nota">
+    <span class="t">El usuario de pileta</span>
+    <p>Quien controla la entrada a la pileta puede tener su propio usuario, con el rol <b>Pileta</b> (capítulo 13). Lo usa desde el celular y ve solo esta pantalla: la lista de pases y quién va en cada uno. No ve cobros ni clientes, y no vende ni cambia pases.</p>
+  </div>
 </section>
 
 <!-- ============ 11 ============ -->
@@ -529,8 +561,8 @@
 
 <!-- ============ 13 ============ -->
 <section class="capitulo">
-  <h1 class="cap"><span class="n">13</span>Panel de usuario</h1>
-  <p>En <b>Panel de usuario</b> hay dos pestañas.</p>
+  <h1 class="cap"><span class="n">13</span>Panel de usuario: contrato y usuarios</h1>
+  <p>En <b>Panel de usuario</b> el dueño ve cuatro pestañas: <b>Perfil</b>, <b>Establecimiento</b>, <b>Contrato</b> y <b>Usuarios</b>. El personal ve solo Perfil.</p>
   <h2>Perfil</h2>
   <p>Tu email de ingreso. Con <b>Cambiar email</b> y <b>Cambiar contraseña</b> los actualizás; siempre pide la contraseña actual. La contraseña nueva tiene que tener al menos 8 caracteres.</p>
   <figure class="w70"><img src="img/12-perfil.png" alt=""><figcaption>Pestaña Perfil.</figcaption></figure>
@@ -548,6 +580,62 @@
     </div>
     <figure class="f50"><img src="img/12-establecimiento.png" alt=""><figcaption>Servicios, capacidad y reglas de las reservas.</figcaption></figure>
   </div>
+</section>
+
+<section class="capitulo">
+  <h2>Contrato</h2>
+  <p>Acá se carga lo que sale en el contrato de cada carpa y sombrilla (capítulo 6). Tiene tres partes. Abajo, <b>Guardar</b> aplica los cambios y <b>Vista previa en PDF</b> baja un contrato de ejemplo, con los datos del cliente en blanco.</p>
+  <h3>1 · Título</h3>
+  <p>Va arriba de todo, en mayúsculas. También acepta datos, como {Temporada}.</p>
+  <h3>2 · Datos del contrato</h3>
+  <p>Las fechas, los horarios y las cantidades que cambian de una temporada a otra. Cada dato tiene un nombre y un valor: el valor se cambia acá y se actualiza solo en todo el texto.</p>
+  <figure class="w70"><img src="img/13-contrato-datos.png" alt=""><figcaption>Los datos del contrato de Zeus.</figcaption></figure>
+  <ul>
+    <li><b>+ Agregar dato</b> suma uno nuevo; el tacho lo quita.</li>
+    <li>El botón de insertar, a la derecha de cada dato, lo pone en las condiciones donde está el cursor.</li>
+    <li>Los dos de arriba, con candado, los pone el sistema: <b>Máximo de personas</b> y <b>Balneario</b>. Se cambian en la pestaña Establecimiento.</li>
+  </ul>
+</section>
+
+<section>
+  <h3>3 · Condiciones generales</h3>
+  <p>El texto del contrato. A la izquierda se escribe y a la derecha, en <b>Así se lee en el contrato</b>, se ve cómo sale impreso, con los datos ya puestos y resaltados.</p>
+  <figure><img src="img/13-contrato-texto.png" alt=""><figcaption>Las condiciones y cómo se leen en el contrato.</figcaption></figure>
+  <table>
+    <tr><th style="width:38%">Si escribís</th><th>En el contrato sale</th></tr>
+    <tr><td>{Pileta abre}</td><td>El valor del dato, en negrita: <b>13.30</b>. Mayúsculas y minúsculas dan igual.</td></tr>
+    <tr><td>**OBLIGATORIO**</td><td>El renglón entero en negrita.</td></tr>
+    <tr><td>Un renglón vacío</td><td>Un párrafo nuevo.</td></tr>
+  </table>
+  <p>Un dato sin valor sale con puntos, para completarlo a mano. Si escribís entre llaves un nombre que no está en la tabla, sale tal cual y la pantalla avisa cuál es, para que lo agregues o corrijas el nombre.</p>
+  <div class="ejemplo">
+    <span class="t">Para la temporada que viene</span>
+    <p>Cambiá en la tabla el valor de <b>Temporada</b>, <b>Inicio de temporada</b> y <b>Fin de temporada</b>, y tocá <b>Guardar</b>. No hace falta tocar el texto.</p>
+  </div>
+</section>
+
+<section>
+  <h2>Usuarios: el personal del balneario</h2>
+  <p>Cada persona del balneario entra con su propio usuario y ve solo lo que su rol le permite. El dueño es la cuenta principal: administra todo y es el único que crea usuarios.</p>
+  <div class="lado">
+    <div class="texto">
+      <p>Para crear un usuario, escribí su <b>Email</b>, elegí el <b>Rol</b> y tocá <b>Crear usuario</b>. El sistema arma la clave y la muestra una sola vez: anotala o tocá <b>Copiar usuario y clave</b> y pasásela. Después la persona la puede cambiar desde su Panel de usuario.</p>
+      <p>En la lista, cada usuario tiene:</p>
+      <ul>
+        <li>el <b>rol</b>, que se cambia ahí mismo;</li>
+        <li><b>Clave nueva</b>, si se olvidó la suya: arma otra y la muestra una vez;</li>
+        <li>el tacho, que borra el usuario. Hacelo cuando alguien deja de trabajar en el balneario: así ya no puede entrar.</li>
+      </ul>
+      <p>El dueño aparece primero, sin acciones: su cuenta no se cambia desde acá.</p>
+    </div>
+    <figure class="f50"><img src="img/13-usuarios.png" alt=""><figcaption>El dueño, dos empleados y el de pileta.</figcaption></figure>
+  </div>
+  <table>
+    <tr><th style="width:18%">Rol</th><th>Qué ve y qué puede hacer</th></tr>
+    <tr><td>Dueño</td><td>Todo: reservas, cobros, clientes, reportes, tarifas, la configuración del balneario, el contrato, los usuarios y Soporte.</td></tr>
+    <tr><td>Empleado</td><td>Reservas, cobros, clientes y reportes. Imprime contratos y comprobantes. No ve Tarifas ni Soporte, y no cambia la configuración, el contrato ni los usuarios.</td></tr>
+    <tr><td>Pileta</td><td>Solo la pantalla de Pileta: los pases y quién va en cada uno. No ve cobros ni clientes, y no vende ni cambia pases. Pensado para el celular, en la entrada de la pileta.</td></tr>
+  </table>
 </section>
 
 <!-- ============ 14 ============ -->
@@ -569,6 +657,13 @@
     <tr><td>Un cliente viene con otro auto.</td><td>Escribí la patente nueva en la reserva: la patente va en cada reserva, no solo en la ficha del cliente.</td></tr>
     <tr><td>Quiero saber cuánto se cobró hoy en efectivo.</td><td>Reportes → Pagos, con la fecha de hoy y el método Efectivo.</td></tr>
     <tr><td>Quiero ver quién se fue debiendo plata.</td><td>Clientes, tildando Solo con deuda de reservas terminadas.</td></tr>
+    <tr><td>Quiero imprimir el contrato de una carpa.</td><td>Abrí la reserva y tocá Imprimir contrato, abajo en el detalle.</td></tr>
+    <tr><td>En el contrato sale un dato con puntos.</td><td>Si es del cliente (DNI, dirección), completalo en su ficha. Si es de las condiciones, cargale el valor en Panel de usuario › Contrato.</td></tr>
+    <tr><td>Cambian las fechas o los horarios de la temporada.</td><td>Panel de usuario › Contrato: cambiá el valor en la tabla de datos y tocá Guardar. El texto se actualiza solo.</td></tr>
+    <tr><td>Quiero darle un usuario a un empleado.</td><td>Panel de usuario › Usuarios: su email, el rol Empleado y Crear usuario. Pasale la clave que aparece: no se vuelve a mostrar.</td></tr>
+    <tr><td>Un empleado se olvidó la clave.</td><td>Panel de usuario › Usuarios, Clave nueva en su renglón.</td></tr>
+    <tr><td>El empleado no ve Tarifas ni Soporte.</td><td>Es así: esas dos las usa solo el dueño.</td></tr>
+    <tr><td>Tengo una duda o encontré un error.</td><td>Soporte, abajo en el menú: buscá en Preguntas frecuentes o escribinos en Mensajes.</td></tr>
   </table>
 </section>
 

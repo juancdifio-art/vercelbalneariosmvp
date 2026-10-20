@@ -41,7 +41,7 @@ describe('Panel de usuario > Usuarios', () => {
     await screen.findByRole('list', { name: 'Usuarios del balneario' });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'pileta@balneario.test' } });
     fireEvent.change(screen.getByLabelText('Rol'), { target: { value: 'pileta' } });
-    expect(screen.getByText(/Solo mira reservas/)).toBeInTheDocument();
+    expect(screen.getByText(/Solo ve los pases de pileta/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Crear usuario' }));
 
     const aviso = await screen.findByRole('status');

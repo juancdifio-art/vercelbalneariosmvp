@@ -12,7 +12,7 @@ export const ETIQUETA_ROL = {
 /** Qué puede hacer cada rol del personal, para elegirlo con conocimiento. */
 export const AYUDA_ROL = {
   operador: 'Reservas, clientes, cobros y reportes. No cambia tarifas, contrato ni usuarios.',
-  pileta: 'Solo mira reservas, pases y clientes, para controlar la pileta.'
+  pileta: 'Solo ve los pases de pileta y quién va en cada uno, para controlar la entrada. No ve cobros ni clientes.'
 };
 
 const ERRORES = {

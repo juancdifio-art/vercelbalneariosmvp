@@ -241,6 +241,18 @@ export const PREGUNTAS_FRECUENTES = [
     ],
     secciones: ['reservas', 'carpas', 'sombrillas']
   },
+  {
+    id: 'imprimir-contrato',
+    pregunta: '¿Cómo imprimo el contrato de una carpa?',
+    resumen: 'Desde la reserva de la carpa o la sombrilla se baja un PDF listo para firmar.',
+    pasos: [
+      { texto: 'Abrí la reserva.' },
+      { texto: 'Tocá **Imprimir contrato**, abajo de todo.', imagen: '06-botones.png' },
+      { texto: 'Se descarga un PDF con los datos del titular, la unidad, el período, el importe, las cocheras, las personas y las condiciones del balneario. Imprimilo y que lo firme.', imagen: '06-contrato.png' }
+    ],
+    nota: 'Lo que falte en la ficha del cliente, como el DNI o la dirección, sale con puntos para completar a mano.',
+    secciones: ['reservas', 'carpas', 'sombrillas']
+  },
 
   // --- Cambiar o cancelar ---
   {
@@ -309,6 +321,18 @@ export const PREGUNTAS_FRECUENTES = [
     nota: 'Las fechas no tienen año. Los días que no caen en ningún período se marcan en rojo en la tira del año: esas reservas saldrían “Consultar precio”.',
     secciones: ['tarifas']
   },
+  {
+    id: 'datos-contrato',
+    pregunta: '¿Cómo cambio las fechas o los horarios del contrato?',
+    resumen: 'En **Panel de usuario**, pestaña **Contrato**: se cambia el valor en la tabla de datos y el texto se actualiza solo.',
+    pasos: [
+      { texto: 'Entrá a **Panel de usuario**, pestaña **Contrato**.' },
+      { texto: 'En **Datos del contrato**, cambiá el valor que corresponda: la temporada, una fecha, un horario.', imagen: '13-contrato-datos.png' },
+      { texto: 'Tocá **Guardar**. Con **Vista previa en PDF** ves cómo queda.' }
+    ],
+    nota: 'En las condiciones, un dato se escribe con su nombre entre llaves, como {Pileta abre}, y sale en negrita con su valor.',
+    secciones: ['panel-usuario']
+  },
 
   // --- Cuenta ---
   {
@@ -329,6 +353,25 @@ export const PREGUNTAS_FRECUENTES = [
       { texto: 'Entrá a **Panel de usuario**, pestaña **Perfil**.', imagen: '12-perfil.png' },
       { texto: 'Tocá **Cambiar contraseña**, escribí la actual y la nueva (de 8 caracteres o más) y guardá.' }
     ],
+    secciones: ['panel-usuario']
+  },
+  {
+    id: 'usuario-empleado',
+    pregunta: 'Quiero darle un usuario a un empleado.',
+    resumen: 'En **Panel de usuario**, pestaña **Usuarios**. Cada persona entra con el suyo y ve solo lo que su rol le permite.',
+    pasos: [
+      { texto: 'Entrá a **Panel de usuario**, pestaña **Usuarios**.' },
+      { texto: 'Escribí su **Email**, elegí el **Rol** y tocá **Crear usuario**.', imagen: '13-usuarios.png' },
+      { texto: 'Pasale la clave que aparece, o tocá **Copiar usuario y clave**: no se vuelve a mostrar.' }
+    ],
+    nota: '**Empleado**: reservas, cobros, clientes y reportes, sin Tarifas ni Soporte. **Pileta**: solo los pases de pileta, para controlar la entrada desde el celular.',
+    secciones: ['panel-usuario']
+  },
+  {
+    id: 'clave-empleado',
+    pregunta: 'Un empleado se olvidó la clave.',
+    resumen: 'En **Panel de usuario**, pestaña **Usuarios**, tocá **Clave nueva** en su renglón y pasale la que aparece.',
+    nota: 'Si alguien deja de trabajar en el balneario, borrá su usuario con el tacho: así ya no puede entrar.',
     secciones: ['panel-usuario']
   }
 ];
