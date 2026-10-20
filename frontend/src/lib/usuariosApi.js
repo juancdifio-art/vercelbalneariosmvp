@@ -3,7 +3,7 @@ import { getApiBaseUrl } from '../apiConfig';
 
 /** Cómo se ve cada rol en pantalla. */
 export const ETIQUETA_ROL = {
-  admin: 'Encargado',
+  admin: 'Dueño',
   operador: 'Empleado',
   pileta: 'Pileta',
   soporte: 'Soporte'
@@ -21,9 +21,9 @@ const ERRORES = {
   email_taken: 'Ya hay una cuenta con ese email.',
   rol_invalido: 'Elegí si es empleado o de pileta.',
   demasiados_usuarios: 'Llegaste al máximo de usuarios del balneario.',
-  es_el_encargado: 'Al encargado no se lo cambia desde acá.',
+  es_el_encargado: 'Al dueño no se lo cambia desde acá.',
   usuario_no_encontrado: 'Ese usuario ya no existe.',
-  sin_permiso: 'Solo el encargado administra los usuarios.'
+  sin_permiso: 'Solo el dueño administra los usuarios.'
 };
 
 export async function pedirUsuarios(ruta = '', { method = 'GET', body } = {}) {

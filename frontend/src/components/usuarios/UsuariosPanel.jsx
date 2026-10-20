@@ -91,7 +91,7 @@ function UsuariosPanel() {
   return (
     <div className="max-w-3xl space-y-4">
       <p className="text-[12px] text-slate-600">
-        Cada persona del balneario entra con su propio usuario y ve lo que su rol le permite. El encargado administra todo.
+        Cada persona del balneario entra con su propio usuario y ve lo que su rol le permite. El dueño administra todo.
       </p>
 
       <form onSubmit={crear} className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
