@@ -21,6 +21,7 @@ const reglasIncluidos = require('../../api/_incluidos/reglas');
 const { enTransaccion } = require('../../api/_incluidos/transaccion');
 const soporte = require('../../api/_soporte/servicio');
 const cuentas = require('../../api/_cuentas/servicio');
+const contrato = require('../../api/_contrato/servicio');
 
 async function conTransaccion(fn) {
   const client = await pool.connect();
@@ -2342,6 +2343,25 @@ app.all(/^\/api\/cuentas(\/.*)?$/, authenticateToken, async (req, res) => {
     return res.status(r.status).json(r.body);
   } catch (error) {
     console.error('Error en cuentas', error);
+    return res.status(500).json({ error: 'server_error' });
+  }
+});
+
+// Titulo y condiciones del contrato imprimible. La logica vive en api/_contrato/servicio.js.
+app.all(/^\/api\/contrato(\/.*)?$/, authenticateToken, async (req, res) => {
+  try {
+    const estResult = await pool.query('SELECT id FROM establishments WHERE user_id = $1', [req.user.id]);
+    if (estResult.rows.length === 0) {
+      return res.status(404).json({ error: 'establishment_not_found' });
+    }
+    const r = await contrato.rutearContrato(queryTarifas, estResult.rows[0].id, {
+      method: req.method,
+      partes: req.path.split('/').filter(Boolean).slice(2),
+      body: req.body || {}
+    });
+    return res.status(r.status).json(r.body);
+  } catch (error) {
+    console.error('Error en contrato', error);
     return res.status(500).json({ error: 'server_error' });
   }
 });

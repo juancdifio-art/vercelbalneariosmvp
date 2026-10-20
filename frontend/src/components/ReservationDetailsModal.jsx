@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { format } from '../lib/dates';
 import { generateReceipt } from '../utils/generateReceipt';
+import { descargarContrato } from '../lib/contratoApi';
 import { getApiBaseUrl } from '../apiConfig';
 import { formatPesos } from '../lib/money';
 import { otrasReservasVigentes, saldoDe, hoyISO, unirPagosDeCuenta } from '../lib/reservas';
@@ -176,6 +177,24 @@ function ReservationDetailsModal({
       pagosDeLaCuenta = unirPagosDeCuenta([payments, ...listas]);
     }
     generateReceipt({ ...reservation, payments: pagosDeLaCuenta, vinculadas }, establishment);
+  };
+
+  // Contrato para firmar: el importe es el de toda la cuenta.
+  const [errorContrato, setErrorContrato] = useState('');
+  const imprimirContrato = async () => {
+    setErrorContrato('');
+    try {
+      await descargarContrato({
+        reserva: reservation,
+        establecimiento: establishment,
+        titular,
+        vinculadas,
+        pagos: payments,
+        total: cuenta ? cuenta.total : totalPrice
+      });
+    } catch (err) {
+      setErrorContrato(err.message || 'No se pudo armar el contrato.');
+    }
   };
 
   const balance =
@@ -677,6 +696,16 @@ function ReservationDetailsModal({
               >
                 📄 Descargar comprobante
               </button>
+              {esUnidadDeSombra && status !== 'cancelled' && (
+                <button
+                  type="button"
+                  className="inline-flex items-center rounded-lg border border-slate-300 px-4 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 transition shadow-sm"
+                  onClick={imprimirContrato}
+                >
+                  📝 Imprimir contrato
+                </button>
+              )}
+              {errorContrato && <p role="alert" className="w-full text-xs text-rose-700">{errorContrato}</p>}
             </div>
             <button
               type="button"

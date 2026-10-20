@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getApiBaseUrl } from '../apiConfig';
 import EstablishmentConfigForm from './EstablishmentConfigForm';
+import ContratoConfig from './ContratoConfig';
 
 const API_BASE_URL = getApiBaseUrl();
 
@@ -12,8 +13,8 @@ const ETIQUETA_ROL = {
 /**
  * Panel de usuario: perfil y configuracion del establecimiento.
  *
- * Son dos solapas y no una pagina apilada porque mas adelante entran Precios y
- * Usuarios; con solapas, sumar una es agregar un item a SOLAPAS.
+ * Son solapas y no una pagina apilada porque se van sumando (Contrato fue la
+ * tercera); sumar una es agregar un item a SOLAPAS.
  *
  * El establecimiento llega como un unico objeto `establecimiento` en vez de 25
  * props sueltas: asi App.jsx —que ya tiene 2781 lineas— no suma 25 lineas de
@@ -22,7 +23,8 @@ const ETIQUETA_ROL = {
  */
 const SOLAPAS = [
   { id: 'perfil', label: 'Perfil' },
-  { id: 'establecimiento', label: 'Establecimiento' }
+  { id: 'establecimiento', label: 'Establecimiento' },
+  { id: 'contrato', label: 'Contrato' }
 ];
 
 function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimiento }) {
@@ -300,6 +302,15 @@ function PanelUsuarioSection({ authToken, userEmail, onEmailChanged, establecimi
           </p>
           <EstablishmentConfigForm variant="light" {...establecimiento} />
         </div>
+      )}
+
+      {solapa === 'contrato' && (
+        <ContratoConfig
+          establishment={{
+            name: establecimiento?.estName,
+            maxPersonasPorUnidad: establecimiento?.estAjustes?.maxPersonasPorUnidad
+          }}
+        />
       )}
     </div>
   );
