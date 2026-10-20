@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { seccionesDelRol, seccionPermitida, usaSoporte } from './sections';
+import { seccionesDelRol, seccionPermitida, seccionVisible, usaSoporte } from './sections';
 
 const TODAS = ['inicio', 'vista-diaria', 'reservas', 'carpas', 'pileta', 'clientes', 'reportes', 'tarifas', 'panel-usuario'].map((id) => ({ id }));
 const ids = (items) => items.map((i) => i.id);
@@ -33,5 +33,18 @@ describe('secciones por rol', () => {
 
   it('sin rol conocido no oculta nada', () => {
     expect(seccionesDelRol(TODAS, '')).toHaveLength(TODAS.length);
+  });
+});
+
+describe('seccion que se muestra', () => {
+  const MENU = [{ id: 'inicio' }, { id: 'clientes' }];
+
+  it('la Bandeja de soporte se muestra aunque no este en el menu de App (la arma el shell)', () => {
+    expect(seccionVisible('bandeja-soporte', MENU)).toBe('bandeja-soporte');
+  });
+
+  it('una seccion del menu se muestra; una que no esta cae en la primera', () => {
+    expect(seccionVisible('clientes', MENU)).toBe('clientes');
+    expect(seccionVisible('tarifas', MENU)).toBe('inicio');
   });
 });
