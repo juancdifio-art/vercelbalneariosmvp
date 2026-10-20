@@ -138,17 +138,34 @@ describe('datos del contrato', () => {
       maxPersonas: 6
     });
     expect(c.titulo).toBe('CONTRATACIÓN 2026-2027');
-    expect(c.condiciones).toEqual([
+    expect(c.condiciones.map(({ texto, negrita }) => ({ texto, negrita }))).toEqual([
       { texto: '8 - PILETA', negrita: true },
       { texto: 'Habilitada de 13.30 a 19.30 hs.', negrita: false },
       { texto: 'Máximo 6 personas.', negrita: false }
+    ]);
+    // El valor de cada dato queda aparte, para imprimirlo en negrita.
+    expect(c.condiciones[1].partes).toEqual([
+      { texto: 'Habilitada de ', dato: false, faltante: false },
+      { texto: '13.30 a 19.30 hs', dato: true, faltante: false },
+      { texto: '.', dato: false, faltante: false }
     ]);
   });
 });
 
 describe('lineasCondiciones', () => {
+  it('marca los {nombres} que no son datos', () => {
+    const [linea] = lineasCondiciones('Desde {Inicio} hasta {Fin}', new Map([['inicio', '15/12']]));
+    expect(linea.partes).toEqual([
+      { texto: 'Desde ', dato: false, faltante: false },
+      { texto: '15/12', dato: true, faltante: false },
+      { texto: ' hasta ', dato: false, faltante: false },
+      { texto: '{Fin}', dato: false, faltante: true }
+    ]);
+  });
+
   it('una linea entre ** sale en negrita y las vacias se conservan', () => {
-    expect(lineasCondiciones('**OBLIGATORIO**\nEl cliente que quiera...\n\n  **7 - DEPOSITO**  \nTexto con **dentro** no es negrita')).toEqual([
+    const lineas = lineasCondiciones('**OBLIGATORIO**\nEl cliente que quiera...\n\n  **7 - DEPOSITO**  \nTexto con **dentro** no es negrita');
+    expect(lineas.map(({ texto, negrita }) => ({ texto, negrita }))).toEqual([
       { texto: 'OBLIGATORIO', negrita: true },
       { texto: 'El cliente que quiera...', negrita: false },
       { texto: '', negrita: false },

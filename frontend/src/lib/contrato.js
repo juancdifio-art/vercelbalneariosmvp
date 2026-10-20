@@ -23,7 +23,7 @@ const MARCA_DATO = /\{([^{}\n]{1,60})\}/g;
 export function datosDelSistema({ nombreBalneario, maxPersonas } = {}) {
   return [
     { nombre: 'Máximo de personas', valor: maxPersonas == null || maxPersonas === '' ? '' : String(maxPersonas), origen: 'Panel de usuario › Establecimiento' },
-    { nombre: 'Balneario', valor: nombreBalneario || '', origen: 'el nombre del establecimiento' }
+    { nombre: 'Balneario', valor: nombreBalneario || '', origen: 'Panel de usuario › Establecimiento' }
   ];
 }
 
@@ -57,16 +57,39 @@ export function datosFaltantes(texto, valores) {
 }
 
 /**
- * Las condiciones, linea por linea. Una linea escrita entre ** y ** sale en
- * negrita; una linea vacia separa parrafos.
+ * Un renglon en trozos: el texto fijo, el valor de cada dato (`dato`, que se
+ * imprime en negrita para que se distinga) y las {marcas} que no son ningun
+ * dato (`faltante`, que quedan tal cual). Sin `valores` no se reemplaza nada.
  */
-export function lineasCondiciones(texto) {
+function partesDelRenglon(renglon, valores) {
+  if (!valores) return [{ texto: renglon, dato: false, faltante: false }];
+  const partes = [];
+  let desde = 0;
+  for (const m of renglon.matchAll(MARCA_DATO)) {
+    if (m.index > desde) partes.push({ texto: renglon.slice(desde, m.index), dato: false, faltante: false });
+    const clave = claveDato(m[1]);
+    partes.push(valores.has(clave)
+      ? { texto: valores.get(clave) || SIN_VALOR, dato: true, faltante: false }
+      : { texto: m[0], dato: false, faltante: true });
+    desde = m.index + m[0].length;
+  }
+  if (desde < renglon.length) partes.push({ texto: renglon.slice(desde), dato: false, faltante: false });
+  return partes;
+}
+
+/**
+ * Las condiciones, renglon por renglon. Un renglon escrito entre ** y ** sale
+ * en negrita; uno vacio separa parrafos. Con `valores`, cada {Nombre} se
+ * cambia por el valor de ese dato (ver partesDelRenglon).
+ */
+export function lineasCondiciones(texto, valores = null) {
   return String(texto || '')
     .replace(/\r\n/g, '\n')
     .split('\n')
-    .map((linea) => {
-      const m = /^\s*\*\*(.+)\*\*\s*$/.exec(linea);
-      return m ? { texto: m[1].trim(), negrita: true } : { texto: linea.trimEnd(), negrita: false };
+    .map((renglon) => {
+      const m = /^\s*\*\*(.+)\*\*\s*$/.exec(renglon);
+      const partes = partesDelRenglon(m ? m[1].trim() : renglon.trimEnd(), valores);
+      return { texto: partes.map((p) => p.texto).join(''), negrita: Boolean(m), partes };
     });
 }
 
@@ -144,6 +167,6 @@ export function armarContrato({
       return [`N° ${c.resourceNumber}`, sector, patente].filter(Boolean).join(' · ');
     }),
     nomina,
-    condiciones: lineasCondiciones(reemplazarDatos(contrato?.condiciones, valores))
+    condiciones: lineasCondiciones(contrato?.condiciones, valores)
   };
 }

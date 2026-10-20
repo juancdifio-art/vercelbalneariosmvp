@@ -23,7 +23,11 @@ import {
   Tags,
   MessageCircle,
   Inbox,
-  UserCog
+  UserCog,
+  Trash2,
+  TextCursorInput,
+  Lock,
+  FileText
 } from 'lucide-react';
 
 /**
@@ -126,6 +130,15 @@ export const PagosIcon = conTrazo(Banknote);
 export const CheckInsIcon = conTrazo(CalendarClock);
 export const CerrarIcon = conTrazo(X);
 export const AvisoIcon = conTrazo(TriangleAlert);
+
+// --- Contrato ----------------------------------------------------------
+// Panel de usuario > Contrato: quitar un dato, insertarlo en el texto, los
+// datos que pone el sistema y la vista previa en PDF.
+
+export const QuitarIcon = conTrazo(Trash2);
+export const InsertarIcon = conTrazo(TextCursorInput);
+export const AutomaticoIcon = conTrazo(Lock);
+export const DocumentoIcon = conTrazo(FileText);
 
 /**
  * Color de cada servicio. Unica fuente: si el naranja de carpas se define en

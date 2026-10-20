@@ -65,7 +65,7 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 
 ```bash
 cd api && npm test        # 267 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas / _contrato
-cd frontend && npm test   # 365 tests de componentes y utilidades
+cd frontend && npm test   # 369 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
@@ -127,6 +127,8 @@ Cada carpa y sombrilla imprime su contrato para firmar desde el detalle de la re
 - **Formato de las condiciones:** cada renglón sale como está; uno escrito entre `**` y `**` sale en negrita.
 - **Datos del contrato** (`establishments.contrato_datos`, JSONB `[{ nombre, valor }]`): fechas, horarios y cantidades. En el título y las condiciones, `{Nombre}` se cambia por el valor al imprimir (`reemplazarDatos` en `lib/contrato.js`; sin distinguir mayúsculas). `{Máximo de personas}` y `{Balneario}` los pone el sistema desde la configuración del establecimiento y le ganan a un dato cargado con el mismo nombre. Un dato sin valor sale con puntos; un `{Nombre}` que no es dato queda tal cual y la solapa lo avisa.
 - **Las fuentes de jsPDF solo traen Latin-1:** `aTextoPdf` pasa guiones y comillas tipográficas a simples y quita lo que no entra. Acentos y eñes andan.
+- **Los valores de los datos salen en negrita en medio del renglón**, así que las condiciones se dibujan palabra por palabra (`renglonConNegritas`). Se miden con `getStringUnitWidth(t, { doKerning: false })`: `getTextWidth` descuenta el kerning pero `text()` no lo aplica, y las palabras con pares como "Te" se comían el espacio siguiente ("Temporadael").
+- **La solapa** está en `components/ContratoConfig.jsx` (título, datos, condiciones) con `components/contrato/DatosContrato.jsx` (tabla, insertar un dato en el cursor) y `TextoContrato.jsx` (editor y "Así se lee", con los datos resaltados).
 - El texto de Zeus, transcripto tal cual de `docs/Contrato zeus*.jpeg`, está en `backend/supabase-zeus-contrato.sql`.
 
 ## Administrador general de cuentas

@@ -107,13 +107,52 @@ export function generarContratoPdf(c, { guardar = true } = {}) {
         y += ALTO_LINEA * 0.6;
         continue;
       }
-      doc.setFont('helvetica', linea.negrita ? 'bold' : 'normal');
-      for (const parte of doc.splitTextToSize(aTextoPdf(linea.texto), util)) {
-        asegurar(ALTO_LINEA);
-        texto(parte, MARGEN);
-        y += ALTO_LINEA;
+      renglonConNegritas(linea);
+    }
+  }
+
+  // Un renglon de las condiciones, palabra por palabra: los valores de los
+  // datos van en negrita en medio del texto, y splitTextToSize no corta un
+  // renglon con dos fuentes. Una palabra pegada a un dato ("13.30.") no se separa.
+  function renglonConNegritas(linea) {
+    const palabras = [[]];
+    for (const parte of linea.partes || [{ texto: linea.texto }]) {
+      const negrita = linea.negrita || Boolean(parte.dato);
+      for (const trozo of aTextoPdf(parte.texto).split(/(\s+)/)) {
+        if (!trozo) continue;
+        if (/^\s+$/.test(trozo)) {
+          if (palabras.at(-1).length) palabras.push([]);
+        } else {
+          palabras.at(-1).push({ texto: trozo, negrita });
+        }
       }
     }
+    // Sin kerning: getTextWidth lo descuenta, pero text() no lo aplica al
+    // dibujar, y cada palabra con pares como "Te" se comia el espacio siguiente.
+    const medir = (t) => doc.getStringUnitWidth(t, { doKerning: false }) * doc.getFontSize() / doc.internal.scaleFactor;
+    const anchoDe = (trozo) => {
+      doc.setFont('helvetica', trozo.negrita ? 'bold' : 'normal');
+      return medir(trozo.texto);
+    };
+    doc.setFont('helvetica', 'normal');
+    const espacio = medir(' ');
+    asegurar(ALTO_LINEA);
+    let x = MARGEN;
+    for (const palabra of palabras.filter((p) => p.length)) {
+      const ancho = palabra.reduce((suma, t) => suma + anchoDe(t), 0);
+      if (x > MARGEN && x + ancho > MARGEN + util) {
+        y += ALTO_LINEA;
+        asegurar(ALTO_LINEA);
+        x = MARGEN;
+      }
+      for (const trozo of palabra) {
+        const anchoTrozo = anchoDe(trozo);
+        doc.text(trozo.texto, x, y);
+        x += anchoTrozo;
+      }
+      x += espacio;
+    }
+    y += ALTO_LINEA;
   }
 
   // Firma: va entera en la misma pagina.
