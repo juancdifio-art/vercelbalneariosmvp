@@ -103,3 +103,21 @@ describe('cuenta de la carpa en el detalle', () => {
     expect(onAddPayment).toHaveBeenCalledWith(expect.objectContaining({ id: 502 }), null);
   });
 });
+
+describe('detalle de la pileta incluida en una carpa', () => {
+  it('dice en el precio de que carpa va, sin $0 ni cobro propio', async () => {
+    const onAddPayment = vi.fn();
+    render(<ReservationDetailsModal reservation={DEL_CLIENTE[1]} {...props({ onAddPayment })} />);
+
+    expect(await screen.findByText('Incluida en el precio de la Carpa 12.')).toBeInTheDocument();
+    expect(screen.queryByText('Saldo pendiente')).toBeNull();
+    expect(screen.queryByText(/Historial de pagos/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Agendar pago/ })).toBeNull();
+  });
+
+  it('el pase pago de la carpa si muestra su precio y se cobra', async () => {
+    render(<ReservationDetailsModal reservation={DEL_CLIENTE[3]} {...props()} />);
+    expect(await screen.findByText('Saldo pendiente')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Agendar pago/ })).toBeInTheDocument();
+  });
+});

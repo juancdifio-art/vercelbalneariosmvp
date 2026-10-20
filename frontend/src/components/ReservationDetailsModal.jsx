@@ -559,7 +559,8 @@ function ReservationDetailsModal({
             />
           )}
 
-          {/* Payments section */}
+          {/* Payments section. La pileta incluida no se cobra sola: se cobra en su carpa. */}
+          {!esPiletaIncluida(reservation) && (
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wide">💳 Historial de pagos</h3>
@@ -642,6 +643,7 @@ function ReservationDetailsModal({
               </div>
             )}
           </div>
+          )}
 
           {/* Actions */}
           <div className="mt-4 flex items-center justify-between gap-3 pt-4 border-t border-slate-200">
