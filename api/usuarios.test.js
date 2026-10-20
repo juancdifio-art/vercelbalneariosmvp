@@ -34,7 +34,15 @@ describe('qué puede cada rol', () => {
     expect(puede('operador', 'POST', 'reservation-groups')).toBe(true);
     expect(puede('operador', 'PUT', 'contrato')).toBe(false);
     expect(puede('operador', 'GET', 'usuarios')).toBe(false);
-    expect(puede('pileta', 'GET', 'reservation-groups')).toBe(true);
+    // Pileta solo mira los pases: la lista filtrada a pileta y quien va en cada pase.
+    expect(puede('pileta', 'GET', 'reservation-groups', { servicio: 'pileta' })).toBe(true);
+    expect(puede('pileta', 'GET', 'reservation-groups', { partes: ['7', 'pase-personas'] })).toBe(true);
+    expect(puede('pileta', 'GET', 'establishment', { partes: ['me'] })).toBe(true);
+    expect(puede('pileta', 'GET', 'reservation-groups')).toBe(false);
+    expect(puede('pileta', 'GET', 'reservation-groups', { servicio: 'carpa' })).toBe(false);
+    expect(puede('pileta', 'GET', 'reservation-groups', { partes: ['7', 'payments'] })).toBe(false);
+    expect(puede('pileta', 'GET', 'clients')).toBe(false);
+    expect(puede('pileta', 'PUT', 'reservation-groups', { partes: ['7', 'pase-personas'] })).toBe(false);
     expect(puede('pileta', 'POST', 'reservation-groups')).toBe(false);
     expect(puede('pileta', 'GET', 'reports')).toBe(false);
     // Una ruta sin control (auth, soporte, cuentas) no pasa por aca.
@@ -64,14 +72,28 @@ describe('control de roles a la entrada de la API', () => {
     expect(rolMock).toHaveBeenCalledTimes(1);
   });
 
-  it('pileta mira reservas pero no las crea ni ve reportes', async () => {
+  it('pileta mira los pases de pileta, pero no el resto de las reservas, los pagos ni reportes', async () => {
     comoRol('pileta');
     responde([]);
-    expect((await request(handler).get('/?route=reservation-groups').set('Authorization', token)).status).toBe(404);
+    expect((await request(handler).get('/?route=reservation-groups&service=pileta').set('Authorization', token)).status).toBe(404);
+    comoRol('pileta');
+    expect((await request(handler).get('/?route=reservation-groups').set('Authorization', token)).status).toBe(403);
+    comoRol('pileta');
+    expect((await request(handler).get('/?route=reservation-groups/7/payments').set('Authorization', token)).status).toBe(403);
     comoRol('pileta');
     expect((await request(handler).post('/?route=reservation-groups').set('Authorization', token).send({})).status).toBe(403);
     comoRol('pileta');
     expect((await request(handler).get('/?route=reports/payments').set('Authorization', token)).status).toBe(403);
+  });
+
+  it('una ruta con ? adentro no existe: no se puede saltear el filtro de pileta', async () => {
+    // Corta antes del control de roles: ni siquiera se pregunta el rol.
+    for (const ruta of ['reservation-groups%3F', 'reservation-groups%3Fservice%3Dcarpa%26', 'reservation-groups%23']) {
+      const res = await request(handler).get(`/?route=${ruta}&service=pileta`).set('Authorization', token);
+      expect(res.status).toBe(404);
+    }
+    expect(rolMock).not.toHaveBeenCalled();
+    expect(queryMock).not.toHaveBeenCalled();
   });
 
   it('un empleado no cambia la configuracion del balneario ni el contrato', async () => {

@@ -64,8 +64,8 @@ Al agregar una columna, reflejarla también en `backend/schema.sql` para instala
 ## Tests
 
 ```bash
-cd api && npm test        # 282 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas / _contrato / _usuarios
-cd frontend && npm test   # 384 tests de componentes y utilidades
+cd api && npm test        # 283 tests del router serverless y de _incluidos / _tarifas / _soporte / _cuentas / _contrato / _usuarios
+cd frontend && npm test   # 388 tests de componentes y utilidades
 ```
 
 `backend/src/index.js` **no tiene tests**. Cuando se replica un endpoint ahí, la cobertura viene del test equivalente en `api/`.
@@ -162,9 +162,9 @@ Pendientes conocidos, fuera del alcance de lo hecho hasta ahora:
 Cada balneario tiene un encargado y su personal. Migración: `backend/migrate-usuarios-establecimiento.sql`.
 
 - **Modelo:** todos apuntan al balneario con `users.establishment_id`; `establishments.user_id` (UNIQUE) sigue siendo el encargado. El balneario de quien pide se busca siempre por `establishments WHERE id = (SELECT establishment_id FROM users WHERE id = $1)`, **nunca por `user_id`**, o el personal no ve su balneario. Al crear un balneario (onboarding o Cuentas) se le pone el `establishment_id` al encargado.
-- **Roles** (`users.role`): `admin` el encargado, todo; `operador` un empleado: reservas, clientes, pagos y reportes, mira tarifas y contrato sin cambiarlos; `pileta` solo mira reservas, pases y clientes; `soporte` sin balneario.
-- **El control es uno solo, a la entrada de cada API** (`api/_permisos/permisos.js`, `REGLAS` por recurso y método): en `api/index.js` antes de las rutas y en `backend/src/index.js` como middleware de `/api`. Lee el rol de la base en cada pedido y responde 403 `sin_permiso`. Auth, soporte y cuentas no pasan por ahí. **Un recurso nuevo del balneario hay que sumarlo a `REGLAS`**, o queda abierto para todo el personal.
+- **Roles** (`users.role`): `admin` el encargado, todo; `operador` un empleado: reservas, clientes, pagos y reportes, mira tarifas y contrato sin cambiarlos; `pileta` solo mira los pases de pileta (la lista con `?service=pileta` y `reservation-groups/:id/pase-personas`, más `establishment/me`), sin pagos ni clientes, y lo usa desde el celular; `soporte` sin balneario. El chat de soporte es solo de la administración: `_soporte` le responde 403 `solo_encargado` al personal.
+- **El control es uno solo, a la entrada de cada API** (`api/_permisos/permisos.js`: `REGLAS` por recurso y método para el empleado, y `puedePileta` con los segmentos de la ruta y el `?service=` para pileta): en `api/index.js` antes de las rutas y en `backend/src/index.js` como middleware de `/api`. Lee el rol de la base en cada pedido y responde 403 `sin_permiso`. Auth, soporte y cuentas no pasan por ahí. **Un recurso nuevo del balneario hay que sumarlo a `REGLAS`**, o queda abierto para todo el personal.
 - **El encargado administra a su personal** en Panel de usuario › Usuarios (`api/_usuarios/servicio.js`, ruta `usuarios`): alta con clave generada, cambio de rol, clave nueva y baja. Al encargado no se lo toca desde ahí; tope de 30 usuarios por balneario.
-- **Frontend:** `seccionesDelRol` (`config/sections.js`) oculta las secciones de cada rol (el empleado no ve Tarifas; pileta ve Vista rápida, Pileta y su perfil) y `App.jsx` muestra `seccionActiva`, que cae en la primera permitida. Las solapas de configuración, contrato y usuarios son solo del encargado. Es lo que se muestra: el que manda es el control de la API.
+- **Frontend:** `seccionesDelRol` (`config/sections.js`) oculta las secciones de cada rol (el empleado no ve Tarifas; pileta ve solo Pileta, sin alta ni detalle, y su perfil); `seccionPermitida` mueve `activeSection` a una que el rol ve, así las cargas de datos de cada sección siguen andando; `usaSoporte` esconde el botón de Soporte al personal. Las solapas de configuración, contrato y usuarios son solo del encargado. Es lo que se muestra: el que manda es el control de la API.
 
 Documentos de diseño en `docs/superpowers/specs/` y planes en `docs/superpowers/plans/`.

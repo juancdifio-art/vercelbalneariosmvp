@@ -34,7 +34,7 @@ import useAuth from './hooks/useAuth';
 import useEstablishment from './hooks/useEstablishment';
 import useClients from './hooks/useClients';
 import { useAccesoCuentas } from './hooks/useCuentas';
-import { seccionesDelRol } from './config/sections';
+import { seccionesDelRol, seccionPermitida, usaSoporte } from './config/sections';
 import { getApiBaseUrl } from './apiConfig';
 
 const API_BASE_URL = getApiBaseUrl();
@@ -141,6 +141,13 @@ function App() {
   // Administrador general: suma la seccion Cuentas, o la ve sola si no tiene
   // balneario. null mientras se pregunta a la API.
   const administraCuentas = useAccesoCuentas(isAuthenticated);
+
+  // Si el rol no ve la seccion abierta (el de pileta arranca en Pileta), se
+  // pasa a una que vea: las cargas de datos de cada seccion siguen a activeSection.
+  useEffect(() => {
+    const destino = seccionPermitida(activeSection, userRole);
+    if (destino !== activeSection) setActiveSection(destino);
+  }, [activeSection, userRole]);
 
   // Sube cada vez que un cambio toca varias reservas a la vez (una carpa con
   // sus incluidos): las grillas y listas que dependen de esto se vuelven a pedir.
@@ -2486,6 +2493,7 @@ function App() {
         onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
         onLogout={handleLogout}
         navItems={navDelRol}
+        conSoporte={usaSoporte(userRole)}
       >
         <>
           <AvisoGlobal
@@ -2837,8 +2845,9 @@ function App() {
                 establishment={establishment}
                 reservationGroups={reservationGroups}
                 reservationGroupsLoading={reservationGroupsLoading}
-                onViewReservationDetails={handleViewReservationDetails}
-                onOpenNewPoolPass={handleOpenNewPoolPass}
+                // El rol pileta solo mira la lista: sin alta ni detalle (pagos, editar, cancelar).
+                onViewReservationDetails={userRole === 'pileta' ? undefined : handleViewReservationDetails}
+                onOpenNewPoolPass={userRole === 'pileta' ? undefined : handleOpenNewPoolPass}
               />
             )}
           </div>

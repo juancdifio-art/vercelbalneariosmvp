@@ -265,6 +265,10 @@ module.exports = async (req, res) => {
     const remainingQuery = url.searchParams.toString();
 
     const normalizedRoute = routeParam.replace(/^\/+/, '').replace(/\/+$/, '');
+    // Una ruta con ? o # adentro (/api/reservation-groups%3F?service=pileta)
+    // armaria en req.url otra query distinta de la que mira el control de
+    // roles, y la lista saldria sin el filtro de pileta: esa ruta no existe.
+    if (/[?#]/.test(normalizedRoute)) return responder(res, 404, { error: 'not_found' });
     const path = normalizedRoute ? `/api/${normalizedRoute}` : '/api';
     req.url = remainingQuery ? `${path}?${remainingQuery}` : path;
 
@@ -286,7 +290,8 @@ module.exports = async (req, res) => {
       const quien = usuarioDelToken(req);
       if (quien) {
         const rol = (await db.query(permisos.CONSULTA_ROL, [quien.id])).rows[0]?.role;
-        if (!permisos.puede(rol, method, first)) return responder(res, 403, { error: 'sin_permiso' });
+        const detalle = { partes: segments.slice(2), servicio: url.searchParams.get('service') };
+        if (!permisos.puede(rol, method, first, detalle)) return responder(res, 403, { error: 'sin_permiso' });
       }
     }
 

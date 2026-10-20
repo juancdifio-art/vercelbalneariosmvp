@@ -32,6 +32,18 @@ beforeEach(() => {
   txMock.mockClear();
 });
 
+describe('el personal del balneario no usa el chat', () => {
+  it('un empleado o el de pileta reciben 403, sin leer ni escribir', async () => {
+    for (const role of ['operador', 'pileta']) {
+      soy({ role, atiende_soporte: false, establishment_id: 1 });
+      const res = await request(handler).get('/?route=soporte/mensajes').set('Authorization', token);
+      expect(res.status).toBe(403);
+      expect(res.body.error).toBe('solo_encargado');
+    }
+    expect(queryMock).toHaveBeenCalledTimes(2); // solo quien pide
+  });
+});
+
 describe('el establecimiento en /api/soporte', () => {
   it('lee su hilo y marca leidas las respuestas de soporte', async () => {
     soy(ENCARGADO);
